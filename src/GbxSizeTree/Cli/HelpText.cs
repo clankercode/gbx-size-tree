@@ -37,6 +37,8 @@ public static class HelpText
           --action LIST             Enable comma-separated actions; may be repeated
           --no-action LIST          Disable comma-separated actions; may be repeated
           --dry-run                 Plan optimization without writing output
+          --attribute               Measure each applied action's marginal savings
+                                    (replays the pipeline once per action)
           --experimental            Enable experimental optimizations
 
         General:

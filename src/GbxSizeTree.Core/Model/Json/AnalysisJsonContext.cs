@@ -14,6 +14,7 @@ namespace GbxSizeTree.Model.Json;
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(MapAnalysis))]
 [JsonSerializable(typeof(RecommendationReport))]
+[JsonSerializable(typeof(OptimizationSummary))]
 [JsonSerializable(typeof(JsonErrorEnvelope))]
 public sealed partial class AnalysisJsonContext : JsonSerializerContext;
 

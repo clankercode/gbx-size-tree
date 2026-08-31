@@ -20,7 +20,8 @@ public static class JsonReportWriter
     public static void Write(
         TextWriter stdout,
         MapAnalysis analysis,
-        RecommendationReport? recommendations)
+        RecommendationReport? recommendations,
+        Model.OptimizationSummary? optimization = null)
     {
         ArgumentNullException.ThrowIfNull(stdout);
         ArgumentNullException.ThrowIfNull(analysis);
@@ -39,6 +40,15 @@ public static class JsonReportWriter
                     writer,
                     recommendations,
                     AnalysisJsonContext.Default.RecommendationReport);
+            }
+
+            if (optimization is not null)
+            {
+                writer.WritePropertyName("optimization");
+                JsonSerializer.Serialize(
+                    writer,
+                    optimization,
+                    AnalysisJsonContext.Default.OptimizationSummary);
             }
 
             writer.WriteEndObject();

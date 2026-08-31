@@ -37,7 +37,7 @@ public static class ActionSelection
     }
 
     public static bool WantsOptimization(CliOptions options) =>
-        options.Optimize || options.StripLightmap || options.DryRun
+        options.Optimize || options.StripLightmap || options.DryRun || options.Attribute
         || options.Actions.Count > 0
         || !string.Equals(options.ThumbnailMode, "keep", StringComparison.OrdinalIgnoreCase);
 }

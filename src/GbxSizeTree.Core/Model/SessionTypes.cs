@@ -18,6 +18,19 @@ public sealed record MaterializedMap(
     ValidationReport Validation,
     TimeSpan Elapsed);
 
+/// <summary>One step of a marginal-savings attribution replay (cumulative, pipeline order).</summary>
+public sealed record AttributionRow(string Label, long FileBytes, long SavedBytes);
+
+/// <summary>Batch-mode outcome for the --json envelope: what was applied and what it bought.</summary>
+public sealed record OptimizationSummary(
+    IReadOnlyList<string> AppliedActionIds,
+    long BeforeBytes,
+    long AfterBytes,
+    long SavedBytes,
+    string? OutputPath,
+    double ElapsedSeconds,
+    IReadOnlyList<AttributionRow>? Attribution);
+
 public sealed record Recommendation(
     string? ActionId,
     string Title,

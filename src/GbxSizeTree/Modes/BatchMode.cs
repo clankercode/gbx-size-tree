@@ -119,12 +119,102 @@ public static class BatchMode
             return ExitCodes.IoError;
         }
 
+        IReadOnlyList<AttributionRow>? attribution = null;
+        if (options.Attribute)
+        {
+            attribution = ComputeAttribution(session, registry, sink);
+        }
+
+        var summary = new OptimizationSummary(
+            AppliedActionIds: session.Applied.Select(a => a.ActionId).ToArray(),
+            BeforeBytes: session.OriginalBytes.LongLength,
+            AfterBytes: materialized.FileBytes,
+            SavedBytes: session.OriginalBytes.LongLength - materialized.FileBytes,
+            OutputPath: outPath,
+            ElapsedSeconds: materialized.Elapsed.TotalSeconds,
+            Attribution: attribution);
+
         if (options.Json)
         {
-            JsonReportWriter.Write(Console.Out, session.Baseline, recommendations);
+            JsonReportWriter.Write(Console.Out, session.Baseline, recommendations, summary);
         }
         RenderDelta(console, session, materialized, outPath);
+        if (attribution is not null)
+        {
+            RenderAttribution(console, attribution);
+        }
         return ExitCodes.Ok;
+    }
+
+    /// <summary>
+    /// Replays cumulative prefixes of the applied set (pipeline order) to measure each
+    /// action's marginal contribution. The empty prefix is the pure LZO1x_999 recompression
+    /// baseline — every save recompresses, so that share exists even without `resave`.
+    /// Leaves the session back at the full applied set.
+    /// </summary>
+    internal static IReadOnlyList<AttributionRow> ComputeAttribution(
+        MapSession session, ActionRegistry registry, IStatusSink sink)
+    {
+        var requests = session.Applied.ToList();
+        var ordered = requests
+            .OrderBy(request => registry.Find(request.ActionId)?.Order ?? int.MaxValue)
+            .Where(request => request.ActionId != "resave")
+            .ToList();
+
+        var rows = new List<AttributionRow>();
+        var previous = session.OriginalBytes.LongLength;
+        session.Reset();
+
+        // An empty request set short-circuits to the original bytes (see MapSession), so the
+        // baseline needs the resave action applied for a real re-serialization to happen.
+        if (session.Apply("resave"))
+        {
+            using (sink.Activity("attributing: LZO1x_999 recompression baseline"))
+            {
+                var baseline = session.Materialize();
+                rows.Add(new AttributionRow(
+                    "recompression (LZO1x_999)", baseline.FileBytes, previous - baseline.FileBytes));
+                previous = baseline.FileBytes;
+            }
+        }
+
+        foreach (var request in ordered)
+        {
+            session.Apply(request.ActionId, request.Settings);
+            using (sink.Activity($"attributing: +{request.ActionId}"))
+            {
+                var step = session.Materialize();
+                rows.Add(new AttributionRow(request.ActionId, step.FileBytes, previous - step.FileBytes));
+                previous = step.FileBytes;
+            }
+        }
+
+        session.Reset();
+        foreach (var request in requests)
+        {
+            session.Apply(request.ActionId, request.Settings);
+        }
+
+        return rows;
+    }
+
+    private static void RenderAttribution(IAnsiConsole console, IReadOnlyList<AttributionRow> rows)
+    {
+        console.WriteLine();
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .Title("Attribution (marginal savings, pipeline order)")
+            .AddColumn("Step")
+            .AddColumn(new TableColumn("File size").RightAligned())
+            .AddColumn(new TableColumn("Saved").RightAligned());
+        foreach (var row in rows)
+        {
+            table.AddRow(
+                Markup.Escape(row.Label),
+                SizeFormat.ShortBytes(row.FileBytes),
+                SizeFormat.ShortBytes(row.SavedBytes));
+        }
+        console.Write(table);
     }
 
     private static void WriteError(IAnsiConsole console, CliOptions options, int code, string message)

@@ -22,6 +22,7 @@ public sealed record CliOptions
     public IReadOnlyList<string> Actions { get; init; } = Array.Empty<string>();
     public IReadOnlyList<string> NoActions { get; init; } = Array.Empty<string>();
     public bool DryRun { get; init; }
+    public bool Attribute { get; init; }
     public bool Experimental { get; init; }
     public bool Verbose { get; init; }
     public bool Quiet { get; init; }

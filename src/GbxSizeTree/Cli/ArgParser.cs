@@ -31,6 +31,7 @@ public static class ArgParser
         var actions = new List<string>();
         var noActions = new List<string>();
         var dryRun = false;
+        var attribute = false;
         var experimental = false;
         var verbose = false;
         var quiet = false;
@@ -143,6 +144,9 @@ public static class ArgParser
                 case "--dry-run":
                     dryRun = true;
                     break;
+                case "--attribute":
+                    attribute = true;
+                    break;
                 case "--experimental":
                     experimental = true;
                     break;
@@ -216,6 +220,7 @@ public static class ArgParser
             Actions = actions.ToArray(),
             NoActions = noActions.ToArray(),
             DryRun = dryRun,
+            Attribute = attribute,
             Experimental = experimental,
             Verbose = verbose,
             Quiet = quiet,
