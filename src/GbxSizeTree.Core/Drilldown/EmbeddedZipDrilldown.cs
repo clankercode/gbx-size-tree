@@ -1,6 +1,8 @@
 using System.IO.Compression;
+using GBX.NET;
 using GBX.NET.Engines.Game;
 using GbxSizeTree.Abstractions;
+using GbxSizeTree.Container;
 using GbxSizeTree.Model;
 
 namespace GbxSizeTree.Drilldown;
@@ -27,8 +29,11 @@ public sealed class EmbeddedZipDrilldown : IEmbeddedZipDrilldown
         var vertexCountBudget = EmbeddedItemVertexCounter.TotalLimit;
 
         using var archive = map.OpenReadEmbeddedZipData();
-        foreach (var entry in archive.Entries)
+        var expectedModels = EmbeddedItemIdentityPreserver.AlignExpectedModels(
+            archive.Entries, map.ExpectedEmbeddedItemModels);
+        for (var entryIndex = 0; entryIndex < archive.Entries.Count; entryIndex++)
         {
+            var entry = archive.Entries[entryIndex];
             var isGbx = entry.FullName.EndsWith(".gbx", StringComparison.OrdinalIgnoreCase);
             var isItem = entry.FullName.EndsWith(".Item.Gbx", StringComparison.OrdinalIgnoreCase);
             EmbeddedItemVertexCounter.Result? vertices = null;
@@ -48,7 +53,7 @@ public sealed class EmbeddedZipDrilldown : IEmbeddedZipDrilldown
                 IsGbx: isGbx,
                 HasCompressedGbxBody: isGbx && HasCompressedGbxBody(entry),
                 RecompressibleSavingsEstimate: isGbx ? null : 0,
-                IsReferenced: IsReferenced(entry.FullName, referenceSet),
+                IsReferenced: IsReferenced(entry.FullName, referenceSet, expectedModels[entryIndex]),
                 VertexCount: vertices?.Count,
                 VertexCountEstimated: vertices?.Estimated ?? false));
         }
@@ -100,8 +105,16 @@ public sealed class EmbeddedZipDrilldown : IEmbeddedZipDrilldown
         }
     }
 
-    private static bool IsReferenced(string path, HashSet<string> referencedIdents)
+    private static bool IsReferenced(
+        string path,
+        HashSet<string> referencedIdents,
+        Ident? expectedModel)
     {
+        if (expectedModel is { } model && referencedIdents.Contains(model.Id))
+        {
+            return true;
+        }
+
         var fileName = Path.GetFileName(path);
         var stem = Path.GetFileNameWithoutExtension(fileName);
         if (string.IsNullOrEmpty(fileName) || string.IsNullOrEmpty(stem))

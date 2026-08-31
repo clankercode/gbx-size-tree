@@ -22,6 +22,15 @@ public static class OutputValidator
         IReadOnlyList<IMapAction> appliedActions,
         IReadOnlyDictionary<string, string> settings,
         out MapFacts after)
+        => Validate(before, producedBytes, appliedActions, settings, null, out after);
+
+    public static ValidationReport Validate(
+        MapFacts before,
+        byte[] producedBytes,
+        IReadOnlyList<IMapAction> appliedActions,
+        IReadOnlyDictionary<string, string> settings,
+        IReadOnlyList<Ident>? expectedEmbeddedItemModels,
+        out MapFacts after)
     {
         ArgumentNullException.ThrowIfNull(before);
         ArgumentNullException.ThrowIfNull(producedBytes);
@@ -35,6 +44,17 @@ public static class OutputValidator
             using var stream = new MemoryStream(producedBytes, writable: false);
             var map = Gbx.Parse<CGameCtnChallenge>(stream).Node;
             after = FactsFrom(map, producedBytes);
+
+            if (expectedEmbeddedItemModels is not null
+                && !expectedEmbeddedItemModels.SequenceEqual(map.ExpectedEmbeddedItemModels ?? []))
+            {
+                return new ValidationReport(false,
+                [
+                    new ValidationIssue(
+                        "embedded-item-identities",
+                        "Produced map changed the ordered embedded item identity mapping."),
+                ]);
+            }
         }
         catch (Exception ex)
         {

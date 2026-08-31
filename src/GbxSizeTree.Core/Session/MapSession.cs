@@ -3,6 +3,7 @@ using GBX.NET;
 using GBX.NET.Engines.Game;
 using GbxSizeTree.Abstractions;
 using GbxSizeTree.Actions;
+using GbxSizeTree.Container;
 using GbxSizeTree.Model;
 
 namespace GbxSizeTree.Session;
@@ -131,6 +132,7 @@ public sealed class MapSession
         using var input = new MemoryStream(OriginalBytes, writable: false);
         var gbx = Gbx.Parse<CGameCtnChallenge>(input);
         var map = gbx.Node;
+        var embeddedIdentities = EmbeddedItemIdentityPreserver.Capture(OriginalBytes);
 
         var ordered = requests.OrderBy(r => r.Action.Order).ToList();
         foreach (var (action, request) in ordered)
@@ -139,6 +141,8 @@ public sealed class MapSession
             var outcome = action.Apply(ctx);
             status.Info($"{action.Id}: {outcome.Summary}");
         }
+
+        var expectedEmbeddedModels = EmbeddedItemIdentityPreserver.PrepareForSave(map, embeddedIdentities);
 
         using var output = new MemoryStream();
         gbx.Save(output);
@@ -156,7 +160,8 @@ public sealed class MapSession
             }
         }
         var validation = OutputValidator.Validate(
-            Baseline.Facts!, bytes, ordered.Select(r => r.Action).ToList(), mergedSettings, out _);
+            Baseline.Facts!, bytes, ordered.Select(r => r.Action).ToList(), mergedSettings,
+            expectedEmbeddedModels, out _);
 
         cache = new MaterializedMap(bytes, bytes.LongLength, analysis, validation, sw.Elapsed);
         return cache;
