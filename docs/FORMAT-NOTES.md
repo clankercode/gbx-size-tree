@@ -135,6 +135,13 @@ Online-play limit ≈ 7,168 KiB (7,340,032 B) — the sample exceeds it by ~481 
 
 ## Embedded-items optimization (gbx-io-proven)
 
+**Empirical finding (sample map, 2026-09-01):** every embedded `.gbx` in the sample's zip already
+has an UNCOMPRESSED body (`GBX v6 'B' 'U' 'U'`) — TM2020 itself embeds items with decompressed
+bodies. So the decompress-inner-bodies step is a no-op for game-embedded items (still needed for
+items embedded by other tools); the realistic wins here are max-level re-deflate of the zip and
+orphan removal. Detection of 'C' bodies must still exist and be tested synthetically.
+
+
 For each `*.gbx`/`*.Gbx` zip entry: `Gbx.Decompress` its body ('C'→'U'), then re-zip everything
 Deflate level 9 (LZO'd bodies are high-entropy and defeat deflate; raw bodies deflate well).
 Handle the "got bigger" case by keeping the original. The game accepts uncompressed-body gbx
