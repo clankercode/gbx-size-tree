@@ -13,6 +13,10 @@
     <SelfContained>true</SelfContained>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <!-- ~16.9 MB vs ~41 MB untrimmed, zero trim warnings; release smokes must compare
+         report output and optimized-file hashes against expectations before shipping.
+         Override with -p:PublishTrimmed=false if a trim regression is suspected. -->
+    <PublishTrimmed Condition="'$(PublishTrimmed)' == ''">true</PublishTrimmed>
   </PropertyGroup>
 
   <ItemGroup>
