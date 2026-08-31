@@ -45,9 +45,11 @@ public static class FakeAnalysis
             Entries:
             [
                 new EmbeddedEntryInfo("Items/A.Item.Gbx", 2_000, 4_000, "Deflate",
-                    IsGbx: true, HasCompressedGbxBody: true, RecompressibleSavingsEstimate: 500, IsReferenced: true),
+                    IsGbx: true, HasCompressedGbxBody: true, RecompressibleSavingsEstimate: 500,
+                    IsReferenced: true, VertexCount: 1_234, VertexCountEstimated: false),
                 new EmbeddedEntryInfo("Items/Orphan.Item.Gbx", 1_000, 2_000, "Deflate",
-                    IsGbx: true, HasCompressedGbxBody: false, RecompressibleSavingsEstimate: null, IsReferenced: false),
+                    IsGbx: true, HasCompressedGbxBody: false, RecompressibleSavingsEstimate: null,
+                    IsReferenced: false, VertexCount: null, VertexCountEstimated: false),
             ],
             ReferencedIdents: ["A"]);
 

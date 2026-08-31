@@ -27,6 +27,59 @@ public class LaunchModeDetectorTests
         Assert.Equal(expected, LaunchModeDetector.Detect(probe));
 
     [Fact]
+    public void ShouldStartInteractive_NormalTerminalDefaultsToTui()
+    {
+        Assert.True(LaunchModeDetector.ShouldStartInteractive(
+            Probe(), explicitlyRequested: false, disabled: false, json: false,
+            reportOnly: false, wantsOptimization: false));
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void ShouldStartInteractive_RedirectedTerminalNeverStartsTui(
+        bool stdinRedirected,
+        bool stdoutRedirected)
+    {
+        var probe = Probe(stdinRedirected: stdinRedirected, stdoutRedirected: stdoutRedirected);
+
+        Assert.False(LaunchModeDetector.ShouldStartInteractive(
+            probe, explicitlyRequested: true, disabled: false, json: false,
+            reportOnly: false, wantsOptimization: false));
+    }
+
+    [Fact]
+    public void ShouldStartInteractive_DumbTerminalNeverStartsTui()
+    {
+        Assert.False(LaunchModeDetector.ShouldStartInteractive(
+            Probe(terminalType: "dumb"),
+            explicitlyRequested: true,
+            disabled: false,
+            json: false,
+            reportOnly: false,
+            wantsOptimization: false));
+    }
+
+    [Theory]
+    [InlineData(false, true, false, false, false)]
+    [InlineData(false, false, true, false, false)]
+    [InlineData(false, false, false, true, false)]
+    [InlineData(false, false, false, false, true)]
+    [InlineData(true, false, false, true, true)]
+    public void ShouldStartInteractive_RespectsModeFlags(
+        bool explicitlyRequested,
+        bool disabled,
+        bool json,
+        bool reportOnly,
+        bool wantsOptimization)
+    {
+        Assert.Equal(
+            explicitlyRequested && !disabled && !json,
+            LaunchModeDetector.ShouldStartInteractive(
+                Probe(), explicitlyRequested, disabled, json, reportOnly, wantsOptimization));
+    }
+
+    [Fact]
     public void ConsoleOwnership_OnNonWindows_ReturnsNull()
     {
         if (OperatingSystem.IsWindows())
@@ -51,12 +104,14 @@ public class LaunchModeDetectorTests
         bool stdinRedirected = false,
         bool stdoutRedirected = false,
         bool hasGuiDisplay = false,
-        string? forceGuiEnv = null) =>
+        string? forceGuiEnv = null,
+        string? terminalType = null) =>
         new(
             isWindows,
             consoleProcessCount,
             stdinRedirected,
             stdoutRedirected,
             hasGuiDisplay,
-            forceGuiEnv);
+            forceGuiEnv,
+            terminalType);
 }

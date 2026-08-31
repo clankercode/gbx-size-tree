@@ -98,6 +98,7 @@ public static class ArgParser
                 case "--interactive":
                     interactive = true;
                     break;
+                case "-n":
                 case "--non-interactive":
                     nonInteractive = true;
                     break;

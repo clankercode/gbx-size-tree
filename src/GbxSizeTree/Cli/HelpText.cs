@@ -26,8 +26,8 @@ public static class HelpText
           --json                    Write the analysis as JSON
           --color                   Always use color
           --no-color                Never use color
-          -i, --interactive         Open the interactive interface
-          --non-interactive         Disable automatic interactive mode
+          -i, --interactive         Explicitly open the interactive interface
+          -n, --non-interactive     Show the report instead of the automatic TUI
 
         Optimization:
           -O, --optimize            Optimize the map
@@ -56,12 +56,14 @@ public static class HelpText
 
         Examples:
           gbx-size-tree MyMap.Map.Gbx
+          gbx-size-tree -n MyMap.Map.Gbx
           gbx-size-tree --top 50 --estimate-compressed MyMap.Map.Gbx
           gbx-size-tree -O --strip-lightmap -o Smaller.Map.Gbx MyMap.Map.Gbx
           gbx-size-tree --lighten-shadows 100 -o Lighter.Map.Gbx MyMap.Map.Gbx
           gbx-size-tree --action embed-zip,thumbnail --thumbnail recompress:80 MyMap.Map.Gbx
 
-        Double-click launches open a file picker and starts interactive mode.
+        A map opened in an interactive terminal starts the TUI. Redirected output and
+        -n/--non-interactive use report mode. Double-click launches open a file picker.
         """;
 
     /// <summary>

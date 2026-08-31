@@ -86,7 +86,9 @@
             "isGbx": true,
             "hasCompressedGbxBody": true,
             "recompressibleSavingsEstimate": 500,
-            "isReferenced": true
+            "isReferenced": true,
+            "vertexCount": 1234,
+            "vertexCountEstimated": false
           },
           {
             "path": "Items/Orphan.Item.Gbx",
@@ -95,7 +97,8 @@
             "method": "Deflate",
             "isGbx": true,
             "hasCompressedGbxBody": false,
-            "isReferenced": false
+            "isReferenced": false,
+            "vertexCountEstimated": false
           }
         ],
         "referencedIdents": [

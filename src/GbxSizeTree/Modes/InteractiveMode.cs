@@ -18,7 +18,7 @@ public static class InteractiveMode
 {
     public static int Run(string inputPath, CliOptions options, ActionRegistry registry)
     {
-        var console = ReportMode.BuildConsole(options);
+        var console = ReportMode.BuildInteractiveConsole(options);
         if (!console.Profile.Capabilities.Interactive)
         {
             Console.Error.WriteLine("note: no interactive terminal detected — showing the report instead.");

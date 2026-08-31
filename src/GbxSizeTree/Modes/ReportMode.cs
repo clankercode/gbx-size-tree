@@ -107,4 +107,19 @@ public static class ReportMode
                 : ColorSystemSupport.Detect,
         });
     }
+
+    /// <summary>
+    /// Builds the prompt console after launch routing has established that a real terminal is
+    /// attached. ANSI remains enabled for cursor control even when colors are disabled.
+    /// </summary>
+    public static IAnsiConsole BuildInteractiveConsole(CliOptions options, TextWriter? output = null) =>
+        AnsiConsole.Create(new AnsiConsoleSettings
+        {
+            Out = new AnsiConsoleOutput(output ?? Console.Out),
+            Ansi = AnsiSupport.Yes,
+            ColorSystem = options.Color == false
+                ? ColorSystemSupport.NoColors
+                : ColorSystemSupport.Detect,
+            Interactive = InteractionSupport.Yes,
+        });
 }

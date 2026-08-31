@@ -24,8 +24,9 @@ never suggested when a lossless pass suffices).
 - **Lightmap diagnostics** — WebP images, compressed mapping cache, framing overhead, frame
   sizes, and VP8/VP8L/VP8X resolutions. Mixed and partially unreadable resolutions are called
   out explicitly.
-- **Detailed size tree and drilldowns** — header/body chunks, embedded ZIP entries, element
-  counts, confidence markers, residual bytes, and optional complete or unknown-only chunk views.
+- **Detailed size tree and drilldowns** — header/body chunks, embedded ZIP entries with usage
+  and vertex counts, element counts, confidence markers, residual bytes, and optional complete
+  or unknown-only chunk views. Recovered counts for legacy items are prefixed with `~`.
 - **Measured lossless optimization** — trial resave, orphaned-embed removal, embedded-ZIP
   recompression, and exact post-save validation. `--attribute` measures each action's marginal
   contribution.
@@ -38,8 +39,9 @@ never suggested when a lossless pass suffices).
 ## Usage
 
 ```
-gbx-size-tree <file.Map.Gbx>              # full diagnostic tree + recommendations
-gbx-size-tree <file.Map.Gbx> -i           # interactive: pick actions, re-measure, save
+gbx-size-tree <file.Map.Gbx>              # interactive TUI: inspect, pick actions, save
+gbx-size-tree <file.Map.Gbx> -n           # report only (--non-interactive)
+gbx-size-tree <file.Map.Gbx> -i           # explicitly request the interactive TUI
 gbx-size-tree <file.Map.Gbx> --optimize   # apply all lossless actions, write output
 gbx-size-tree <file.Map.Gbx> --json       # machine-readable report
 gbx-size-tree <file.Map.Gbx> -O --attribute  # optimize + per-action savings breakdown
@@ -49,6 +51,7 @@ gbx-size-tree <file.Map.Gbx> --unknown-chunks  # unknown-chunk debugging view
 
 Double-clicking the exe (Windows/Wine) opens a file picker (defaults to your
 `Documents/Trackmania/Maps`) and an interactive session, and pauses before closing.
+When stdin or stdout is redirected, the CLI stays non-interactive automatically.
 
 ### Optimization and visual-edit examples
 

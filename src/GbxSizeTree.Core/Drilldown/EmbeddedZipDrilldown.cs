@@ -24,11 +24,21 @@ public sealed class EmbeddedZipDrilldown : IEmbeddedZipDrilldown
         var referenceSet = new HashSet<string>(referencedIdents, StringComparer.OrdinalIgnoreCase);
         var entries = new List<EmbeddedEntryInfo>();
         long entriesUncompressedBytes = 0;
+        var vertexCountBudget = EmbeddedItemVertexCounter.TotalLimit;
 
         using var archive = map.OpenReadEmbeddedZipData();
         foreach (var entry in archive.Entries)
         {
             var isGbx = entry.FullName.EndsWith(".gbx", StringComparison.OrdinalIgnoreCase);
+            var isItem = entry.FullName.EndsWith(".Item.Gbx", StringComparison.OrdinalIgnoreCase);
+            EmbeddedItemVertexCounter.Result? vertices = null;
+            if (isItem
+                && entry.Length <= EmbeddedItemVertexCounter.EntryLimit
+                && entry.Length <= vertexCountBudget)
+            {
+                vertexCountBudget -= entry.Length;
+                vertices = EmbeddedItemVertexCounter.TryCount(entry);
+            }
             entriesUncompressedBytes += entry.Length;
             entries.Add(new EmbeddedEntryInfo(
                 Path: entry.FullName,
@@ -38,7 +48,9 @@ public sealed class EmbeddedZipDrilldown : IEmbeddedZipDrilldown
                 IsGbx: isGbx,
                 HasCompressedGbxBody: isGbx && HasCompressedGbxBody(entry),
                 RecompressibleSavingsEstimate: isGbx ? null : 0,
-                IsReferenced: IsReferenced(entry.FullName, referenceSet)));
+                IsReferenced: IsReferenced(entry.FullName, referenceSet),
+                VertexCount: vertices?.Count,
+                VertexCountEstimated: vertices?.Estimated ?? false));
         }
 
         return new EmbeddedZipInfo(
@@ -145,4 +157,5 @@ public sealed class EmbeddedZipDrilldown : IEmbeddedZipDrilldown
             && prefix[2] == (byte)'X'
             && prefix[7] == (byte)'C';
     }
+
 }

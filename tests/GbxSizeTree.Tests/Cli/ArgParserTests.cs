@@ -13,6 +13,7 @@ public class ArgParserTests
     [InlineData("--no-color", nameof(CliOptions.Color), "False")]
     [InlineData("--interactive", nameof(CliOptions.Interactive), "True")]
     [InlineData("-i", nameof(CliOptions.Interactive), "True")]
+    [InlineData("-n", nameof(CliOptions.NonInteractive), "True")]
     [InlineData("--non-interactive", nameof(CliOptions.NonInteractive), "True")]
     [InlineData("--optimize", nameof(CliOptions.Optimize), "True")]
     [InlineData("-O", nameof(CliOptions.Optimize), "True")]
@@ -155,6 +156,7 @@ public class ArgParserTests
 
     [Theory]
     [InlineData("--json", "-i")]
+    [InlineData("-i", "-n")]
     [InlineData("-i", "--non-interactive")]
     [InlineData("-q", "-v")]
     public void Parse_ConflictingFlagsAreRejected(string first, string second)

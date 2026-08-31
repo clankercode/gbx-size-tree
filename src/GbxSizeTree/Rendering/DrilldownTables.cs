@@ -92,7 +92,8 @@ public static class DrilldownTables
             return;
         }
 
-        var table = NewTable("Embedded ZIP entries", "Path", "Compressed", "Uncompressed", "Method", "Referenced");
+        var table = NewTable(
+            "Embedded ZIP entries", "Path", "Compressed", "Uncompressed", "Vertices", "Method", "Used");
         var entries = zip.Entries
             .OrderByDescending(entry => entry.CompressedBytes)
             .ThenBy(entry => entry.Path, StringComparer.Ordinal)
@@ -103,6 +104,7 @@ public static class DrilldownTables
                 Markup.Escape(entry.Path),
                 SizeFormat.ShortBytes(entry.CompressedBytes),
                 SizeFormat.ShortBytes(entry.UncompressedBytes),
+                FormatVertexCount(entry),
                 Markup.Escape(entry.Method),
                 entry.IsReferenced ? "yes" : "no");
         }
@@ -114,6 +116,17 @@ public static class DrilldownTables
         }
 
         console.Write(table);
+    }
+
+    private static string FormatVertexCount(EmbeddedEntryInfo entry)
+    {
+        if (entry.VertexCount is not { } count)
+        {
+            return "—";
+        }
+
+        var formatted = count.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
+        return entry.VertexCountEstimated ? $"~{formatted}" : formatted;
     }
 
     private static void RenderLightmapFrames(IAnsiConsole console, LightmapInfo? lightmap)

@@ -14,7 +14,9 @@ public sealed record EmbeddedEntryInfo(
     bool IsGbx,
     bool HasCompressedGbxBody,
     long? RecompressibleSavingsEstimate,
-    bool IsReferenced);
+    bool IsReferenced,
+    int? VertexCount,
+    bool VertexCountEstimated);
 
 public sealed record LightmapInfo(
     bool HasLightmaps,

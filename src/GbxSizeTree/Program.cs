@@ -74,15 +74,23 @@ try
         }
         else
         {
-            var automaticInteractive = launchKind == LaunchKind.GuiOwnConsole
-                && !options.NonInteractive
-                && !options.Json
-                && !ActionSelection.WantsOptimization(options);
-            if (options.Interactive || automaticInteractive)
+            var wantsOptimization = ActionSelection.WantsOptimization(options);
+            var reportOnly = options.HeaderOnly
+                || options.EstimateCompressed
+                || options.AllChunks
+                || options.UnknownChunks;
+            var startInteractive = LaunchModeDetector.ShouldStartInteractive(
+                probe,
+                explicitlyRequested: options.Interactive,
+                disabled: options.NonInteractive,
+                json: options.Json,
+                reportOnly: reportOnly,
+                wantsOptimization: wantsOptimization);
+            if (startInteractive)
             {
                 exitCode = InteractiveMode.Run(input, options, registry);
             }
-            else if (ActionSelection.WantsOptimization(options))
+            else if (!options.Interactive && wantsOptimization)
             {
                 exitCode = BatchMode.Run(input, options, registry);
             }

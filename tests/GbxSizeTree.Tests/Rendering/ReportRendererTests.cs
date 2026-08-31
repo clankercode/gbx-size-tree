@@ -35,6 +35,10 @@ public sealed class ReportRendererTests
             console.Output.Split("12,000 B", StringSplitOptions.None).Length >= 3,
             "The title and category reconciliation should show the exact file size.");
         Assert.Contains("Blocks", console.Output);
+        Assert.Contains("Vertices", console.Output);
+        Assert.Contains("1,234", console.Output);
+        Assert.Contains("Used", console.Output);
+        Assert.DoesNotContain("Referenced", console.Output);
 
         var categoryIndex = console.Output.IndexOf("On-disk contribution by category", StringComparison.Ordinal);
         var lightmapIndex = console.Output.IndexOf("Lightmap breakdown", StringComparison.Ordinal);
@@ -125,6 +129,32 @@ public sealed class ReportRendererTests
 
         Assert.Contains("1 frame · mixed resolutions · partly unknown", console.Output);
         Assert.Contains("512×512 / 256×256 / —", console.Output);
+    }
+
+    [Fact]
+    public void FullReport_MarksRecoveredVertexCountsAsEstimated()
+    {
+        var console = new TestConsole().Width(120);
+        var analysis = FakeAnalysis.Build();
+        var zip = analysis.Body!.EmbeddedZip!;
+        analysis = analysis with
+        {
+            Body = analysis.Body with
+            {
+                EmbeddedZip = zip with
+                {
+                    Entries = zip.Entries
+                        .Select((entry, index) => index == 0
+                            ? entry with { VertexCountEstimated = true }
+                            : entry)
+                        .ToArray(),
+                },
+            },
+        };
+
+        ReportRenderer.Render(console, analysis, topN: 10);
+
+        Assert.Contains("~1,234", console.Output);
     }
 
     [Theory]
