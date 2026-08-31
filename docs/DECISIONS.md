@@ -48,6 +48,12 @@
 - `just package` (local zips) and `just release X.Y.Z` (bump+tag, RELEASE.md flow) both
   refuse a dirty worktree — a stale HEAD hash was once stamped into shipped binaries when
   zips were built before the commit.
+- **ChunkCatalog covers all 18 small body chunks** after Max's 2026-09-01 Ghidra pass over
+  `CGameCtnChallenge_SerializeChunk` (table in FORMAT-NOTES.md; full layouts in his private
+  notes). Ghidra overrides GBX.NET naming where they conflict: 0x018 is not laps in TM2020,
+  0x036 is medal times + comments (not a thumbnail camera), and 0x05D — the former 5,357 B
+  reverse-engineering candidate — is a sparse 3D byte octree over the block grid.
+  `--unknown-chunks` reports 0 on the sample; the debug view stays for out-of-set ids.
 
 ## Test stack gotchas (xunit v3 + .NET 10)
 

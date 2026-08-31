@@ -19,7 +19,8 @@ Initial release.
   are measured by a background trial resave started at file-read.
 - `--attribute` per-action marginal savings; `--all-chunks` full chunk table;
   `--unknown-chunks` debug view for ids missing from the chunk catalog; `--json`
-  machine-readable envelope (camelCase).
+  machine-readable envelope (camelCase). The catalog names every TM2020 body chunk,
+  including the 18 small ones verified via Ghidra against the game's serializer.
 - Windows/Wine double-click UX: file picker (Documents/Trackmania/Maps), interactive
   session, pause-before-close; trimmed self-contained single-file binaries for
   linux-x64 and win-x64 (~16/14 MB).

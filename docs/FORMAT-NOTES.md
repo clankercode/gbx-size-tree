@@ -75,16 +75,35 @@ Body (S = skippable):
 | 0x03043069 | S | macroblock indexes: i32 per block + item, then id/flags pairs |
 | 0x0304306C | S | color palette |
 
-### Unknown even to GBX.NET 2.4.4 (kept OUT of ChunkCatalog so `--unknown-chunks` surfaces them)
+### Small body chunks — Ghidra-verified (2026-09-01)
 
-Verified against the package's XML docs 2026-09-01: GBX.NET parses these as bare `U01`/`Ignore`
-data with no semantic name. Sample-map sizes in parentheses.
+All 18 small body chunks on a current-map dump, identified from Max's Ghidra pass over
+`Trackmania.exe`'s `CGameCtnChallenge_SerializeChunk` (private notes:
+`~/src/openplanet/research-priv/2026-09-01-MapGbxBodyChunks-Focused.md` — wire layouts,
+struct offsets, helper addresses). Sizes are from that dump (matches the sample map).
+Every one is now in `ChunkCatalog`, so `--unknown-chunks` reports 0 here; the debug view
+remains for ids outside this set. Skippable framing overhead is 12 B (`id + 'SKIP' + len`).
 
-- 0x03043022 inline (8 B, a single i32 — observed value 1); 0x0304304F S (17 B);
-  0x03043057 S (20 B); 0x0304305A S (20 B); 0x0304305E S (32 B); 0x03043060 S (20 B);
-  0x03043061 S (32 B); 0x03043064 S (28 B, GBX.NET hints "MT groups?").
-- **0x0304305D S (5,357 B on the sample — the only sizeable one, sits right after the
-  lightmap chunk).** Worth reversing if it grows on other maps.
+| Id | S | Sample B | Meaning (Ghidra) |
+|---|---|---|---|
+| 0x0304300D | no | 20 | player-model (vehicle) ident triple; body's first TaggedId also emits the archive codec version u32 |
+| 0x03043018 | S | 20 | two u32s; GBX.NET says "laps" but TM2020 semantics unproven (laps live in 0x036's group) |
+| 0x03043019 | S | 53 | ModPackDesc (texture mod), V3 resource ref |
+| 0x03043022 | no | 8 | map flags u32 (DecoBaseHeightOffset = word − 4) |
+| 0x03043024 | no | 45 | CustomMusicPackDesc, V3 resource ref |
+| 0x03043025 | no | 20 | MapCoordOrigin + MapCoordTarget (2 × vec2) |
+| 0x03043029 | S | 32 | password raw16 + CRC32 over hex+MapUid string; reader tolerates a mismatch (resets to {1,0}) |
+| 0x03043034 | S | 16 | length-prefixed byte buffer, empty (GBX.NET: decals) |
+| 0x03043036 | S | 60 | **medal times + comments**: TMObjective author/gold/silver/bronze, NbLaps, IsLapRace, 5 more u32s, Comments string — NOT the "realtime thumbnail camera" GBX.NET names |
+| 0x0304303E | S | 24 | CarMarksBuffer v10 nod-ref list, empty |
+| 0x0304304F | S | 17 | v3 + one byte; unidentified |
+| 0x03043057 | S | 20 | v5 record list (index + Vec3 polyline + Vec4s + ident) — path-like; empty |
+| 0x0304305A | S | 20 | nested-challenge grid (sub-maps); empty read paints the XZ grid 0xFF |
+| 0x0304305D | S | 5,357 | **sparse 3D byte octree** over the block grid (terrain/occupancy-style; only nonzero cells become leaves). Wire: root extent, dims XYZ, record count, then per record parent index + (leaf u8 \| 8 child indices). The only sizeable one |
+| 0x0304305E | S | 32 | legacy macroblock list stub — writer always emits empty, reader discards |
+| 0x03043060 | S | 20 | v0 + one u32; unidentified |
+| 0x03043061 | S | 32 | write-side snapshot (u32 + u32[] + bytes + u32) — reader clears it, does not survive load |
+| 0x03043064 | S | 28 | always-empty CGameCtnMediaClipGroup list stub |
 
 ## Lightmap chunk 0x0304305B (TM2020) — layout VERIFIED on-disk 2026-09-01
 

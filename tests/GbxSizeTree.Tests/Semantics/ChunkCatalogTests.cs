@@ -15,6 +15,7 @@ public sealed class ChunkCatalogTests
     [InlineData(0x03043008u, SizeCategory.Metadata, false, false)]
     [InlineData(0x03043011u, SizeCategory.Metadata, false, false)]
     [InlineData(0x0304301Fu, SizeCategory.Blocks, false, false)]
+    [InlineData(0x03043022u, SizeCategory.Metadata, false, false)]
     [InlineData(0x0304302Au, SizeCategory.Metadata, false, false)]
     [InlineData(0x03043040u, SizeCategory.Items, true, true)]
     [InlineData(0x03043042u, SizeCategory.Metadata, true, false)]
@@ -32,6 +33,8 @@ public sealed class ChunkCatalogTests
     [InlineData(0x03043056u, SizeCategory.Metadata, true, false)]
     [InlineData(0x03043059u, SizeCategory.Metadata, true, false)]
     [InlineData(0x0304305Bu, SizeCategory.Lightmap, true, false)]
+    [InlineData(0x0304305Du, SizeCategory.Other, true, false)]
+    [InlineData(0x0304305Eu, SizeCategory.Metadata, true, false)]
     [InlineData(0x0304305Fu, SizeCategory.FreeBlocks, true, false)]
     [InlineData(0x03043062u, SizeCategory.PerElementArrays, true, false)]
     [InlineData(0x03043063u, SizeCategory.PerElementArrays, true, false)]
@@ -60,19 +63,19 @@ public sealed class ChunkCatalogTests
         uint[] ids =
         [
             0x03043002, 0x03043003, 0x03043004, 0x03043005, 0x03043007, 0x03043008,
-            0x0304300D, 0x03043011, 0x03043018, 0x03043019, 0x0304301F, 0x03043024,
-            0x03043025, 0x03043029, 0x0304302A, 0x03043034, 0x03043036, 0x0304303E,
-            0x03043040, 0x03043042, 0x03043043,
-            0x03043044, 0x03043048, 0x03043049, 0x0304304B, 0x03043050, 0x03043051,
-            0x03043052, 0x03043053, 0x03043054, 0x03043055, 0x03043056, 0x03043059,
-            0x0304305B, 0x0304305F, 0x03043062, 0x03043063, 0x03043065, 0x03043067,
-            0x03043068, 0x03043069, 0x0304306B, 0x0304306C,
+            0x0304300D, 0x03043011, 0x03043018, 0x03043019, 0x0304301F, 0x03043022,
+            0x03043024, 0x03043025, 0x03043029, 0x0304302A, 0x03043034, 0x03043036,
+            0x0304303E, 0x03043040, 0x03043042, 0x03043043,
+            0x03043044, 0x03043048, 0x03043049, 0x0304304B, 0x0304304F, 0x03043050,
+            0x03043051, 0x03043052, 0x03043053, 0x03043054, 0x03043055, 0x03043056,
+            0x03043057, 0x03043059, 0x0304305A, 0x0304305B, 0x0304305D, 0x0304305E,
+            0x0304305F, 0x03043060, 0x03043061, 0x03043062, 0x03043063, 0x03043064,
+            0x03043065, 0x03043067, 0x03043068, 0x03043069, 0x0304306B, 0x0304306C,
         ];
 
-        // Deliberately NOT cataloged (unknown even to GBX.NET 2.4.4; --unknown-chunks
-        // must keep surfacing them): 0x022, 0x04F, 0x057, 0x05A, 0x05D, 0x05E, 0x060,
-        // 0x061, 0x064. See docs/FORMAT-NOTES.md.
-        Assert.False(ChunkCatalog.IsKnown(0x0304305D));
+        // All 18 small body chunks from the 2026-09-01 Ghidra pass are cataloged
+        // (docs/FORMAT-NOTES.md); --unknown-chunks now reports 0 on the sample map.
+        Assert.True(ChunkCatalog.IsKnown(0x0304305D));
 
         Assert.Equal(ids.Length, ChunkCatalog.All.Count);
         Assert.All(ids, id => Assert.Contains(ChunkCatalog.All, chunk => chunk.Id == id));
