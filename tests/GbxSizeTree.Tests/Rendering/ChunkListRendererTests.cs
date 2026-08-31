@@ -21,6 +21,29 @@ public sealed class ChunkListRendererTests
         Assert.Contains("0x0304305B", output, StringComparison.Ordinal);
         Assert.Contains("0x03043054", output, StringComparison.Ordinal);
         Assert.Contains("skippable", output, StringComparison.Ordinal);
+        Assert.Contains("Optional", output, StringComparison.Ordinal);
+        Assert.Contains("✗", output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RenderAll_MarksVerifiedDiscardOnLoadChunksOptional()
+    {
+        var console = new TestConsole().Width(140);
+        var analysis = FakeAnalysis.Build();
+        var body = analysis.Body!;
+        analysis = analysis with
+        {
+            Body = body with
+            {
+                Chunks = body.Chunks.Append(new BodyChunkInfo(
+                    0x03043061, "Write-only snapshot", SizeCategory.Metadata, "snapshot", 32,
+                    SizeConfidence.ExactOnDisk, BodyOffset: 9_450, Skippable: true, Order: 3)).ToList(),
+            },
+        };
+
+        ChunkListRenderer.RenderAll(console, analysis);
+
+        Assert.Contains("✓", console.Output, StringComparison.Ordinal);
     }
 
     [Fact]

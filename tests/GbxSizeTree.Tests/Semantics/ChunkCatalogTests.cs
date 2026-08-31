@@ -77,6 +77,11 @@ public sealed class ChunkCatalogTests
         // (docs/FORMAT-NOTES.md); --unknown-chunks now reports 0 on the sample map.
         Assert.True(ChunkCatalog.IsKnown(0x0304305D));
 
+        // Optional == verified discard-on-load; exactly the prune-chunks target set.
+        Assert.Equal(
+            [0x0304305Eu, 0x03043061u, 0x03043064u],
+            ChunkCatalog.All.Where(chunk => chunk.Optional).Select(chunk => chunk.Id).Order());
+
         Assert.Equal(ids.Length, ChunkCatalog.All.Count);
         Assert.All(ids, id => Assert.Contains(ChunkCatalog.All, chunk => chunk.Id == id));
     }

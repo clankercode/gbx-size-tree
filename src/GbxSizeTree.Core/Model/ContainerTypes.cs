@@ -59,14 +59,19 @@ public sealed record WriterMeasurement(
     long ReferenceUncompressedBytes,
     long ResidualBytes);
 
-/// <summary>Static metadata about a known chunk id.</summary>
+/// <summary>
+/// Static metadata about a known chunk id. <paramref name="Optional"/> means the map is
+/// verified to load identically without the chunk (the game discards it on read —
+/// Ghidra-proven, docs/FORMAT-NOTES.md); these are what `prune-chunks` removes.
+/// </summary>
 public sealed record ChunkMeta(
     uint Id,
     string Name,
     SizeCategory Category,
     string Description,
     bool Skippable,
-    bool Encapsulated);
+    bool Encapsulated,
+    bool Optional = false);
 
 /// <summary>Result of the compressed-contribution attribution model for one chunk.</summary>
 public sealed record AttributedChunk(uint ChunkId, long EstimatedOnDiskBytes);

@@ -23,6 +23,7 @@ public static class ChunkListRenderer
             .AddColumn("Name")
             .AddColumn(new TableColumn("Bytes").RightAligned())
             .AddColumn("Kind")
+            .AddColumn(new TableColumn("Optional").Centered())
             .AddColumn(new TableColumn("Offset").RightAligned());
 
         foreach (var chunk in analysis.Header.Chunks.OrderBy(chunk => chunk.FileOffset))
@@ -33,6 +34,7 @@ public static class ChunkListRenderer
                 Name(chunk.ChunkId, chunk.Name),
                 SizeFormat.Bytes(chunk.Bytes),
                 chunk.Heavy ? "heavy" : "",
+                OptionalGlyph(chunk.ChunkId),
                 chunk.FileOffset.ToString("N0", System.Globalization.CultureInfo.InvariantCulture));
         }
 
@@ -44,12 +46,15 @@ public static class ChunkListRenderer
                 $"{Name(chunk.ChunkId, chunk.Name)} {Theme.ConfidenceGlyph(chunk.Confidence)}",
                 SizeFormat.Bytes(chunk.Bytes),
                 chunk.Skippable ? "skippable" : "inline",
+                OptionalGlyph(chunk.ChunkId),
                 chunk.BodyOffset?.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) ?? "");
         }
 
         console.Write(table);
         console.MarkupLine(
             "[dim]body offsets are into the decompressed body; ● exact  ◐ writer delta  ○ estimated[/]");
+        console.MarkupLine(
+            "[dim]optional ✓ = verified the game discards it on load (removed by prune-chunks)[/]");
     }
 
     /// <summary>Plain, greppable listing; returns the number of unknown chunks.</summary>
@@ -80,6 +85,9 @@ public static class ChunkListRenderer
     }
 
     private static string Id(uint chunkId) => $"0x{chunkId:X8}";
+
+    private static string OptionalGlyph(uint chunkId) =>
+        ChunkCatalog.Describe(chunkId).Optional ? "[green]✓[/]" : "[dim]✗[/]";
 
     private static string Name(uint chunkId, string name) =>
         ChunkCatalog.IsKnown(chunkId) ? Markup.Escape(name) : $"[yellow]{Markup.Escape(name)}[/]";
