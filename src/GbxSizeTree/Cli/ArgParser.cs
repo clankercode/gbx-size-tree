@@ -227,7 +227,10 @@ public static class ArgParser
             return (null, "-q/--quiet cannot be used with -v/--verbose.");
         }
 
-        if (stripLightmap && shadowBrightnessFloor is not null)
+        var stripRequested = (stripLightmap ||
+                actions.Contains("strip-lightmap", StringComparer.OrdinalIgnoreCase)) &&
+            !noActions.Contains("strip-lightmap", StringComparer.OrdinalIgnoreCase);
+        if (stripRequested && shadowBrightnessFloor is > 0)
         {
             return (null, "--lighten-shadows cannot be combined with --strip-lightmap.");
         }

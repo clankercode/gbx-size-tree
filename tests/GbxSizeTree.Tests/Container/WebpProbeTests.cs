@@ -48,6 +48,20 @@ public sealed class WebpProbeTests
             [0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50]));
     }
 
+    [Fact]
+    public void TryReadDimensions_InvalidRiffSizeOrVp8LVersion_ReturnsNull()
+    {
+        var vp8X = BuildWebp("VP8X"u8, new byte[10]);
+        BinaryPrimitives.WriteUInt32LittleEndian(vp8X.AsSpan(4, 4), 0);
+
+        var vp8LPayload = new byte[5];
+        vp8LPayload[0] = 0x2F;
+        BinaryPrimitives.WriteUInt32LittleEndian(vp8LPayload.AsSpan(1, 4), 1U << 29);
+
+        Assert.Null(WebpProbe.TryReadDimensions(vp8X));
+        Assert.Null(WebpProbe.TryReadDimensions(BuildWebp("VP8L"u8, vp8LPayload)));
+    }
+
     private static byte[] BuildWebp(ReadOnlySpan<byte> chunkType, ReadOnlySpan<byte> payload)
     {
         var paddedLength = payload.Length + (payload.Length & 1);

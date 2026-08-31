@@ -107,6 +107,24 @@ public class ArgParserTests
     }
 
     [Fact]
+    public void Parse_LightenAndGenericStripLightmapAreRejectedTogether()
+    {
+        var (options, error) = ArgParser.Parse([
+            "--lighten-shadows", "100", "--action", "strip-lightmap",
+        ]);
+
+        Assert.Null(options);
+        Assert.Contains("cannot be combined", error);
+
+        var (excludedOptions, excludedError) = ArgParser.Parse([
+            "--lighten-shadows", "100", "--action", "strip-lightmap",
+            "--no-action", "strip-lightmap",
+        ]);
+        Assert.Null(excludedError);
+        Assert.NotNull(excludedOptions);
+    }
+
+    [Fact]
     public void Parse_RepeatedActionListsAccumulate()
     {
         var (options, error) = ArgParser.Parse(["--action", "a,b", "--action", "c"]);

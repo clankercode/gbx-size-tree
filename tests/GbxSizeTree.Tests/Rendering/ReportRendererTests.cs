@@ -71,6 +71,75 @@ public sealed class ReportRendererTests
     }
 
     [Fact]
+    public void FullReport_RendersMixedAndUnknownLightmapResolutions()
+    {
+        var console = new TestConsole().Width(120);
+        var analysis = FakeAnalysis.Build();
+        var lightmap = analysis.Body!.Lightmap!;
+        var mixedFrame = new LightmapFrameInfo(0, [300L, 200L, 100L])
+        {
+            BlobDimensions = [new(512, 512), new(256, 256), null],
+        };
+        analysis = analysis with
+        {
+            Body = analysis.Body with
+            {
+                Lightmap = lightmap with { Frames = [mixedFrame], FrameCount = 1 },
+            },
+        };
+
+        ReportRenderer.Render(console, analysis, topN: 10);
+
+        Assert.Contains("1 frame · mixed resolutions · partly unknown", console.Output);
+        Assert.Contains("512×512 / 256×256 / —", console.Output);
+    }
+
+    [Theory]
+    [InlineData(800, 300, "654 B", "246 B")]
+    [InlineData(500, 300, "100 B", "Chunk overhead")]
+    public void FullReport_LightmapRowsReconcileToNormalizedCategoryContribution(
+        long webpBytes,
+        long cacheBytes,
+        string expectedComponent,
+        string expectedOther)
+    {
+        var console = new TestConsole().Width(120);
+        var analysis = FakeAnalysis.Build();
+        var lightmap = analysis.Body!.Lightmap! with
+        {
+            WebpBytesTotal = webpBytes,
+            ZlibCompressedBytes = cacheBytes,
+            ChunkBytes = 900,
+        };
+        var tree = new SizeNode(
+            "file", "test", SizeCategory.Other, 1_000, 1_000, null,
+            SizeConfidence.ExactOnDisk, null,
+            [
+                new SizeNode(
+                    "body", "Body", SizeCategory.Other, 900, 900, null,
+                    SizeConfidence.ExactOnDisk, null,
+                    [SizeNode.Leaf(
+                        "body.lightmap", "Lightmap", SizeCategory.Lightmap, 900,
+                        SizeConfidence.ExactOnDisk, estOnDisk: 900)]),
+                SizeNode.Leaf(
+                    "header", "Header", SizeCategory.Header, 100,
+                    SizeConfidence.ExactOnDisk, onDisk: 100),
+            ]);
+        analysis = analysis with
+        {
+            FileBytes = 1_000,
+            Body = analysis.Body with { Lightmap = lightmap },
+            Tree = tree,
+        };
+
+        ReportRenderer.Render(console, analysis, topN: 10);
+
+        Assert.Contains(expectedComponent, console.Output);
+        Assert.Contains(expectedOther, console.Output);
+        Assert.Contains("Total 900 B · matches category contribution", console.Output);
+    }
+
+    [Fact]
     public void Recommendations_RenderRowsEditorBadgeAndVerdict()
     {
         var console = new TestConsole().Width(120);

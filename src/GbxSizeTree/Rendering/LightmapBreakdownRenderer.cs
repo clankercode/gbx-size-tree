@@ -76,18 +76,21 @@ internal static class LightmapBreakdownRenderer
             return frameLabel;
         }
 
-        if (nonEmptyBlobs.Any(blob => blob.Dimensions is null))
-        {
-            return $"{frameLabel} · resolution partly unknown";
-        }
-
         var resolutions = nonEmptyBlobs
+            .Where(blob => blob.Dimensions is not null)
             .Select(blob => FormatDimensions(blob.Dimensions!))
             .Distinct(StringComparer.Ordinal)
             .ToList();
-        return resolutions.Count == 1
-            ? $"{frameLabel} · {resolutions[0]}"
-            : $"{frameLabel} · mixed resolutions";
+        var hasUnknown = nonEmptyBlobs.Any(blob => blob.Dimensions is null);
+        var resolutionLabel = resolutions.Count switch
+        {
+            0 => "resolution unknown",
+            1 => resolutions[0],
+            _ => "mixed resolutions",
+        };
+        return hasUnknown
+            ? $"{frameLabel} · {resolutionLabel} · partly unknown"
+            : $"{frameLabel} · {resolutionLabel}";
     }
 
     private static string FormatDimensions(LightmapDimensions dimensions) =>

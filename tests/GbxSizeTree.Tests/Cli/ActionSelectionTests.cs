@@ -63,6 +63,10 @@ public sealed class ActionSelectionTests
         Assert.Equal(["lighten-shadows"], explicitIds);
         Assert.Equal(["default-a"], optimizeIds);
         Assert.True(ActionSelection.WantsOptimization(new CliOptions { ShadowBrightnessFloor = 100 }));
+        Assert.Empty(ActionSelection.RequestedIds(
+            new CliOptions { ShadowBrightnessFloor = 0 },
+            registry));
+        Assert.False(ActionSelection.WantsOptimization(new CliOptions { ShadowBrightnessFloor = 0 }));
     }
 
     [Theory]

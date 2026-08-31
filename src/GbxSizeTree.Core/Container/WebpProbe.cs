@@ -17,8 +17,15 @@ public static class WebpProbe
             return null;
         }
 
+        var riffLengthValue = BinaryPrimitives.ReadUInt32LittleEndian(webp.Slice(4, 4));
+        if (riffLengthValue < 12 || riffLengthValue > webp.Length - 8)
+        {
+            return null;
+        }
+
+        var riffEnd = 8 + (int)riffLengthValue;
         var cursor = 12;
-        while (cursor <= webp.Length - 8)
+        while (cursor <= riffEnd - 8)
         {
             var chunkType = webp.Slice(cursor, 4);
             var chunkLengthValue = BinaryPrimitives.ReadUInt32LittleEndian(webp.Slice(cursor + 4, 4));
@@ -29,7 +36,7 @@ public static class WebpProbe
 
             var chunkLength = (int)chunkLengthValue;
             var payloadOffset = cursor + 8;
-            if (chunkLength > webp.Length - payloadOffset)
+            if (chunkLength > riffEnd - payloadOffset)
             {
                 return null;
             }
@@ -42,7 +49,7 @@ public static class WebpProbe
             }
 
             var paddedLength = chunkLength + (chunkLength & 1);
-            if (paddedLength > webp.Length - payloadOffset)
+            if (paddedLength > riffEnd - payloadOffset)
             {
                 return null;
             }
@@ -88,6 +95,11 @@ public static class WebpProbe
             }
 
             var bits = BinaryPrimitives.ReadUInt32LittleEndian(payload.Slice(1, 4));
+            if ((bits >> 29) != 0)
+            {
+                return null;
+            }
+
             var width = (int)(bits & 0x3FFF) + 1;
             var height = (int)((bits >> 14) & 0x3FFF) + 1;
             return (width, height);

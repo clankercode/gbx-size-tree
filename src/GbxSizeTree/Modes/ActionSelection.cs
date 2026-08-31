@@ -29,7 +29,7 @@ public static class ActionSelection
         {
             ids.Add("strip-lightmap");
         }
-        if (options.ShadowBrightnessFloor is not null)
+        if (options.ShadowBrightnessFloor is > 0)
         {
             ids.Add("lighten-shadows");
         }
@@ -45,7 +45,7 @@ public static class ActionSelection
     }
 
     public static bool WantsOptimization(CliOptions options) =>
-        options.Optimize || options.StripLightmap || options.ShadowBrightnessFloor is not null
+        options.Optimize || options.StripLightmap || options.ShadowBrightnessFloor is > 0
         || options.DryRun || options.Attribute
         || options.Actions.Count > 0
         || !string.Equals(options.ThumbnailMode, "keep", StringComparison.OrdinalIgnoreCase);

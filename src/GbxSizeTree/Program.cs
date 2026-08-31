@@ -76,7 +76,7 @@ try
             var automaticInteractive = launchKind == LaunchKind.GuiOwnConsole
                 && !options.NonInteractive
                 && !options.Json
-                && !options.Optimize;
+                && !ActionSelection.WantsOptimization(options);
             if (options.Interactive || automaticInteractive)
             {
                 exitCode = InteractiveMode.Run(input, options, registry);

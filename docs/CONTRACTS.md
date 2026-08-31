@@ -1,12 +1,14 @@
 # Frozen contracts (v1)
 
-Everything in `src/GbxSizeTree.Core/Model/`, `Abstractions/`, `Actions/IMapAction.cs`, and
-`Actions/ActionRegistry.cs` is FROZEN after the `contracts-v1` commit. Implementation agents:
-if a contract seems wrong, STOP and report to the coordinator — do not edit these files.
+Existing contracts in `src/GbxSizeTree.Core/Model/`, `Abstractions/`, `Actions/IMapAction.cs`, and
+`Actions/ActionRegistry.cs` are FROZEN after the `contracts-v1` commit. Implementation agents:
+if a contract seems wrong, STOP and report to the coordinator. An explicitly approved additive
+contract change must update this document and the JSON golden contract in the same delivery.
 
 ## Rules for implementation agents
 
-- Own only the files your task lists; never touch anyone else's, never touch Model/ or Abstractions/.
+- Own only the files your task lists; never touch anyone else's, never touch Model/ or Abstractions/
+  without an explicitly approved contract change.
 - Core must never reference Spectre.Console (its csproj has no such package — keep it that way).
 - No `async`/`Task`/`Thread`/`Parallel`/`lock` — the tool is deliberately single-threaded.
 - Do not re-research the Gbx format: `docs/FORMAT-NOTES.md` is the verified reference; cite it in comments.
