@@ -28,6 +28,7 @@ public static class ArgParser
         string? outputPath = null;
         var force = false;
         var stripLightmap = false;
+        byte? shadowBrightnessFloor = null;
         var thumbnailMode = "keep";
         var embedStored = false;
         var actions = new List<string>();
@@ -117,6 +118,23 @@ public static class ArgParser
                     break;
                 case "--strip-lightmap":
                     stripLightmap = true;
+                    break;
+                case "--lighten-shadows":
+                    if (!TryTakeValue(args, ref i, arg, out var floorValue, out var floorError))
+                    {
+                        return (null, floorError);
+                    }
+
+                    if (!byte.TryParse(
+                            floorValue,
+                            NumberStyles.None,
+                            CultureInfo.InvariantCulture,
+                            out var parsedFloor))
+                    {
+                        return (null, "--lighten-shadows requires a byte minimum from 0 to 255.");
+                    }
+
+                    shadowBrightnessFloor = parsedFloor;
                     break;
                 case "--thumbnail":
                     if (!TryTakeValue(args, ref i, arg, out thumbnailMode, out var thumbnailError))
@@ -209,6 +227,11 @@ public static class ArgParser
             return (null, "-q/--quiet cannot be used with -v/--verbose.");
         }
 
+        if (stripLightmap && shadowBrightnessFloor is not null)
+        {
+            return (null, "--lighten-shadows cannot be combined with --strip-lightmap.");
+        }
+
         return (new CliOptions
         {
             InputPath = inputPath,
@@ -225,6 +248,7 @@ public static class ArgParser
             OutputPath = outputPath,
             Force = force,
             StripLightmap = stripLightmap,
+            ShadowBrightnessFloor = shadowBrightnessFloor,
             ThumbnailMode = thumbnailMode,
             EmbedStored = embedStored,
             Actions = actions.ToArray(),

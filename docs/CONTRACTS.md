@@ -44,6 +44,7 @@ file
 |---|---|---|---|
 | 10 | `orphan-embeds` | Lossless | before embed-zip (don't recompress deleted entries) |
 | 20 | `embed-zip` | Lossless | Deflate-max; Stored variant only with setting `stored=true` |
+| 25 | `lighten-shadows` | BenignLossy | opt-in; setting `shadow-brightness-floor=0..255`; DD2 used 100 |
 | 30 | `strip-lightmap` | BenignLossy | |
 | 40 | `thumbnail` | BenignLossy | setting `mode=keep|strip|lossless|recompress:<q>|downscale:<px>` |
 | 90 | `resave` | Lossless | implicit baseline, always last; savings = LZO999 re-save |

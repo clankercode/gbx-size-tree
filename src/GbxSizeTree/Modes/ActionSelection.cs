@@ -1,4 +1,6 @@
 using GbxSizeTree.Actions;
+using GbxSizeTree.Actions.Passes;
+using System.Globalization;
 
 namespace GbxSizeTree.Cli.Modes;
 
@@ -10,6 +12,8 @@ public static class ActionSelection
         {
             ["stored"] = options.EmbedStored ? "true" : "false",
             ["mode"] = options.ThumbnailMode,
+            [LightenShadowsAction.FloorSetting] = options.ShadowBrightnessFloor?
+                .ToString(CultureInfo.InvariantCulture) ?? string.Empty,
             ["experimental"] = options.Experimental ? "true" : "false",
         };
 
@@ -25,6 +29,10 @@ public static class ActionSelection
         {
             ids.Add("strip-lightmap");
         }
+        if (options.ShadowBrightnessFloor is not null)
+        {
+            ids.Add("lighten-shadows");
+        }
         if (!string.Equals(options.ThumbnailMode, "keep", StringComparison.OrdinalIgnoreCase))
         {
             ids.Add("thumbnail");
@@ -37,7 +45,8 @@ public static class ActionSelection
     }
 
     public static bool WantsOptimization(CliOptions options) =>
-        options.Optimize || options.StripLightmap || options.DryRun || options.Attribute
+        options.Optimize || options.StripLightmap || options.ShadowBrightnessFloor is not null
+        || options.DryRun || options.Attribute
         || options.Actions.Count > 0
         || !string.Equals(options.ThumbnailMode, "keep", StringComparison.OrdinalIgnoreCase);
 }

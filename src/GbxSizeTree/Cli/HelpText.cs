@@ -34,6 +34,7 @@ public static class HelpText
           -o, --output PATH         Write the optimized map to PATH
           --force                   Overwrite an existing output file
           --strip-lightmap          Remove the baked lightmap
+          --lighten-shadows MIN     Floor shadow-brightness bytes at 0-255 (DD2: 100)
           --thumbnail MODE          keep, strip, lossless, recompress:1-100, or
                                     downscale:32-1024
           --embed-stored            Store embedded ZIP entries (experimental)
@@ -57,6 +58,7 @@ public static class HelpText
           gbx-size-tree MyMap.Map.Gbx
           gbx-size-tree --top 50 --estimate-compressed MyMap.Map.Gbx
           gbx-size-tree -O --strip-lightmap -o Smaller.Map.Gbx MyMap.Map.Gbx
+          gbx-size-tree --lighten-shadows 100 -o Lighter.Map.Gbx MyMap.Map.Gbx
           gbx-size-tree --action embed-zip,thumbnail --thumbnail recompress:80 MyMap.Map.Gbx
 
         Double-click launches open a file picker and starts interactive mode.

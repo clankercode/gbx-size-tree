@@ -1,4 +1,5 @@
 using GbxSizeTree.Actions;
+using GbxSizeTree.Actions.Passes;
 using GbxSizeTree.Cli;
 using GbxSizeTree.Cli.Modes;
 
@@ -35,12 +36,33 @@ public sealed class ActionSelectionTests
         {
             EmbedStored = true,
             ThumbnailMode = "downscale:512",
+            ShadowBrightnessFloor = 100,
             Experimental = true,
         });
 
         Assert.Equal("true", settings["stored"]);
         Assert.Equal("downscale:512", settings["mode"]);
+        Assert.Equal("100", settings[LightenShadowsAction.FloorSetting]);
         Assert.Equal("true", settings["experimental"]);
+    }
+
+    [Fact]
+    public void ShadowFloor_RequestsOnlyExplicitLightenAction()
+    {
+        var registry = new ActionRegistry([
+            new FakeAction("default-a", defaultOn: true, order: 10),
+        ]);
+
+        var explicitIds = ActionSelection.RequestedIds(
+            new CliOptions { ShadowBrightnessFloor = 100 },
+            registry);
+        var optimizeIds = ActionSelection.RequestedIds(
+            new CliOptions { Optimize = true },
+            registry);
+
+        Assert.Equal(["lighten-shadows"], explicitIds);
+        Assert.Equal(["default-a"], optimizeIds);
+        Assert.True(ActionSelection.WantsOptimization(new CliOptions { ShadowBrightnessFloor = 100 }));
     }
 
     [Theory]

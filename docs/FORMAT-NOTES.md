@@ -135,13 +135,14 @@ Ghidra-verified detail (Max's E++ research, `~/src/openplanet/my-plugins/tm-edit
   (v≥5) u32 sprite/frame count (max 32, production often 3); per frame **three counted byte buffers**
   — WebP in the non-zero slots, and **slots may be zero-length**; then uncompressed_size + zlib payload.
 - The inflated zlib payload starts with a `CHmsLightMapCache` chunk **0x0602200B** + SKIP — metadata only
-  (quality, samples, mapping vectors, frames); NO atlas pixels inside the zlib.
+  (quality, samples, mapping vectors, frames); NO atlas pixels inside the zlib. Its chunk 0x0602201A
+  mapping `colorData[0]` is the per-entry shadow-brightness byte channel.
 - The full-resolution bake atlases (`LightMap%u_HSH%c.webp`, `LightMap%u_LocalBig_Avg.webp`,
   `ProbeGrid.webp`) live in a separate cache PACK outside the map file (game cache dir) — they are NOT
   part of .Map.Gbx size and out of scope for this tool.
 - Saved RGB is always half-res of the bake (`YCbCr_to_RGB_Down2x2`); frame webps are reconstructed-RGB /
-  HSH planes. Any future "soften/re-encode shadows" action edits webp pixel data only — never the mapping
-  metadata or sizes.
+  HSH planes. DD2 lightened shadows inside the Map.Gbx by clamping mapping `colorData[0]` to minimum 100;
+  this changes shadow brightness without modifying WebP pixels, mapping sizes, or the other color channels.
 
 ## GBX.NET 2.4.4 API essentials
 

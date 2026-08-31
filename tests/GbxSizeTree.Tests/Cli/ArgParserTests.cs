@@ -20,6 +20,7 @@ public class ArgParserTests
     [InlineData("-o result.Map.Gbx", nameof(CliOptions.OutputPath), "result.Map.Gbx")]
     [InlineData("--force", nameof(CliOptions.Force), "True")]
     [InlineData("--strip-lightmap", nameof(CliOptions.StripLightmap), "True")]
+    [InlineData("--lighten-shadows 100", nameof(CliOptions.ShadowBrightnessFloor), "100")]
     [InlineData("--thumbnail keep", nameof(CliOptions.ThumbnailMode), "keep")]
     [InlineData("--embed-stored", nameof(CliOptions.EmbedStored), "True")]
     [InlineData("--action embed-zip", nameof(CliOptions.Actions), "embed-zip")]
@@ -70,6 +71,39 @@ public class ArgParserTests
 
         Assert.Null(options);
         Assert.Contains("--thumbnail", error);
+    }
+
+    [Theory]
+    [InlineData("-1")]
+    [InlineData("256")]
+    [InlineData("bright")]
+    public void Parse_InvalidShadowBrightnessFloorsAreRejected(string value)
+    {
+        var (options, error) = ArgParser.Parse(["--lighten-shadows", value]);
+
+        Assert.Null(options);
+        Assert.Contains("--lighten-shadows", error);
+    }
+
+    [Theory]
+    [InlineData("0", 0)]
+    [InlineData("255", 255)]
+    public void Parse_ShadowBrightnessFloorBoundsAreAccepted(string value, byte expected)
+    {
+        var (options, error) = ArgParser.Parse(["--lighten-shadows", value]);
+
+        Assert.Null(error);
+        Assert.NotNull(options);
+        Assert.Equal(expected, options.ShadowBrightnessFloor);
+    }
+
+    [Fact]
+    public void Parse_LightenAndStripLightmapAreRejectedTogether()
+    {
+        var (options, error) = ArgParser.Parse(["--lighten-shadows", "100", "--strip-lightmap"]);
+
+        Assert.Null(options);
+        Assert.Contains("cannot be combined", error);
     }
 
     [Fact]
@@ -144,6 +178,7 @@ public class ArgParserTests
         Assert.Null(options.InputPath);
         Assert.Equal(20, options.TopN);
         Assert.Equal("keep", options.ThumbnailMode);
+        Assert.Null(options.ShadowBrightnessFloor);
         Assert.Null(options.Color);
         Assert.Null(options.Pause);
     }

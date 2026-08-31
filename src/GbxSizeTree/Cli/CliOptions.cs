@@ -19,6 +19,7 @@ public sealed record CliOptions
     public string? OutputPath { get; init; }
     public bool Force { get; init; }
     public bool StripLightmap { get; init; }
+    public byte? ShadowBrightnessFloor { get; init; }
     public string ThumbnailMode { get; init; } = "keep";
     public bool EmbedStored { get; init; }
     public IReadOnlyList<string> Actions { get; init; } = Array.Empty<string>();
