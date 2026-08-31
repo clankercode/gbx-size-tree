@@ -6,7 +6,7 @@ namespace GbxSizeTree.Tests.Fixtures;
 /// </summary>
 public static class SampleMap
 {
-    public const string DefaultPath = "/home/xertrov/Downloads/sample.Map.Gbx";
+    public const string DefaultPath = "sample.Map.Gbx";
 
     public static string Path =>
         Environment.GetEnvironmentVariable("GBX_SIZE_TREE_SAMPLE") is { Length: > 0 } p ? p : DefaultPath;

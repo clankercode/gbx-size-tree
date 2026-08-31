@@ -166,7 +166,7 @@ Ghidra-verified detail (Max's E++ research, `~/src/openplanet/my-plugins/tm-edit
   dispatch `IReadableWritableChunk.ReadWrite(node, rw)` / `IWritableChunk.Write(node, w)`, skip
   `IHeaderChunk`, record position deltas. Mirrors `CMwNod.Write` — GBX.NET pinned to [2.4.4].
 
-## Sample map ground truth (sample.Map.Gbx)
+## Sample map ground truth (reference map, Ultra2 bake)
 
 File 7,832,571 B · user data 65,473 B · header chunks 0x002=57 0x003=241 0x004=4 0x005=6135
 0x007=58889 0x008=95 · 688 nodes · body 18,529,821 → 7,767,065 B (41.9%) · 35,374 blocks ·

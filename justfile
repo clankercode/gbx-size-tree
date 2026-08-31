@@ -1,6 +1,6 @@
 # gbx-size-tree — common tasks. Builds/tests capped at 2 threads (system etiquette).
 
-sample := env_var_or_default("GBX_SIZE_TREE_SAMPLE", "/home/xertrov/Downloads/sample.Map.Gbx")
+sample := env_var_or_default("GBX_SIZE_TREE_SAMPLE", "sample.Map.Gbx")
 version := `grep -oPm1 '(?<=<Version>)[^<]+' Directory.Build.props`
 
 export MSBUILDDISABLENODEREUSE := "1"
