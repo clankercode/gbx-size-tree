@@ -123,12 +123,20 @@ public static class DrilldownTables
             return;
         }
 
-        var table = NewTable("Lightmap frames", "Frame", "Blob 1", "Blob 2", "Blob 3", "Total");
+        var table = NewTable(
+            "Lightmap frames",
+            "Frame",
+            "Resolution",
+            "Blob 1",
+            "Blob 2",
+            "Blob 3",
+            "Total");
         foreach (var frame in lightmap.Frames.OrderBy(frame => frame.Index))
         {
             var blobs = frame.BlobBytes.Select(SizeFormat.ShortBytes).ToList();
             table.AddRow(
                 frame.Index.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                FrameResolution(frame),
                 blobs.ElementAtOrDefault(0) ?? "—",
                 blobs.ElementAtOrDefault(1) ?? "—",
                 blobs.ElementAtOrDefault(2) ?? "—",
@@ -136,6 +144,29 @@ public static class DrilldownTables
         }
 
         console.Write(table);
+    }
+
+    private static string FrameResolution(LightmapFrameInfo frame)
+    {
+        var resolutions = frame.BlobBytes
+            .Select((bytes, index) => new
+            {
+                Bytes = bytes,
+                Dimensions = frame.BlobDimensions?.ElementAtOrDefault(index),
+            })
+            .Where(blob => blob.Bytes > 0)
+            .Select(blob => blob.Dimensions is { } dimensions
+                ? $"{dimensions.Width}×{dimensions.Height}"
+                : "—")
+            .ToList();
+        if (resolutions.Count == 0)
+        {
+            return "—";
+        }
+
+        return resolutions.All(resolution => resolution == resolutions[0])
+            ? resolutions[0]
+            : string.Join(" / ", resolutions);
     }
 
     private static Table NewTable(string title, params string[] columns)

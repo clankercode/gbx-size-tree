@@ -23,10 +23,25 @@ public sealed class ReportRendererTests
         Assert.Contains("on disk ≈ 1.8 KiB", console.Output);
         Assert.DoesNotContain("83.3%", console.Output);
         Assert.Contains("Accounted on disk:", console.Output);
+        Assert.Contains("Lightmap breakdown", console.Output);
+        Assert.Contains("WebP shadow images", console.Output);
+        Assert.Contains("Mapping cache (zlib)", console.Output);
+        Assert.Contains("3 frames · 512×512", console.Output);
+        Assert.Contains("Resolution", console.Output);
+        Assert.Contains("matches category contribution", console.Output);
+        Assert.Contains("Delta to online limit", console.Output);
         Assert.True(
-            console.Output.Split("12,000 B", StringSplitOptions.None).Length >= 4,
-            "The title and both reconciliation operands should show the exact file size.");
+            console.Output.Split("12,000 B", StringSplitOptions.None).Length >= 3,
+            "The title and category reconciliation should show the exact file size.");
         Assert.Contains("Blocks", console.Output);
+
+        var categoryIndex = console.Output.IndexOf("On-disk contribution by category", StringComparison.Ordinal);
+        var lightmapIndex = console.Output.IndexOf("Lightmap breakdown", StringComparison.Ordinal);
+        var deltaIndex = console.Output.IndexOf("Delta to online limit", StringComparison.Ordinal);
+        var treeIndex = console.Output.IndexOf("Fake Map.Map.Gbx", deltaIndex, StringComparison.Ordinal);
+        Assert.True(categoryIndex >= 0 && categoryIndex < lightmapIndex);
+        Assert.True(lightmapIndex < deltaIndex);
+        Assert.True(deltaIndex < treeIndex);
     }
 
     [Fact]
@@ -42,9 +57,10 @@ public sealed class ReportRendererTests
     }
 
     [Theory]
-    [InlineData(8_000_000, "OVER")]
-    [InlineData(12_000, "under")]
-    public void FullReport_RendersOnlineLimitStatus(long fileBytes, string expected)
+    [InlineData(8_000_000, "over")]
+    [InlineData(12_000, "headroom")]
+    [InlineData(7_340_032, "Exactly at")]
+    public void FullReport_RendersOnlineLimitDelta(long fileBytes, string expected)
     {
         var console = new TestConsole().Width(120);
         var analysis = FakeAnalysis.Build() with { FileBytes = fileBytes };

@@ -42,6 +42,14 @@ public static class BreakdownRenderer
             $"{Markup.Escape(SizeFormat.Bytes(DisplayBytes(root)))}");
     }
 
+    internal static long OnDiskBytesForCategory(SizeNode root, SizeCategory category)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+        return BuildContributions(root)
+            .Where(item => item.Category == category)
+            .Sum(item => item.Bytes);
+    }
+
     private static IReadOnlyList<Contribution> BuildContributions(SizeNode root)
     {
         var contributions = new List<Contribution>();

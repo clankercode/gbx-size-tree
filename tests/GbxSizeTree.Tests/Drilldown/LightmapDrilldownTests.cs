@@ -28,6 +28,16 @@ public sealed class LightmapDrilldownTests
         Assert.Equal(3, sample.Info.FrameCount);
         Assert.Equal(3, sample.Info.Frames.Count);
         Assert.All(sample.Info.Frames, frame => Assert.Equal(3, frame.BlobBytes.Count));
+        Assert.All(sample.Info.Frames, frame =>
+        {
+            for (var index = 0; index < frame.BlobBytes.Count; index++)
+            {
+                if (frame.BlobBytes[index] > 0)
+                {
+                    Assert.NotNull(frame.BlobDimensions?.ElementAtOrDefault(index));
+                }
+            }
+        });
     }
 
     [Fact]

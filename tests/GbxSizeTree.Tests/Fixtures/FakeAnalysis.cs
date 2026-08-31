@@ -26,9 +26,18 @@ public static class FakeAnalysis
         var lightmap = new LightmapInfo(HasLightmaps: true, Version: 8, FrameCount: 3,
             Frames:
             [
-                new LightmapFrameInfo(0, [300L, 200L, 100L]),
-                new LightmapFrameInfo(1, [300L, 200L, 100L]),
-                new LightmapFrameInfo(2, [300L, 200L, 100L]),
+                new LightmapFrameInfo(0, [300L, 200L, 100L])
+                {
+                    BlobDimensions = [new(512, 512), new(512, 512), new(512, 512)],
+                },
+                new LightmapFrameInfo(1, [300L, 200L, 100L])
+                {
+                    BlobDimensions = [new(512, 512), new(512, 512), new(512, 512)],
+                },
+                new LightmapFrameInfo(2, [300L, 200L, 100L])
+                {
+                    BlobDimensions = [new(512, 512), new(512, 512), new(512, 512)],
+                },
             ],
             WebpBytesTotal: 1_800, ZlibCompressedBytes: 500, ZlibUncompressedBytes: 900, ChunkBytes: 2_350);
 

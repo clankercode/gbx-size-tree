@@ -113,6 +113,20 @@
               300,
               200,
               100
+            ],
+            "blobDimensions": [
+              {
+                "width": 512,
+                "height": 512
+              },
+              {
+                "width": 512,
+                "height": 512
+              },
+              {
+                "width": 512,
+                "height": 512
+              }
             ]
           },
           {
@@ -121,6 +135,20 @@
               300,
               200,
               100
+            ],
+            "blobDimensions": [
+              {
+                "width": 512,
+                "height": 512
+              },
+              {
+                "width": 512,
+                "height": 512
+              },
+              {
+                "width": 512,
+                "height": 512
+              }
             ]
           },
           {
@@ -129,6 +157,20 @@
               300,
               200,
               100
+            ],
+            "blobDimensions": [
+              {
+                "width": 512,
+                "height": 512
+              },
+              {
+                "width": 512,
+                "height": 512
+              },
+              {
+                "width": 512,
+                "height": 512
+              }
             ]
           }
         ],

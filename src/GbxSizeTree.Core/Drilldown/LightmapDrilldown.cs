@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using GBX.NET.Engines.Game;
 using GbxSizeTree.Abstractions;
+using GbxSizeTree.Container;
 using GbxSizeTree.Model;
 
 namespace GbxSizeTree.Drilldown;
@@ -66,6 +67,7 @@ public sealed class LightmapDrilldown : ILightmapDrilldown
         for (var frameIndex = 0; frameIndex < frameCount; frameIndex++)
         {
             var blobBytes = new long[BuffersPerFrame];
+            var blobDimensions = new LightmapDimensions?[BuffersPerFrame];
             for (var bufferIndex = 0; bufferIndex < BuffersPerFrame; bufferIndex++)
             {
                 var bufferLength = ReadNonNegativeInt32(
@@ -79,12 +81,23 @@ public sealed class LightmapDrilldown : ILightmapDrilldown
                     $"frame {frameIndex} buffer {bufferIndex}");
 
                 blobBytes[bufferIndex] = bufferLength;
+                var dimensions = WebpProbe.TryReadDimensions(payload.Slice(cursor, bufferLength));
+                if (dimensions is { } size)
+                {
+                    blobDimensions[bufferIndex] = new LightmapDimensions(size.Width, size.Height);
+                }
+
                 webpBytesTotal += bufferLength;
                 hasNonEmptyBuffer |= bufferLength != 0;
                 cursor += bufferLength;
             }
 
-            frames[frameIndex] = new LightmapFrameInfo(frameIndex, blobBytes);
+            frames[frameIndex] = new LightmapFrameInfo(frameIndex, blobBytes)
+            {
+                BlobDimensions = blobDimensions.Any(item => item is not null)
+                    ? blobDimensions
+                    : null,
+            };
         }
 
         long zlibCompressedBytes = 0;

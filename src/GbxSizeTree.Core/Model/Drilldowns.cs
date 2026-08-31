@@ -27,7 +27,13 @@ public sealed record LightmapInfo(
     long ChunkBytes);
 
 /// <summary>One baked frame; up to three webp blobs (base/bump/night variants).</summary>
-public sealed record LightmapFrameInfo(int Index, IReadOnlyList<long> BlobBytes);
+public sealed record LightmapFrameInfo(int Index, IReadOnlyList<long> BlobBytes)
+{
+    /// <summary>Dimensions aligned with <see cref="BlobBytes"/>; null entries are empty or unreadable blobs.</summary>
+    public IReadOnlyList<LightmapDimensions?>? BlobDimensions { get; init; }
+}
+
+public sealed record LightmapDimensions(int Width, int Height);
 
 public sealed record ThumbnailInfo(
     long ChunkBytes,

@@ -1,4 +1,3 @@
-using System.Globalization;
 using GbxSizeTree.Model;
 using Spectre.Console;
 
@@ -20,8 +19,22 @@ public static class ReportRenderer
             RenderCompressionCallout(console, body);
         }
 
-        SizeTreeRenderer.Render(console, analysis.Tree, topN);
+        console.WriteLine();
         BreakdownRenderer.Render(console, analysis.Tree);
+        if (analysis.Body?.Lightmap is { HasLightmaps: true } lightmap)
+        {
+            console.WriteLine();
+            var lightmapBytes = BreakdownRenderer.OnDiskBytesForCategory(
+                analysis.Tree,
+                SizeCategory.Lightmap);
+            LightmapBreakdownRenderer.Render(console, lightmap, lightmapBytes);
+        }
+
+        console.WriteLine();
+        RenderOnlineLimitDelta(console, analysis.FileBytes);
+        console.WriteLine();
+
+        SizeTreeRenderer.Render(console, analysis.Tree, topN);
         DrilldownTables.Render(console, analysis, topN);
 
         if (analysis.Body is { } reconciledBody)
@@ -34,14 +47,29 @@ public static class ReportRenderer
     {
         var label = Markup.Escape(analysis.SourceLabel);
         var size = Markup.Escape(SizeFormat.Bytes(analysis.FileBytes));
-        if (analysis.FileBytes > Theme.OnlineLimitBytes)
+        console.MarkupLine($"[bold]{label}[/] — {size}");
+    }
+
+    private static void RenderOnlineLimitDelta(IAnsiConsole console, long fileBytes)
+    {
+        var limit = Markup.Escape(SizeFormat.ShortBytes(Theme.OnlineLimitBytes));
+        console.MarkupLine("[bold]Delta to online limit[/]");
+
+        if (fileBytes > Theme.OnlineLimitBytes)
         {
-            var overKib = (analysis.FileBytes - Theme.OnlineLimitBytes + 1023) / 1024;
-            console.MarkupLine($"[bold]{label}[/] — {size}  [red bold]{overKib.ToString("N0", CultureInfo.InvariantCulture)} KiB OVER the online limit[/]");
+            var delta = Markup.Escape(SizeFormat.ShortBytes(fileBytes - Theme.OnlineLimitBytes));
+            console.MarkupLine($"[red bold]{delta} over[/] [dim]({limit} limit)[/]");
             return;
         }
 
-        console.MarkupLine($"[bold]{label}[/] — {size}  [green]under limit[/]");
+        if (fileBytes < Theme.OnlineLimitBytes)
+        {
+            var delta = Markup.Escape(SizeFormat.ShortBytes(Theme.OnlineLimitBytes - fileBytes));
+            console.MarkupLine($"[green bold]{delta} headroom[/] [dim]({limit} limit)[/]");
+            return;
+        }
+
+        console.MarkupLine($"[green bold]Exactly at the {limit} limit[/]");
     }
 
     private static void RenderCompressionCallout(IAnsiConsole console, BodyAnalysis body)
