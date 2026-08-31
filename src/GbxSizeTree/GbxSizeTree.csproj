@@ -4,6 +4,7 @@
     <OutputType>Exe</OutputType>
     <AssemblyName>gbx-size-tree</AssemblyName>
     <RootNamespace>GbxSizeTree.Cli</RootNamespace>
+    <ApplicationIcon>../../assets/icon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <!-- Publish-only: keeps ordinary builds framework-dependent so the test project can reference this exe. -->
