@@ -21,6 +21,11 @@ public sealed class ReportRendererTests
         Assert.Contains("on disk", console.Output);
         Assert.Contains("on disk 11.7 KiB", console.Output);
         Assert.Contains("on disk ≈ 1.8 KiB", console.Output);
+        Assert.DoesNotContain("83.3%", console.Output);
+        Assert.Contains("Accounted on disk:", console.Output);
+        Assert.True(
+            console.Output.Split("12,000 B", StringSplitOptions.None).Length >= 4,
+            "The title and both reconciliation operands should show the exact file size.");
         Assert.Contains("Blocks", console.Output);
     }
 
@@ -77,5 +82,29 @@ public sealed class ReportRendererTests
     public void Bytes_IncludesInvariantExactByteCount()
     {
         Assert.Contains("7,832,571", SizeFormat.Bytes(7_832_571));
+    }
+
+    [Fact]
+    public void BodyChunks_CollapsesRowsSmallerThan420Bytes()
+    {
+        var console = new TestConsole().Width(120);
+        var analysis = FakeAnalysis.Build();
+        var chunks = analysis.Body!.Chunks.Concat([
+            new BodyChunkInfo(1, "Exactly 420", SizeCategory.Other, "", 420,
+                SizeConfidence.ExactOnDisk, 0, true, 10),
+            new BodyChunkInfo(2, "Small 419", SizeCategory.Other, "", 419,
+                SizeConfidence.ExactOnDisk, 0, true, 11),
+            new BodyChunkInfo(3, "Small 100", SizeCategory.Other, "", 100,
+                SizeConfidence.ExactOnDisk, 0, true, 12),
+        ]).ToList();
+        analysis = analysis with { Body = analysis.Body with { Chunks = chunks } };
+
+        DrilldownTables.Render(console, analysis, topN: 0);
+
+        Assert.Contains("Exactly 420", console.Output);
+        Assert.DoesNotContain("Small 419", console.Output);
+        Assert.DoesNotContain("Small 100", console.Output);
+        Assert.Contains("and 2 more", console.Output);
+        Assert.Contains("519 B", console.Output);
     }
 }

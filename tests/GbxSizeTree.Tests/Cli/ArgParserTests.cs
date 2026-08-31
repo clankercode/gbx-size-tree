@@ -24,7 +24,6 @@ public class ArgParserTests
     [InlineData("--embed-stored", nameof(CliOptions.EmbedStored), "True")]
     [InlineData("--action embed-zip", nameof(CliOptions.Actions), "embed-zip")]
     [InlineData("--no-action resave", nameof(CliOptions.NoActions), "resave")]
-    [InlineData("--measure-actions", nameof(CliOptions.MeasureActions), "True")]
     [InlineData("--dry-run", nameof(CliOptions.DryRun), "True")]
     [InlineData("--experimental", nameof(CliOptions.Experimental), "True")]
     [InlineData("--verbose", nameof(CliOptions.Verbose), "True")]

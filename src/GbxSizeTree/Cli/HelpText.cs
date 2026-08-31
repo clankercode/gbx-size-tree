@@ -36,7 +36,6 @@ public static class HelpText
           --embed-stored            Store embedded ZIP entries (experimental)
           --action LIST             Enable comma-separated actions; may be repeated
           --no-action LIST          Disable comma-separated actions; may be repeated
-          --measure-actions         Measure each action's savings
           --dry-run                 Plan optimization without writing output
           --experimental            Enable experimental optimizations
 

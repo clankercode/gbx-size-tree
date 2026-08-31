@@ -21,7 +21,6 @@ public sealed record CliOptions
     public bool EmbedStored { get; init; }
     public IReadOnlyList<string> Actions { get; init; } = Array.Empty<string>();
     public IReadOnlyList<string> NoActions { get; init; } = Array.Empty<string>();
-    public bool MeasureActions { get; init; }
     public bool DryRun { get; init; }
     public bool Experimental { get; init; }
     public bool Verbose { get; init; }

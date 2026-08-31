@@ -20,7 +20,8 @@ public sealed class ActionRegistry
 
     public IReadOnlyList<IMapAction> All => actions;
 
-    public IMapAction? Find(string id) => actions.FirstOrDefault(a => a.Id == id);
+    public IMapAction? Find(string id) => actions.FirstOrDefault(
+        a => string.Equals(a.Id, id, StringComparison.OrdinalIgnoreCase));
 
     public IEnumerable<IMapAction> Defaults() => actions.Where(a => a.DefaultOn);
 

@@ -47,11 +47,8 @@ public sealed class OutputValidatorTests
         SampleMap.SkipUnlessAvailable();
         Gbx.LZO = new Lzo();
         Gbx.ZLib = new ZLib();
-        var before = AnalyzeFacts();
-        var gbx = Gbx.Parse<CGameCtnChallenge>(SampleMap.Path);
-        using var stream = new MemoryStream();
-        gbx.Save(stream);
-        var truncated = stream.ToArray()[..1000];
+        var before = Assert.IsType<MapFacts>(FakeAnalysis.Build().Facts);
+        var truncated = File.ReadAllBytes(SampleMap.Path)[..1000];
 
         var report = OutputValidator.Validate(before, truncated, [],
             new Dictionary<string, string>(), out _);

@@ -148,7 +148,7 @@ public static class SizeTreeBuilder
             var frames = lm.Frames
                 .Select(f => SizeNode.Leaf($"body.lightmap.webp.frame{f.Index}", $"Frame {f.Index}",
                     SizeCategory.Lightmap, f.BlobBytes.Sum(), SizeConfidence.ExactOnDisk,
-                    $"{f.BlobBytes.Count(b => b > 0)} webp images"))
+                    WebpImageCount(f.BlobBytes.Count(b => b > 0))))
                 .ToList();
             children.Add(new SizeNode("body.lightmap.webp", "WebP shadow frames", SizeCategory.Lightmap,
                 lm.WebpBytesTotal, null, lm.WebpBytesTotal, SizeConfidence.ExactOnDisk,
@@ -161,6 +161,9 @@ public static class SizeTreeBuilder
         return new SizeNode("body.lightmap", chunk.Name, SizeCategory.Lightmap,
             chunk.Bytes, null, estOnDisk, chunk.Confidence, chunk.Description, children);
     }
+
+    private static string WebpImageCount(int count) =>
+        $"{count} WebP {(count == 1 ? "image" : "images")}";
 
     private static SizeNode BuildEmbedded(BodyChunkInfo chunk, EmbeddedZipInfo? zip, long? estOnDisk, int topN)
     {

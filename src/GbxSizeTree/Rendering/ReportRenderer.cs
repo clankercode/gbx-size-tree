@@ -50,8 +50,9 @@ public static class ReportRenderer
         var text = "body is one LZO stream: " +
             $"{Markup.Escape(SizeFormat.ShortBytes(body.UncompressedBytes))} → " +
             $"{Markup.Escape(SizeFormat.ShortBytes(body.CompressedBytes))} ({Markup.Escape(SizeFormat.Percent(body.Ratio))}); " +
-            "sizes below are uncompressed; 'on disk ≈' estimates count pre-compressed data " +
-            "(webp/jpeg/zip) ~1:1 and scale the rest to match the real total.";
+            "tree sizes below are uncompressed; 'on disk ≈' estimates count pre-compressed data " +
+            "(webp/jpeg/zip) ~1:1 and scale the rest to match the real total. The category " +
+            "chart uses those on-disk contributions and reconciles to the exact file size.";
         console.Write(new Panel(new Markup(text)).Header("[yellow]Honest compression[/]").Border(BoxBorder.Rounded));
     }
 

@@ -8,6 +8,8 @@ namespace GbxSizeTree.Cli.Rendering;
 /// </summary>
 public static class DrilldownTables
 {
+    private const long MinimumBodyChunkRowBytes = 420;
+
     public static void Render(IAnsiConsole console, MapAnalysis analysis, int topN)
     {
         ArgumentNullException.ThrowIfNull(console);
@@ -54,7 +56,11 @@ public static class DrilldownTables
         }
 
         var table = NewTable("Body chunks", "Name", "Id", "Bytes", "%", "Confidence");
-        foreach (var chunk in body.Chunks.OrderByDescending(chunk => chunk.Bytes).ThenBy(chunk => chunk.Order))
+        var ordered = body.Chunks
+            .OrderByDescending(chunk => chunk.Bytes)
+            .ThenBy(chunk => chunk.Order)
+            .ToList();
+        foreach (var chunk in ordered.Where(chunk => chunk.Bytes >= MinimumBodyChunkRowBytes))
         {
             table.AddRow(
                 Markup.Escape(chunk.Name),
@@ -62,6 +68,18 @@ public static class DrilldownTables
                 SizeFormat.ShortBytes(chunk.Bytes),
                 SizeFormat.Percent(chunk.Bytes, body.UncompressedBytes),
                 Theme.ConfidenceGlyph(chunk.Confidence));
+        }
+
+        var smaller = ordered.Where(chunk => chunk.Bytes < MinimumBodyChunkRowBytes).ToList();
+        if (smaller.Count > 0)
+        {
+            var combinedBytes = smaller.Sum(chunk => chunk.Bytes);
+            table.AddRow(
+                $"and {smaller.Count} more",
+                "—",
+                SizeFormat.ShortBytes(combinedBytes),
+                SizeFormat.Percent(combinedBytes, body.UncompressedBytes),
+                "—");
         }
 
         console.Write(table);

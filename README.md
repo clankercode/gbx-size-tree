@@ -1,5 +1,13 @@
 # gbx-size-tree
 
+<p align="center">
+  <img
+    src="docs/assets/readme-hero.png"
+    alt="gbx-size-tree showing an exact on-disk Trackmania map breakdown and a verified 7.5 percent lossless size reduction"
+    width="800"
+  />
+</p>
+
 Colorful size breakdown + optimizer for Trackmania 2020 `.Map.Gbx` files. See exactly what's
 eating your map's bytes — lightmap, embedded items, block/item placements, thumbnail — then
 shrink it: lossless recompression, embedded-zip optimization, and flag-gated lossy trims,
@@ -19,8 +27,6 @@ gbx-size-tree <file.Map.Gbx> --json       # machine-readable report
 
 Double-clicking the exe (Windows/Wine) opens a file picker (defaults to your
 `Documents/Trackmania/Maps`) and an interactive session, and pauses before closing.
-
-<!-- TODO: screenshot -->
 
 ## Why sizes are "uncompressed"
 

@@ -8,15 +8,15 @@ default: build
 
 # flock serializes builds when parallel implementation agents share this machine.
 build:
-    flock /tmp/gbx-size-tree.build.lock dotnet build -m:2
+    flock --close /tmp/gbx-size-tree.build.lock dotnet build -m:2
 
 # NB: `-m:2` silently breaks MTP-mode `dotnet test` (runs 0 tests) — build first, test bare.
 test: build
-    flock /tmp/gbx-size-tree.build.lock dotnet test
+    flock --close /tmp/gbx-size-tree.build.lock dotnet test --no-build
 
 # Run one test class, e.g. `just test-one SkippableScanner` (xunit v3 MTP wildcard filter)
 test-one FILTER: build
-    flock /tmp/gbx-size-tree.build.lock dotnet test -- --filter-class "*{{FILTER}}*"
+    flock --close /tmp/gbx-size-tree.build.lock dotnet test --no-build -- --filter-class "*{{FILTER}}*"
 
 # NB: `dotnet run -m:2` forwards -m:2 to the app; build first, then run --no-build.
 run *ARGS: build

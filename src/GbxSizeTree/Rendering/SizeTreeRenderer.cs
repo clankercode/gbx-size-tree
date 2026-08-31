@@ -29,7 +29,12 @@ public static class SizeTreeRenderer
 
         foreach (var child in visible)
         {
-            var childNode = parent.AddNode(NodeMarkup(child, node.UncompressedBytes));
+            var topLevelOnDisk = node.Id == "file" && node.OnDiskBytes is not null;
+            var parentBytes = topLevelOnDisk ? node.OnDiskBytes!.Value : node.UncompressedBytes;
+            var childPercentBytes = topLevelOnDisk
+                ? child.OnDiskBytes ?? child.EstimatedOnDiskBytes ?? child.UncompressedBytes
+                : child.UncompressedBytes;
+            var childNode = parent.AddNode(NodeMarkup(child, parentBytes, childPercentBytes));
             AddChildren(childNode, child, topN);
         }
 
@@ -40,12 +45,12 @@ public static class SizeTreeRenderer
         }
     }
 
-    private static string NodeMarkup(SizeNode node, long parentBytes)
+    private static string NodeMarkup(SizeNode node, long parentBytes, long? percentBytes = null)
     {
         var color = Theme.CategoryColor(node.Category).ToMarkup();
         var label = Markup.Escape(node.Label);
         var bytes = SizeFormat.ShortBytes(node.UncompressedBytes).PadLeft(11);
-        var percent = SizeFormat.Percent(node.UncompressedBytes, parentBytes).PadLeft(6);
+        var percent = SizeFormat.Percent(percentBytes ?? node.UncompressedBytes, parentBytes).PadLeft(6);
         var onDisk = node.OnDiskBytes is long exactOnDisk
             ? $" [dim]on disk {Markup.Escape(SizeFormat.ShortBytes(exactOnDisk))}[/]"
             : node.EstimatedOnDiskBytes is long estimatedOnDisk

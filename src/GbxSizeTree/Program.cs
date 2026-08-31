@@ -1,5 +1,7 @@
 using System.Reflection;
 using GBX.NET;
+using GbxSizeTree.Actions;
+using GbxSizeTree.Actions.Passes;
 using GbxSizeTree.Cli;
 using GbxSizeTree.Cli.Modes;
 using GbxSizeTree.Cli.Platform;
@@ -14,6 +16,13 @@ var (options, parseError) = ArgParser.Parse(args);
 var probe = LaunchModeDetector.ProbeCurrent();
 var launchKind = LaunchModeDetector.Detect(probe);
 var exitCode = ExitCodes.Ok;
+var registry = new ActionRegistry([
+    new OrphanEmbedsAction(),
+    new EmbeddedZipAction(),
+    new StripLightmapAction(),
+    new ThumbnailAction(new ImageSharpJpegRecoder()),
+    new ResaveAction(),
+]);
 
 try
 {
@@ -51,13 +60,22 @@ try
         }
         else
         {
-            if (options.Optimize || options.Interactive || options.StripLightmap
-                || options.Actions.Count > 0 || options.DryRun)
+            var automaticInteractive = launchKind == LaunchKind.GuiOwnConsole
+                && !options.NonInteractive
+                && !options.Json
+                && !options.Optimize;
+            if (options.Interactive || automaticInteractive)
             {
-                Console.Error.WriteLine(
-                    "note: optimization actions are not wired up in this build yet — showing the report only.");
+                exitCode = InteractiveMode.Run(input, options, registry);
             }
-            exitCode = ReportMode.Run(input, options);
+            else if (ActionSelection.WantsOptimization(options))
+            {
+                exitCode = BatchMode.Run(input, options, registry);
+            }
+            else
+            {
+                exitCode = ReportMode.Run(input, options, registry);
+            }
         }
     }
 }

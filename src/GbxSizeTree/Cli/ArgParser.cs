@@ -30,7 +30,6 @@ public static class ArgParser
         var embedStored = false;
         var actions = new List<string>();
         var noActions = new List<string>();
-        var measureActions = false;
         var dryRun = false;
         var experimental = false;
         var verbose = false;
@@ -141,9 +140,6 @@ public static class ArgParser
 
                     AddList(noActions, noActionValue);
                     break;
-                case "--measure-actions":
-                    measureActions = true;
-                    break;
                 case "--dry-run":
                     dryRun = true;
                     break;
@@ -219,7 +215,6 @@ public static class ArgParser
             EmbedStored = embedStored,
             Actions = actions.ToArray(),
             NoActions = noActions.ToArray(),
-            MeasureActions = measureActions,
             DryRun = dryRun,
             Experimental = experimental,
             Verbose = verbose,

@@ -11,6 +11,9 @@ namespace GbxSizeTree.Tests.Drilldown;
 
 public class MiscDrilldownTests
 {
+    private static readonly Lazy<(CGameCtnChallenge Map, byte[] Bytes)> Sample =
+        new(LoadSampleDecompressed);
+
     [Fact]
     public void ScriptMetadata_WithNullRegion_ReturnsNull()
     {
@@ -61,7 +64,7 @@ public class MiscDrilldownTests
     public void SampleScriptMetadataRegion_ReturnsBoundedParsedInfo()
     {
         SampleMap.SkipUnlessAvailable();
-        var (map, bytes) = LoadSampleDecompressed();
+        var (map, bytes) = Sample.Value;
         var region = FindSkippableRegion(bytes, 0x03043044);
 
         var result = new ScriptMetadataDrilldown().Inspect(bytes, region, map);
@@ -89,7 +92,7 @@ public class MiscDrilldownTests
     public void SampleMediaTracker_ReturnsConsistentClipCount()
     {
         SampleMap.SkipUnlessAvailable();
-        var (map, _) = LoadSampleDecompressed();
+        var (map, _) = Sample.Value;
 
         var result = new MediaTrackerDrilldown().Inspect(map, 1_000);
         var expectedClipCount =

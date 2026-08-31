@@ -10,6 +10,10 @@ namespace GbxSizeTree.Tests.Drilldown;
 
 public sealed class EmbeddedZipDrilldownTests
 {
+    private static readonly Lazy<(
+        CGameCtnChallenge Map,
+        GbxSizeTree.Model.EmbeddedZipInfo Result)> Sample = new(LoadSample);
+
     [Fact]
     public void Inspect_MapWithoutEmbeddedData_ReturnsNull()
     {
@@ -74,6 +78,11 @@ public sealed class EmbeddedZipDrilldownTests
     private static (CGameCtnChallenge Map, GbxSizeTree.Model.EmbeddedZipInfo Result) InspectSampleWithMap()
     {
         SampleMap.SkipUnlessAvailable();
+        return Sample.Value;
+    }
+
+    private static (CGameCtnChallenge Map, GbxSizeTree.Model.EmbeddedZipInfo Result) LoadSample()
+    {
         Gbx.LZO = new Lzo();
         Gbx.ZLib = new ZLib();
         var map = Gbx.Parse<CGameCtnChallenge>(SampleMap.Path).Node;

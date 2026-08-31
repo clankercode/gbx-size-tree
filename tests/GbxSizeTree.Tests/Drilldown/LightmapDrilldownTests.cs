@@ -12,6 +12,11 @@ namespace GbxSizeTree.Tests.Drilldown;
 public sealed class LightmapDrilldownTests
 {
     private const uint LightmapChunkId = 0x0304305B;
+    private static readonly Lazy<(
+        CGameCtnChallenge Map,
+        byte[] DecompressedFile,
+        RawChunkRegion Region,
+        LightmapInfo Info)> Sample = new(LoadSample);
 
     [Fact]
     public void Inspect_SampleLightmap_ReportsVersionFramesAndThreeBuffersPerFrame()
@@ -84,6 +89,15 @@ public sealed class LightmapDrilldownTests
         LightmapInfo Info) InspectSample()
     {
         SampleMap.SkipUnlessAvailable();
+        return Sample.Value;
+    }
+
+    private static (
+        CGameCtnChallenge Map,
+        byte[] DecompressedFile,
+        RawChunkRegion Region,
+        LightmapInfo Info) LoadSample()
+    {
         Gbx.LZO = new Lzo();
         Gbx.ZLib = new ZLib();
 
