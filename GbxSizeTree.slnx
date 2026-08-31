@@ -3,4 +3,7 @@
     <Project Path="src/GbxSizeTree.Core/GbxSizeTree.Core.csproj" />
     <Project Path="src/GbxSizeTree/GbxSizeTree.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/GbxSizeTree.Tests/GbxSizeTree.Tests.csproj" />
+  </Folder>
 </Solution>

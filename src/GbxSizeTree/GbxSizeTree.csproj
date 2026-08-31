@@ -4,9 +4,14 @@
     <OutputType>Exe</OutputType>
     <AssemblyName>gbx-size-tree</AssemblyName>
     <RootNamespace>GbxSizeTree.Cli</RootNamespace>
+  </PropertyGroup>
+
+  <!-- Publish-only: keeps ordinary builds framework-dependent so the test project can reference this exe. -->
+  <PropertyGroup Condition="'$(_IsPublishing)' == 'true'">
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
 
   <ItemGroup>
