@@ -1,0 +1,262 @@
+{
+  "schemaVersion": 1,
+  "analysis": {
+    "SourceLabel": "<path>",
+    "FileBytes": 12000,
+    "Header": {
+      "TotalBytes": 2000,
+      "Chunks": [
+        {
+          "ChunkId": 50606087,
+          "Name": "Thumbnail",
+          "Bytes": 1000,
+          "Heavy": true,
+          "FileOffset": 100
+        },
+        {
+          "ChunkId": 50606085,
+          "Name": "XML",
+          "Bytes": 900,
+          "Heavy": true,
+          "FileOffset": 1100
+        }
+      ],
+      "Thumbnail": {
+        "ChunkBytes": 1000,
+        "JpegBytes": 950,
+        "Width": 512,
+        "Height": 512,
+        "CommentLength": 0,
+        "StrippableMetadataBytes": 120
+      },
+      "XmlLength": 900
+    },
+    "Body": {
+      "UncompressedBytes": 10000,
+      "CompressedBytes": 7000,
+      "Ratio": 0.7,
+      "Chunks": [
+        {
+          "ChunkId": 50606111,
+          "Name": "Blocks",
+          "Category": "Blocks",
+          "Description": "block placements",
+          "Bytes": 4000,
+          "Confidence": "WriterDelta",
+          "BodyOffset": 0,
+          "Skippable": false,
+          "Order": 0,
+          "PrecompressedPayloadBytes": 0
+        },
+        {
+          "ChunkId": 50606171,
+          "Name": "Lightmap",
+          "Category": "Lightmap",
+          "Description": "baked shadows",
+          "Bytes": 2350,
+          "Confidence": "ExactOnDisk",
+          "BodyOffset": 4000,
+          "Skippable": true,
+          "Order": 1,
+          "PrecompressedPayloadBytes": 2300
+        },
+        {
+          "ChunkId": 50606164,
+          "Name": "Embedded items",
+          "Category": "EmbeddedItems",
+          "Description": "custom items zip",
+          "Bytes": 3100,
+          "Confidence": "ExactOnDisk",
+          "BodyOffset": 6350,
+          "Skippable": true,
+          "Order": 2,
+          "PrecompressedPayloadBytes": 3000
+        }
+      ],
+      "UnattributedBytes": 550,
+      "EmbeddedZip": {
+        "ZipBytes": 3000,
+        "EntriesUncompressedBytes": 6000,
+        "Entries": [
+          {
+            "Path": "Items/A.Item.Gbx",
+            "CompressedBytes": 2000,
+            "UncompressedBytes": 4000,
+            "Method": "Deflate",
+            "IsGbx": true,
+            "HasCompressedGbxBody": true,
+            "RecompressibleSavingsEstimate": 500,
+            "IsReferenced": true
+          },
+          {
+            "Path": "Items/Orphan.Item.Gbx",
+            "CompressedBytes": 1000,
+            "UncompressedBytes": 2000,
+            "Method": "Deflate",
+            "IsGbx": true,
+            "HasCompressedGbxBody": false,
+            "IsReferenced": false
+          }
+        ],
+        "ReferencedIdents": [
+          "A"
+        ]
+      },
+      "Lightmap": {
+        "HasLightmaps": true,
+        "Version": 8,
+        "FrameCount": 3,
+        "Frames": [
+          {
+            "Index": 0,
+            "BlobBytes": [
+              300,
+              200,
+              100
+            ]
+          },
+          {
+            "Index": 1,
+            "BlobBytes": [
+              300,
+              200,
+              100
+            ]
+          },
+          {
+            "Index": 2,
+            "BlobBytes": [
+              300,
+              200,
+              100
+            ]
+          }
+        ],
+        "WebpBytesTotal": 1800,
+        "ZlibCompressedBytes": 500,
+        "ZlibUncompressedBytes": 900,
+        "ChunkBytes": 2350
+      },
+      "ScriptMetadata": {
+        "ChunkBytes": 400,
+        "EntryCount": 3,
+        "TraitNames": [
+          "MapType",
+          "Foo",
+          "Bar"
+        ]
+      },
+      "MediaTracker": {
+        "ChunkBytes": 200,
+        "ClipCount": 1,
+        "Summary": "intro clip"
+      }
+    },
+    "Facts": {
+      "MapUid": "FAKEUID",
+      "MapName": "Fake Map",
+      "AuthorLogin": "fakeauthor",
+      "BlockCount": 100,
+      "AnchoredObjectCount": 50,
+      "BakedBlockCount": 10,
+      "FreeBlockCount": 2,
+      "HasLightmaps": true,
+      "LightmapFrameCount": 3,
+      "LightmapVersion": 8,
+      "EmbeddedEntryCount": 2
+    },
+    "Warnings": [
+      {
+        "Code": "fake",
+        "Message": "this analysis is synthetic"
+      }
+    ],
+    "Tree": {
+      "Id": "file",
+      "Label": "Fake Map.Map.Gbx",
+      "Category": "Other",
+      "UncompressedBytes": 12000,
+      "OnDiskBytes": 12000,
+      "Confidence": "ExactOnDisk",
+      "Children": [
+        {
+          "Id": "header",
+          "Label": "Header",
+          "Category": "Header",
+          "UncompressedBytes": 2000,
+          "OnDiskBytes": 2000,
+          "Confidence": "ExactOnDisk",
+          "Children": [
+            {
+              "Id": "header.thumbnail",
+              "Label": "Thumbnail",
+              "Category": "Thumbnail",
+              "UncompressedBytes": 1000,
+              "OnDiskBytes": 1000,
+              "Confidence": "ExactOnDisk",
+              "Detail": "JPEG 512x512",
+              "Children": []
+            },
+            {
+              "Id": "header.xml",
+              "Label": "XML metadata",
+              "Category": "Metadata",
+              "UncompressedBytes": 900,
+              "OnDiskBytes": 900,
+              "Confidence": "ExactOnDisk",
+              "Children": []
+            }
+          ]
+        },
+        {
+          "Id": "body",
+          "Label": "Body",
+          "Category": "Other",
+          "UncompressedBytes": 10000,
+          "OnDiskBytes": 7000,
+          "Confidence": "ExactOnDisk",
+          "Children": [
+            {
+              "Id": "body.blocks",
+              "Label": "Blocks",
+              "Category": "Blocks",
+              "UncompressedBytes": 4000,
+              "EstimatedOnDiskBytes": 1800,
+              "Confidence": "WriterDelta",
+              "Detail": "100 blocks",
+              "Children": []
+            },
+            {
+              "Id": "body.lightmap",
+              "Label": "Lightmap",
+              "Category": "Lightmap",
+              "UncompressedBytes": 2350,
+              "EstimatedOnDiskBytes": 2300,
+              "Confidence": "ExactOnDisk",
+              "Detail": "3 frames",
+              "Children": []
+            },
+            {
+              "Id": "body.embedded",
+              "Label": "Embedded items",
+              "Category": "EmbeddedItems",
+              "UncompressedBytes": 3100,
+              "EstimatedOnDiskBytes": 2900,
+              "Confidence": "ExactOnDisk",
+              "Detail": "2 entries",
+              "Children": []
+            },
+            {
+              "Id": "body.residual",
+              "Label": "Unattributed residual",
+              "Category": "Residual",
+              "UncompressedBytes": 550,
+              "Confidence": "Estimated",
+              "Children": []
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
