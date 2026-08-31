@@ -100,10 +100,17 @@ the zlib cache holds only mapping metadata, no pixels):
   652² slot (q95 re-encode is 66% smaller there).
 - Per Max's Ghidra research (E++ lightmap-encoding note), the map-embedded CacheSmall
   drives the editor/preview lighting; in-game lighting loads from the external cache pack.
-- Test artifacts built via GBX.NET frame-data swap (re-parse-verified, NOT yet game-tested),
-  in `~/Downloads`: `…_lmq90.Map.Gbx` (6,909,807 B — under the online limit from the WebP
-  re-encode + resave alone) and `…_lmjpg.Map.Gbx` (7,208,355 B, all five blobs JFIF JPEG —
-  probes whether the game's loader sniffs content or requires WebP).
+- Test artifacts built via GBX.NET frame-data swap, in `~/Downloads`: `…_lmq90.Map.Gbx`
+  (6,909,807 B — under the online limit from the WebP re-encode + resave alone) and
+  `…_lmjpg.Map.Gbx` (7,208,355 B, all five blobs JFIF JPEG).
+- **In-game result (2026-09-01): loading a swapped map CRASHED the game** (Max; believed to
+  be the JPEG variant — renamed `.crashed-do-not-load`). Control experiment exonerates the
+  save path: a no-op frame swap (original bytes re-written through GBX.NET's materialized
+  `LightmapFrames`) is **byte-identical** to the validated resave-only output
+  (SHA256 7daaeee8…), so the crash is blob-content-driven. Conclusion: the lightmap loader
+  does not tolerate JPEG in these slots — the webp→jpg idea is dead (dropped at Max's call,
+  and JPEG was worse than WebP at equal quality anyway). A `recompress-lightmap` (WebP q~90,
+  T2) remains plausible but needs an in-game pass of `…_lmq90.Map.Gbx` first.
 
 ## Library pins
 
