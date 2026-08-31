@@ -41,8 +41,12 @@ publish-win:
 
 publish: publish-linux publish-win
 
+# A dirty worktree stamps a stale commit hash into --version (bitten once; see git log).
+_assert-clean:
+    @git diff --quiet && git diff --cached --quiet || { echo "refusing to release from a dirty worktree: binaries would carry a stale version stamp. Commit first."; exit 1; }
+
 # Release zips (binary + license/notices/readme), one per OS, under artifacts/release/.
-release: publish
+release: _assert-clean publish
     rm -rf artifacts/release && mkdir -p artifacts/release/stage
     cp LICENSE THIRD-PARTY-NOTICES.md README.md artifacts/release/stage/
     cp artifacts/linux-x64/gbx-size-tree artifacts/release/stage/

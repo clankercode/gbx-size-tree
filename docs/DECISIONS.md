@@ -25,6 +25,23 @@
 - The orphan-removal increment over the resave-only baseline was 167,004 B. Both outputs
   reparsed and passed the identity/count validation gate before they were written.
 
+## Post-v0.1.0 improvement batch (2026-09-01)
+
+- **Trimmed publish is now the default** (16.1 MB linux / 14.4 MB win vs ~41 MB untrimmed,
+  zero trim warnings). Gates run before flipping: trimmed report output byte-identical to
+  untrimmed, `--optimize` output SHA256-identical, wine render + pty interactive clean.
+  Escape hatch: `-p:PublishTrimmed=false`.
+- **Resave Detect estimate**: 5% of the compressed body, `Heuristic` (measured 5.4% on the
+  sample). Chosen over a trial LZO999 in Detect (cost ≈ a full materialize) and over
+  0/`MeasuredOnSave` (ranked the guaranteed win last and the under-limit verdict ignored it).
+- **`--attribute`** replays cumulative prefixes to attribute savings per action; the baseline
+  prefix must apply `resave` explicitly because an empty session set short-circuits to the
+  original bytes. Sample attribution: recompression 420,007 B + orphan-embeds 167,004 B.
+- **JSON is camelCase throughout** (pre-release contract change; enum values stay PascalCase).
+  Golden regen: `just golden-update`.
+- `just release` refuses a dirty worktree — a stale HEAD hash was once stamped into shipped
+  binaries when zips were built before the commit.
+
 ## Test stack gotchas (xunit v3 + .NET 10)
 
 - xunit.v3 4.0 under the new `dotnet test` (MTP mode): opt-in lives in **global.json** `"test": {"runner": "Microsoft.Testing.Platform"}` (NOT dotnet.config); the test csproj needs `UseMicrosoftTestingPlatformRunner=true` (else xunit's own console runner answers and MTP flags fail).

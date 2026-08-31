@@ -23,6 +23,7 @@ gbx-size-tree <file.Map.Gbx>              # full diagnostic tree + recommendatio
 gbx-size-tree <file.Map.Gbx> -i           # interactive: pick actions, re-measure, save
 gbx-size-tree <file.Map.Gbx> --optimize   # apply all lossless actions, write output
 gbx-size-tree <file.Map.Gbx> --json       # machine-readable report
+gbx-size-tree <file.Map.Gbx> -O --attribute  # optimize + per-action savings breakdown
 ```
 
 Double-clicking the exe (Windows/Wine) opens a file picker (defaults to your
@@ -38,8 +39,8 @@ honest per-chunk on-disk *estimate* (already-compressed payloads like WebP/JPEG/
 ## Building
 
 .NET 10 SDK, then `just build` / `just test` / `just publish` (self-contained single-file for
-linux-x64 + win-x64). **Do not enable NativeAOT on CachyOS-style v4-CRT hosts** — see the note
-in `Directory.Build.props`.
+linux-x64 + win-x64, trimmed, ~15 MB each; `just release` builds the zips). **Do not enable
+NativeAOT on CachyOS-style v4-CRT hosts** — see the note in `Directory.Build.props`.
 
 ## License
 
