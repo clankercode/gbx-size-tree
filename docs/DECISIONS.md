@@ -45,8 +45,9 @@
   original bytes. Sample attribution: recompression 420,007 B + orphan-embeds 167,004 B.
 - **JSON is camelCase throughout** (pre-release contract change; enum values stay PascalCase).
   Golden regen: `just golden-update`.
-- `just release` refuses a dirty worktree — a stale HEAD hash was once stamped into shipped
-  binaries when zips were built before the commit.
+- `just package` (local zips) and `just release X.Y.Z` (bump+tag, RELEASE.md flow) both
+  refuse a dirty worktree — a stale HEAD hash was once stamped into shipped binaries when
+  zips were built before the commit.
 
 ## Test stack gotchas (xunit v3 + .NET 10)
 

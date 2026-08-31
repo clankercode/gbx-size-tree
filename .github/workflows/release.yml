@@ -1,0 +1,129 @@
+name: release
+
+# Tag vX.Y.Z → test gate → publish linux-x64 + win-x64 single-file binaries →
+# zip with LICENSE/notices/README → GitHub Release with auto-generated notes.
+# After CI succeeds, an agent/human MUST finalize the release notes from
+# CHANGELOG.md via `gh release edit` — full procedure: RELEASE.md (keep that
+# file in sync if this workflow changes).
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build and pack only (skip the GitHub Release)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.event.deleted }}" == "true" ]]; then
+            echo "Tag deletion events cannot create or publish a release."
+            exit 1
+          fi
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.dry_run }}" != "true" ]]; then
+            echo "Manual dispatch is dry-run only; push a vX.Y.Z tag for a real release."
+            exit 1
+          fi
+          PROPS_VER=$(grep -oPm1 '(?<=<Version>)[^<]+' Directory.Build.props)
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="v${PROPS_VER}"
+          fi
+          if [[ ! "${TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Tag '${TAG}' must look like v1.2.3"
+            exit 1
+          fi
+          VERSION="${TAG#v}"
+          if [[ "${PROPS_VER}" != "${VERSION}" ]]; then
+            echo "Directory.Build.props <Version> (${PROPS_VER}) != tag version (${VERSION})"
+            echo "Run 'just release ${VERSION}' to bump before tagging."
+            exit 1
+          fi
+          if ! grep -q "^## \[${VERSION}\]" CHANGELOG.md; then
+            echo "CHANGELOG.md has no '## [${VERSION}]' section — write it before tagging."
+            exit 1
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Releasing ${TAG} (${VERSION})"
+
+  release:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # Test gate: never ship binaries from a commit that fails the suite.
+      - run: dotnet build -m:2
+      - run: dotnet test --no-build
+
+      - name: Publish binaries (trimmed single-file, both RIDs)
+        run: |
+          dotnet publish src/GbxSizeTree -m:2 -c Release -r linux-x64 -o artifacts/linux-x64
+          dotnet publish src/GbxSizeTree -m:2 -c Release -r win-x64 -o artifacts/win-x64
+
+      - name: Package release zips
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ needs.version.outputs.version }}"
+          mkdir -p artifacts/release/stage
+          cp LICENSE THIRD-PARTY-NOTICES.md README.md artifacts/release/stage/
+          cp artifacts/linux-x64/gbx-size-tree artifacts/release/stage/
+          (cd artifacts/release/stage && zip -q "../gbx-size-tree-${version}-linux-x64.zip" gbx-size-tree LICENSE THIRD-PARTY-NOTICES.md README.md)
+          rm artifacts/release/stage/gbx-size-tree
+          cp artifacts/win-x64/gbx-size-tree.exe artifacts/release/stage/
+          (cd artifacts/release/stage && zip -q "../gbx-size-tree-${version}-win-x64.zip" gbx-size-tree.exe LICENSE THIRD-PARTY-NOTICES.md README.md)
+          rm -rf artifacts/release/stage
+          ls -lh artifacts/release/
+
+      - name: Smoke the linux binary
+        run: |
+          artifacts/linux-x64/gbx-size-tree --version
+          artifacts/linux-x64/gbx-size-tree --help > /dev/null
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-zips
+          path: artifacts/release/*.zip
+          if-no-files-found: error
+
+      - name: Create / update GitHub Release
+        if: ${{ github.event_name == 'push' && github.ref_type == 'tag' && github.event.deleted == false }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: gbx-size-tree ${{ needs.version.outputs.version }}
+          generate_release_notes: true
+          files: artifacts/release/*.zip
+
+      - name: Dry-run summary
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: |
+          echo "Dry run complete. Artifacts staged but not published."
+          ls -lh artifacts/release/

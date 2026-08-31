@@ -43,10 +43,21 @@ publish: publish-linux publish-win
 
 # A dirty worktree stamps a stale commit hash into --version (bitten once; see git log).
 _assert-clean:
-    @git diff --quiet && git diff --cached --quiet || { echo "refusing to release from a dirty worktree: binaries would carry a stale version stamp. Commit first."; exit 1; }
+    @git diff --quiet && git diff --cached --quiet || { echo "refusing: dirty worktree would stamp a stale version into the binaries. Commit first."; exit 1; }
 
-# Release zips (binary + license/notices/readme), one per OS, under artifacts/release/.
-release: _assert-clean publish
+# Cut a release: verify CHANGELOG section, bump Directory.Build.props, commit, tag.
+# Pushes commit + tag when an 'origin' remote exists (that starts release.yml). See RELEASE.md.
+release VERSION: _assert-clean
+    @grep -q '^## \[{{VERSION}}\]' CHANGELOG.md || { echo "CHANGELOG.md needs a '## [{{VERSION}}]' section first (see RELEASE.md)"; exit 1; }
+    sed -i 's#<Version>[^<]*</Version>#<Version>{{VERSION}}</Version>#' Directory.Build.props
+    @grep -q '<Version>{{VERSION}}</Version>' Directory.Build.props
+    git add Directory.Build.props CHANGELOG.md
+    git commit -m "chore: release v{{VERSION}}"
+    git tag -a v{{VERSION}} -m "v{{VERSION}}"
+    @git remote get-url origin >/dev/null 2>&1 && { git push origin HEAD && git push origin v{{VERSION}} && echo "Pushed — release.yml is running (gh run watch)"; } || echo "No 'origin' remote — push manually: git push origin HEAD && git push origin v{{VERSION}}"
+
+# Local release zips (binary + license/notices/readme), one per OS, under artifacts/release/.
+package: _assert-clean publish
     rm -rf artifacts/release && mkdir -p artifacts/release/stage
     cp LICENSE THIRD-PARTY-NOTICES.md README.md artifacts/release/stage/
     cp artifacts/linux-x64/gbx-size-tree artifacts/release/stage/

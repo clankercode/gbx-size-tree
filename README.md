@@ -39,8 +39,9 @@ honest per-chunk on-disk *estimate* (already-compressed payloads like WebP/JPEG/
 ## Building
 
 .NET 10 SDK, then `just build` / `just test` / `just publish` (self-contained single-file for
-linux-x64 + win-x64, trimmed, ~15 MB each; `just release` builds the zips). **Do not enable
-NativeAOT on CachyOS-style v4-CRT hosts** — see the note in `Directory.Build.props`.
+linux-x64 + win-x64, trimmed, ~15 MB each; `just package` builds the zips locally). Releases
+are cut with `just release X.Y.Z` — see `RELEASE.md`. **Do not enable NativeAOT on
+CachyOS-style v4-CRT hosts** — see the note in `Directory.Build.props`.
 
 ## License
 
