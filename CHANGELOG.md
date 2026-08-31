@@ -29,5 +29,7 @@ Initial release.
   linux-x64 and win-x64 (~16/14 MB).
 
 ### Distribution
-- Measured on the reference map: default lossless pipeline 7,832,571 → 7,245,531 B
-  (7.5% saved), taking it from ~481 KiB over the online limit to 92 KiB under.
+- Measured on the reference map: identity-safe default lossless pipeline 7,832,571 →
+  7,410,663 B (5.4% saved), leaving it about 69 KiB over the online limit. The serializer
+  preserves aliased embedded-item identities and orphan removal deletes only genuinely
+  unused entries.

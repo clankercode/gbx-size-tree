@@ -3,7 +3,7 @@
 <p align="center">
   <img
     src="docs/assets/readme-hero.png"
-    alt="gbx-size-tree showing an exact on-disk Trackmania map breakdown and a verified 7.5 percent lossless size reduction"
+    alt="gbx-size-tree showing an exact on-disk Trackmania map breakdown and a verified 5.4 percent lossless size reduction"
     width="800"
   />
 </p>
@@ -28,8 +28,8 @@ never suggested when a lossless pass suffices).
   and vertex counts, element counts, confidence markers, residual bytes, and optional complete
   or unknown-only chunk views. Recovered counts for legacy items are prefixed with `~`.
 - **Measured lossless optimization** — trial resave, orphaned-embed removal, embedded-ZIP
-  recompression, and exact post-save validation. `--attribute` measures each action's marginal
-  contribution.
+  recompression, identity-safe map serialization, and exact post-save validation.
+  `--attribute` measures each action's marginal contribution.
 - **Explicit visual edits** — thumbnail controls, baked-lightmap removal, and DD2-style shadow
   lightening. Destructive or quality-changing actions are opt-in and kept out of the default
   lossless recommendation verdict.

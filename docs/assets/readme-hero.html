@@ -232,6 +232,15 @@
         text-align: center;
       }
       .saved b { color: var(--green); }
+      .result.remaining {
+        border-color: rgba(255, 184, 77, .35);
+        background: linear-gradient(135deg, rgba(255, 184, 77, .08), rgba(255, 106, 26, .04));
+      }
+      .result.remaining .metric.after strong { color: #ffbd59; }
+      .result.remaining .saved {
+        border-top-color: rgba(255, 184, 77, .22);
+        color: #ffd39a;
+      }
     </style>
   </head>
   <body>
@@ -271,11 +280,11 @@
           <div class="barrow"><span>Everything else</span><span class="track"><span class="fill rest"></span></span><span class="bytes">650.5 KiB</span></div>
         </div>
         <div class="accounted">Accounted on disk: 7,832,571 B / 7,832,571 B</div>
-        <div class="result">
+        <div class="result remaining">
           <div class="metric"><small>Before</small><strong>7,832,571 B</strong></div>
           <div class="arrow">→</div>
-          <div class="metric after"><small>After</small><strong>7,245,560 B</strong></div>
-          <div class="saved"><b>✓ 587,011 B saved (7.5%)</b> · now under the online limit</div>
+          <div class="metric after"><small>After</small><strong>7,410,663 B</strong></div>
+          <div class="saved"><b>✓ 421,908 B saved (5.4%)</b> · 69 KiB over the online limit</div>
         </div>
       </div>
     </section>

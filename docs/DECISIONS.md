@@ -20,10 +20,12 @@
 - **LZO1x_999 resave only**: 7,832,571 B → **7,412,564 B**, saving 420,007 B
   (**5.4%**). It remains 72,532 B over the online-play limit.
 - **Default T1 pipeline** (`orphan-embeds`, `embed-zip`, `resave`): the embedded ZIP was
-  already optimal; removing 12 unreferenced entries plus the LZO1x_999 resave produced
-  **7,245,560 B**, saving 587,011 B (**7.5%**) and finishing 94,472 B under the limit.
-- The orphan-removal increment over the resave-only baseline was 167,004 B. Both outputs
-  reparsed and passed the identity/count validation gate before they were written.
+  already optimal; identity-safe removal of 3 genuinely unreferenced entries plus the
+  LZO1x_999 resave and dead-chunk pruning produced **7,410,663 B**, saving 421,908 B
+  (**5.4%**) and remaining 70,631 B over the limit.
+- The corrected marginal attribution is recompression 420,007 B + dead chunks 29 B +
+  orphan embeds 1,872 B. The former 12-entry result was invalid: nine live entries used
+  aliased identities whose paths did not match their ZIP locations.
 
 ## Post-v0.1.0 improvement batch (2026-09-01)
 
@@ -42,7 +44,8 @@
   ranking and the verdict, still available via `--strip-lightmap`/menu.
 - **`--attribute`** replays cumulative prefixes to attribute savings per action; the baseline
   prefix must apply `resave` explicitly because an empty session set short-circuits to the
-  original bytes. Sample attribution: recompression 420,007 B + orphan-embeds 167,004 B.
+  original bytes. Sample attribution: recompression 420,007 B + prune-chunks 29 B +
+  orphan-embeds 1,872 B.
 - **JSON is camelCase throughout** (pre-release contract change; enum values stay PascalCase).
   Golden regen: `just golden-update`.
 - `just package` (local zips) and `just release X.Y.Z` (bump+tag, RELEASE.md flow) both
@@ -60,8 +63,9 @@
 - **`prune-chunks` (T1, default-on, Order 5)** removes the three body chunks the game
   provably discards on load (Ghidra: 0x05E parsed-then-freed, 0x061 cleared after read,
   0x064 temp-vector stub) — 92 B uncompressed on the sample, 29 B on-disk marginal. Default
-  pipeline is now 7,832,571 → **7,245,531 B** (587,040 B, 7.5%), 94,501 B under the limit;
-  output SHA256 7b74bbe1…. after Max's 2026-09-01 Ghidra pass over
+  pipeline contribution remains 29 B on top of the identity-safe resave/orphan result;
+  after the full default pipeline the map is 7,410,663 B, still 70,631 B over the limit.
+  This follows Max's 2026-09-01 Ghidra pass over
   `CGameCtnChallenge_SerializeChunk` (table in FORMAT-NOTES.md; full layouts in his private
   notes). Ghidra overrides GBX.NET naming where they conflict: 0x018 is not laps in TM2020,
   0x036 is medal times + comments (not a thumbnail camera), and 0x05D — the former 5,357 B
@@ -126,7 +130,8 @@ the zlib cache holds only mapping metadata, no pixels):
   against whole multi-image buffers. Only the three 1024² diffuse buffers shrink (−7–8.5%,
   ~194 KB total); the HBasis planes balloon +60–148%. A `recompress-lightmap` action would
   need selective re-encoding PLUS a mapping-cache metadata rewrite for ~194 KB of T2-lossy
-  savings — dropped as not worth it (resave+prune already puts the sample 92 KiB under).
+  savings — dropped because the descriptor rewrite and generational-loss risk outweigh the
+  benefit, even though the corrected identity-safe lossless pipeline remains over the limit.
 - **Load-path facts Ghidra-confirmed (2026-09-01)**: `Hms_ModelCreateForZone` decodes each
   embedded sprite via a WebP-only path (`FileWebP::ReadHeader` + libwebp YCbCr import) whose
   results are IGNORED at two levels. No format sniffing; WebP is mandatory. The zlib mapping

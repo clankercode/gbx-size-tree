@@ -187,3 +187,15 @@ Deflate level 9 (LZO'd bodies are high-entropy and defeat deflate; raw bodies de
 Handle the "got bigger" case by keeping the original. The game accepts uncompressed-body gbx
 in embeds. Stored (uncompressed) zip entries would let the outer LZO compress across entries —
 UNVERIFIED in-game, keep behind `--embed-stored`.
+
+### Embedded identity mapping and safe saves
+
+Chunk 0x03043054 stores an ordered `Ident[]` before the ZIP. Its entries map placed item
+identities to parseable item-model ZIP entries by order; the identity path may intentionally
+differ from the ZIP path, and path casing is significant. GBX.NET 2.4.4 reconstructs this
+array from ZIP paths on every normal save, which breaks such aliases even when the ZIP bytes
+are unchanged. Before saving, gbx-size-tree projects the original ordered mapping onto the
+final ZIP (removals only) and supplies the corrected raw chunk payload through
+`ISkippableChunk.Data`. Output validation then compares the reparsed ordered identities
+case-sensitively. Added or renamed item-model ZIP entries fail closed because no original
+mapping exists for them.
