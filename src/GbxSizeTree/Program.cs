@@ -1,28 +1,82 @@
+using System.Reflection;
 using GBX.NET;
-using GBX.NET.Engines.Game;
-using GBX.NET.LZO;
-using GBX.NET.ZLib;
+using GbxSizeTree.Cli;
+using GbxSizeTree.Cli.Modes;
+using GbxSizeTree.Cli.Platform;
 
-// P0 spike: prove parse + publish + native LZO under single-file on linux and wine.
-Gbx.LZO = new Lzo();
-Gbx.ZLib = new ZLib();
+Gbx.LZO = new GBX.NET.LZO.Lzo();
+Gbx.ZLib = new GBX.NET.ZLib.ZLib();
 
-if (args.Length < 1)
+var version = Assembly.GetExecutingAssembly()
+    .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "dev";
+
+var (options, parseError) = ArgParser.Parse(args);
+var probe = LaunchModeDetector.ProbeCurrent();
+var launchKind = LaunchModeDetector.Detect(probe);
+var exitCode = ExitCodes.Ok;
+
+try
 {
-    Console.Error.WriteLine("usage: gbx-size-tree <file.Map.Gbx>");
-    return 1;
+    if (parseError is not null || options is null)
+    {
+        Console.Error.WriteLine($"error: {parseError ?? "invalid arguments"}");
+        Console.Error.WriteLine("run with --help for usage");
+        exitCode = ExitCodes.Usage;
+    }
+    else if (options.ShowHelp)
+    {
+        Console.Write(HelpText.Full(version));
+    }
+    else if (options.ShowVersion)
+    {
+        Console.WriteLine($"gbx-size-tree {version} (GPL-3.0-or-later; uses GBX.NET + GBX.NET.LZO)");
+    }
+    else
+    {
+        var input = options.InputPath;
+        if (input is null && launchKind == LaunchKind.GuiOwnConsole)
+        {
+            IFilePicker picker = OperatingSystem.IsWindows()
+                ? new WindowsFilePicker()
+                : new ZenityFilePicker();
+            input = picker.PickMapFile();
+        }
+
+        if (input is null)
+        {
+            Console.Write(HelpText.Full(version));
+            exitCode = options.InputPath is null && launchKind == LaunchKind.Terminal
+                ? ExitCodes.Usage
+                : ExitCodes.Ok;
+        }
+        else
+        {
+            if (options.Optimize || options.Interactive || options.StripLightmap
+                || options.Actions.Count > 0 || options.DryRun)
+            {
+                Console.Error.WriteLine(
+                    "note: optimization actions are not wired up in this build yet — showing the report only.");
+            }
+            exitCode = ReportMode.Run(input, options);
+        }
+    }
+}
+catch (Exception ex)
+{
+    if (options?.Json == true)
+    {
+        GbxSizeTree.Cli.Output.JsonReportWriter.WriteError(Console.Out, ExitCodes.Internal, ex.Message);
+    }
+    Console.Error.WriteLine($"error: {ex.Message}");
+    if (options?.Verbose == true)
+    {
+        Console.Error.WriteLine(ex.ToString());
+    }
+    exitCode = ex is FileNotFoundException or IOException ? ExitCodes.IoError : ExitCodes.Internal;
+}
+finally
+{
+    PauseOnExit.PauseIfNeeded(options?.Pause, launchKind);
 }
 
-var path = args[0];
-var fileSize = new FileInfo(path).Length;
-var gbx = Gbx.Parse<CGameCtnChallenge>(path);
-var map = gbx.Node;
-
-Console.WriteLine($"file: {path}");
-Console.WriteLine($"file size: {fileSize:N0} B");
-Console.WriteLine($"body: {gbx.Body.UncompressedSize:N0} -> {gbx.Body.CompressedSize:N0} ({gbx.Body.CompressionRatio:P1})");
-Console.WriteLine($"blocks: {map.Blocks?.Count ?? 0:N0}, items: {map.AnchoredObjects?.Count ?? 0:N0}");
-Console.WriteLine($"embedded zip: {map.EmbeddedZipData?.Length ?? 0:N0} B");
-Console.WriteLine($"lightmap zlib: {map.LightmapCacheData?.Data.Length ?? 0:N0} B (uncompressed {map.LightmapCacheData?.UncompressedSize ?? 0:N0} B)");
-Console.WriteLine($"thumbnail: {map.Thumbnail?.Length ?? 0:N0} B");
-return 0;
+return exitCode;
