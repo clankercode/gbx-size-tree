@@ -1,3 +1,4 @@
+using GbxSizeTree.Abstractions;
 using GbxSizeTree.Actions;
 using GbxSizeTree.Analysis;
 using GbxSizeTree.Cli.Output;
@@ -83,7 +84,7 @@ public static class InteractiveMode
     private static void PromptAndApply(IAnsiConsole console, MapSession session,
         ActionRegistry registry, IReadOnlyDictionary<string, string> settings)
     {
-        var sink = NullSink.Instance;
+        var sink = NullStatusSink.Instance;
         var appliedIds = session.Applied.Select(a => a.ActionId).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var candidates = new List<(IMapAction Action, ActionApplicability App)>();
         foreach (var action in registry.Applyable(settings.TryGetValue("experimental", out var e) && e == "true"))
@@ -114,7 +115,7 @@ public static class InteractiveMode
         {
             var tier = action.Tier == ActionTier.Lossless ? "[green]lossless[/]" : "[yellow]lossy[/]";
             var est = app.EstimatedSavingsBytes > 0
-                ? $"~{SizeFormat.Bytes(app.EstimatedSavingsBytes)}"
+                ? $"~{SizeFormat.ShortBytes(app.EstimatedSavingsBytes)}"
                 : app.Kind == EstimateKind.MeasuredOnSave ? "measured at save" : app.Kind.ToString();
             var label = $"{action.Id} — {est} {tier}" +
                 (action.Consequence.Length > 0 ? $" [grey]({action.Consequence})[/]" : "");
@@ -179,14 +180,5 @@ public static class InteractiveMode
         {
             console.MarkupLineInterpolated($"[red]error:[/] {ex.Message}");
         }
-    }
-
-    private sealed class NullSink : GbxSizeTree.Abstractions.IStatusSink
-    {
-        public static readonly NullSink Instance = new();
-        public void Info(string message) { }
-        public void Warn(string message) { }
-        public IDisposable Activity(string label) => new Scope();
-        private sealed class Scope : IDisposable { public void Dispose() { } }
     }
 }
