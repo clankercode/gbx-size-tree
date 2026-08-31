@@ -60,3 +60,16 @@ public sealed record BodyChunkInfo(
     long PrecompressedPayloadBytes = 0);
 
 public sealed record AnalysisWarning(string Code, string Message);
+
+/// <summary>One chunk the catalog does not recognize (the --unknown-chunks debug view).</summary>
+public sealed record UnknownChunkInfo(
+    string Section,
+    string ChunkId,
+    long Bytes,
+    bool Skippable,
+    long? Offset);
+
+/// <summary>The --unknown-chunks --json envelope payload.</summary>
+public sealed record UnknownChunksReport(
+    string SourceLabel,
+    IReadOnlyList<UnknownChunkInfo> UnknownChunks);

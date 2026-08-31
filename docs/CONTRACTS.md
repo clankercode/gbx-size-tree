@@ -75,3 +75,7 @@ ids above, unaffected by casing policy.
 tool must never *suggest* it — it lands in `RecommendationReport.Cautions` (rendered as a
 warning, `cautions` in JSON), is excluded from `ranked` and from the under-limit verdict, and
 stays available via flags and the interactive menu. `strip-lightmap` is the canonical case.
+
+`--unknown-chunks` is a standalone debug view (exempt from the tree-first invariant): chunks
+missing from `ChunkCatalog`, as plain lines or a `{schemaVersion, unknownChunksReport}` JSON
+envelope. `--all-chunks` appends a full flat chunk table (no size cutoff) to the report.

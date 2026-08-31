@@ -15,6 +15,7 @@ namespace GbxSizeTree.Model.Json;
 [JsonSerializable(typeof(MapAnalysis))]
 [JsonSerializable(typeof(RecommendationReport))]
 [JsonSerializable(typeof(OptimizationSummary))]
+[JsonSerializable(typeof(UnknownChunksReport))]
 [JsonSerializable(typeof(JsonErrorEnvelope))]
 public sealed partial class AnalysisJsonContext : JsonSerializerContext;
 

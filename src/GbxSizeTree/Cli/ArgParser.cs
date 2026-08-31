@@ -17,6 +17,8 @@ public static class ArgParser
         string? inputPath = null;
         var headerOnly = false;
         var estimateCompressed = false;
+        var allChunks = false;
+        var unknownChunks = false;
         var topN = 20;
         var json = false;
         bool? color = null;
@@ -62,6 +64,12 @@ public static class ArgParser
                     break;
                 case "--estimate-compressed":
                     estimateCompressed = true;
+                    break;
+                case "--all-chunks":
+                    allChunks = true;
+                    break;
+                case "--unknown-chunks":
+                    unknownChunks = true;
                     break;
                 case "--top":
                     if (!TryTakeValue(args, ref i, arg, out var topValue, out var topError))
@@ -206,6 +214,8 @@ public static class ArgParser
             InputPath = inputPath,
             HeaderOnly = headerOnly,
             EstimateCompressed = estimateCompressed,
+            AllChunks = allChunks,
+            UnknownChunks = unknownChunks,
             TopN = topN,
             Json = json,
             Color = color,

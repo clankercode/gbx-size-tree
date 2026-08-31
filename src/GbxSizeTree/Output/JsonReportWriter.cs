@@ -55,6 +55,21 @@ public static class JsonReportWriter
         });
     }
 
+    public static void WriteUnknownChunks(TextWriter stdout, Model.UnknownChunksReport report)
+    {
+        ArgumentNullException.ThrowIfNull(stdout);
+        ArgumentNullException.ThrowIfNull(report);
+
+        WriteJson(stdout, writer =>
+        {
+            writer.WriteStartObject();
+            writer.WriteNumber("schemaVersion", 1);
+            writer.WritePropertyName("unknownChunksReport");
+            JsonSerializer.Serialize(writer, report, AnalysisJsonContext.Default.UnknownChunksReport);
+            writer.WriteEndObject();
+        });
+    }
+
     public static void WriteError(TextWriter stdout, int code, string message)
     {
         ArgumentNullException.ThrowIfNull(stdout);

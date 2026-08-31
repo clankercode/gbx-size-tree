@@ -26,6 +26,8 @@ public class ArgParserTests
     [InlineData("--no-action resave", nameof(CliOptions.NoActions), "resave")]
     [InlineData("--dry-run", nameof(CliOptions.DryRun), "True")]
     [InlineData("--attribute", nameof(CliOptions.Attribute), "True")]
+    [InlineData("--all-chunks", nameof(CliOptions.AllChunks), "True")]
+    [InlineData("--unknown-chunks", nameof(CliOptions.UnknownChunks), "True")]
     [InlineData("--experimental", nameof(CliOptions.Experimental), "True")]
     [InlineData("--verbose", nameof(CliOptions.Verbose), "True")]
     [InlineData("-v", nameof(CliOptions.Verbose), "True")]

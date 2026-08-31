@@ -57,4 +57,7 @@ public static class ChunkCatalog
     public static ChunkMeta Describe(uint id) => ById.TryGetValue(id, out var chunk)
         ? chunk
         : new ChunkMeta(id, $"Unknown 0x{id:X8}", SizeCategory.Other, "unrecognized chunk", false, false);
+
+    /// <summary>True when the id is in the catalog (the `--unknown-chunks` debug filter).</summary>
+    public static bool IsKnown(uint id) => ById.ContainsKey(id);
 }

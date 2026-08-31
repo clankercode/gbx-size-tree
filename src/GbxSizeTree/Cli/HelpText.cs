@@ -19,6 +19,9 @@ public static class HelpText
         Analysis:
           --header-only             Read and report only the map header
           --estimate-compressed     Estimate compressed sizes for tree entries
+          --all-chunks              List every header and body chunk (no size cutoff)
+          --unknown-chunks          Debug: print only chunks the catalog does not
+                                    recognize, then exit (works with --json)
           --top N                   Show the top N entries (default: 20)
           --json                    Write the analysis as JSON
           --color                   Always use color

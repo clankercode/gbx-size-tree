@@ -34,13 +34,31 @@ public static class ReportMode
         // Read once so the background resave trial starts BEFORE the multi-second analysis;
         // by recommendation time it has usually finished and resave gets a measured number.
         var bytes = File.ReadAllBytes(inputPath);
-        var trial = options.HeaderOnly ? null : GbxSizeTree.Measure.ResaveTrial.Start(bytes);
+        var trial = options.HeaderOnly || options.UnknownChunks
+            ? null
+            : GbxSizeTree.Measure.ResaveTrial.Start(bytes);
         var analysis = analyzer.Analyze(
             new MapSource.FromBytes(bytes, inputPath),
             new AnalyzeOptions(
                 HeaderOnly: options.HeaderOnly,
                 TrialCompressionEstimates: options.EstimateCompressed,
                 TopN: options.TopN));
+
+        if (options.UnknownChunks)
+        {
+            // Debug view: just the chunks the catalog does not recognize, nothing else.
+            if (options.Json)
+            {
+                JsonReportWriter.WriteUnknownChunks(Console.Out, new Model.UnknownChunksReport(
+                    analysis.SourceLabel, Semantics.UnknownChunks.Collect(analysis)));
+            }
+            else
+            {
+                ChunkListRenderer.RenderUnknown(BuildConsole(options), analysis);
+            }
+            return ExitCodes.Ok;
+        }
+
         // Header-only analysis grounds no recommendations; rendering an empty table with a
         // "cannot get under the limit" verdict would be actively misleading.
         var recommendations = analysis.Body is null
@@ -56,6 +74,10 @@ public static class ReportMode
 
         var console = BuildConsole(options);
         ReportRenderer.Render(console, analysis, options.TopN);
+        if (options.AllChunks)
+        {
+            ChunkListRenderer.RenderAll(console, analysis);
+        }
         if (recommendations is not null)
         {
             RecommendationRenderer.Render(console, recommendations);

@@ -8,6 +8,8 @@ public sealed record CliOptions
     public string? InputPath { get; init; }
     public bool HeaderOnly { get; init; }
     public bool EstimateCompressed { get; init; }
+    public bool AllChunks { get; init; }
+    public bool UnknownChunks { get; init; }
     public int TopN { get; init; } = 20;
     public bool Json { get; init; }
     public bool? Color { get; init; }
