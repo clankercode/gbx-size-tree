@@ -1,6 +1,7 @@
 # gbx-size-tree — common tasks. Builds/tests capped at 2 threads (system etiquette).
 
 sample := env_var_or_default("GBX_SIZE_TREE_SAMPLE", "/home/xertrov/Downloads/sample.Map.Gbx")
+version := `grep -oPm1 '(?<=<Version>)[^<]+' Directory.Build.props`
 
 export MSBUILDDISABLENODEREUSE := "1"
 
@@ -35,6 +36,18 @@ publish-win:
     dotnet publish src/GbxSizeTree -m:2 -c Release -r win-x64 -o artifacts/win-x64
 
 publish: publish-linux publish-win
+
+# Release zips (binary + license/notices/readme), one per OS, under artifacts/release/.
+release: publish
+    rm -rf artifacts/release && mkdir -p artifacts/release/stage
+    cp LICENSE THIRD-PARTY-NOTICES.md README.md artifacts/release/stage/
+    cp artifacts/linux-x64/gbx-size-tree artifacts/release/stage/
+    cd artifacts/release/stage && zip -q ../gbx-size-tree-{{version}}-linux-x64.zip gbx-size-tree LICENSE THIRD-PARTY-NOTICES.md README.md
+    rm artifacts/release/stage/gbx-size-tree
+    cp artifacts/win-x64/gbx-size-tree.exe artifacts/release/stage/
+    cd artifacts/release/stage && zip -q ../gbx-size-tree-{{version}}-win-x64.zip gbx-size-tree.exe LICENSE THIRD-PARTY-NOTICES.md README.md
+    rm -rf artifacts/release/stage
+    ls -l artifacts/release/
 
 clean:
     dotnet clean -m:2

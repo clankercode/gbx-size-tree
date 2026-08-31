@@ -12,6 +12,13 @@ public static class PauseOnExit
             return;
         }
 
+        // A GUI-owned console always has real streams; redirected stdin means a pipe
+        // misdetected as GUI, where "press any key" would just hang or spam the log.
+        if (overridePause is null && (Console.IsInputRedirected || Console.IsOutputRedirected))
+        {
+            return;
+        }
+
         try
         {
             Console.Write("\nPress any key to exit...");

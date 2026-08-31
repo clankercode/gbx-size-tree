@@ -6,6 +6,18 @@ using GbxSizeTree.Cli;
 using GbxSizeTree.Cli.Modes;
 using GbxSizeTree.Cli.Platform;
 
+if (OperatingSystem.IsWindows() && !Console.IsOutputRedirected)
+{
+    try
+    {
+        Console.OutputEncoding = System.Text.Encoding.UTF8;
+    }
+    catch
+    {
+        // Legacy console hosts may refuse; box-drawing degrades but nothing breaks.
+    }
+}
+
 Gbx.LZO = new GBX.NET.LZO.Lzo();
 Gbx.ZLib = new GBX.NET.ZLib.ZLib();
 
