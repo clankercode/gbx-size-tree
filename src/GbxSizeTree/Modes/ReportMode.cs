@@ -30,8 +30,13 @@ public static class ReportMode
             ? NullStatusSink.Instance
             : new ConsoleStatusSink(toStderr: options.Json);
         var analyzer = MapAnalyzer.CreateDefault(sink);
+
+        // Read once so the background resave trial starts BEFORE the multi-second analysis;
+        // by recommendation time it has usually finished and resave gets a measured number.
+        var bytes = File.ReadAllBytes(inputPath);
+        var trial = options.HeaderOnly ? null : GbxSizeTree.Measure.ResaveTrial.Start(bytes);
         var analysis = analyzer.Analyze(
-            new MapSource.FromFile(inputPath),
+            new MapSource.FromBytes(bytes, inputPath),
             new AnalyzeOptions(
                 HeaderOnly: options.HeaderOnly,
                 TrialCompressionEstimates: options.EstimateCompressed,
@@ -41,7 +46,7 @@ public static class ReportMode
         var recommendations = analysis.Body is null
             ? null
             : new RecommendationEngine(registry, sink)
-                .Recommend(analysis, ActionSelection.BuildSettings(options));
+                .Recommend(analysis, ActionSelection.BuildSettings(options), trial);
 
         if (options.Json)
         {

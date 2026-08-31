@@ -70,3 +70,8 @@ Settings are `IReadOnlyDictionary<string,string>`; keys are per-action, kebab-ca
 JSON property names are **camelCase** throughout (envelope and model; changed pre-release
 2026-09-01); enum *values* stay PascalCase (`ExactOnDisk`). SizeNode `id` values are the frozen
 ids above, unaffected by casing policy.
+
+`IMapAction.RecommendByDefault` (default true): false means the action is applicable but the
+tool must never *suggest* it — it lands in `RecommendationReport.Cautions` (rendered as a
+warning, `cautions` in JSON), is excluded from `ranked` and from the under-limit verdict, and
+stays available via flags and the interactive menu. `strip-lightmap` is the canonical case.

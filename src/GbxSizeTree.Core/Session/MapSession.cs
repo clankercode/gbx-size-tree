@@ -34,9 +34,16 @@ public sealed class MapSession
         this.status = status;
     }
 
-    public static MapSession Open(string path, ActionRegistry registry, IMapAnalyzer analyzer, IStatusSink status)
+    /// <summary>
+    /// <paramref name="onBytesRead"/> fires with the raw file bytes BEFORE the (multi-second)
+    /// baseline analysis — the hook frontends use to start the background resave trial as
+    /// early as possible.
+    /// </summary>
+    public static MapSession Open(string path, ActionRegistry registry, IMapAnalyzer analyzer, IStatusSink status,
+        Action<byte[]>? onBytesRead = null)
     {
         var bytes = File.ReadAllBytes(path);
+        onBytesRead?.Invoke(bytes);
         var baseline = analyzer.Analyze(
             new MapSource.FromBytes(bytes, Path.GetFileName(path)), new AnalyzeOptions());
         if (baseline.Facts is null || baseline.Body is null)

@@ -50,5 +50,11 @@ public static class RecommendationRenderer
                 $"[yellow]Verdict: apply the first {report.RecommendationsToGetUnderLimit.ToString(System.Globalization.CultureInfo.InvariantCulture)} " +
                 "recommendation(s) to get under the online limit.[/]");
         }
+
+        foreach (var caution in report.Cautions ?? [])
+        {
+            console.MarkupLineInterpolated(
+                $"[yellow]⚠ not recommended:[/] {caution.Title} would save {SizeFormat.ShortBytes(caution.EstimatedSavingsBytes)} ({caution.HowTo}), but: {caution.Consequence}");
+        }
     }
 }

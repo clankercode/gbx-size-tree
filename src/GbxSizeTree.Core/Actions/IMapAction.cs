@@ -49,12 +49,15 @@ public sealed record ActionResult(bool Changed, string Summary, IReadOnlyList<st
 /// <paramref name="Map"/> is present when the caller holds a parsed map (batch/interactive) —
 /// actions may use it for MEASURED trial estimates; when null (plain report mode) they must
 /// degrade to computed/heuristic estimates from <paramref name="Analysis"/> alone.
+/// <paramref name="ResaveTrial"/> is the background trial resave the frontends start right
+/// after reading the file, when available.
 /// </summary>
 public sealed record ActionDetectContext(
     MapAnalysis Analysis,
     IReadOnlyDictionary<string, string> Settings,
     IStatusSink Status,
-    GBX.NET.Engines.Game.CGameCtnChallenge? Map = null);
+    GBX.NET.Engines.Game.CGameCtnChallenge? Map = null,
+    Measure.ResaveTrial? ResaveTrial = null);
 
 public sealed record ActionApplyContext(
     Gbx Gbx,
@@ -82,6 +85,13 @@ public interface IMapAction
     bool DefaultOn { get; }
     /// <summary>Deterministic pipeline order (see docs/CONTRACTS.md for assignments).</summary>
     int Order { get; }
+
+    /// <summary>
+    /// False for actions that degrade the map enough that the tool should never *suggest*
+    /// them (they surface as warnings instead of ranked recommendations, and never count
+    /// toward the under-limit verdict). The action itself stays available via flags/menu.
+    /// </summary>
+    bool RecommendByDefault => true;
 
     ActionApplicability Detect(ActionDetectContext ctx);
 

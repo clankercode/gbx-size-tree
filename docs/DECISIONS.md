@@ -31,9 +31,15 @@
   zero trim warnings). Gates run before flipping: trimmed report output byte-identical to
   untrimmed, `--optimize` output SHA256-identical, wine render + pty interactive clean.
   Escape hatch: `-p:PublishTrimmed=false`.
-- **Resave Detect estimate**: 5% of the compressed body, `Heuristic` (measured 5.4% on the
-  sample). Chosen over a trial LZO999 in Detect (cost ≈ a full materialize) and over
-  0/`MeasuredOnSave` (ranked the guaranteed win last and the under-limit verdict ignored it).
+- **Resave Detect estimate**: a background `ResaveTrial` (parse + LZO1x_999 save on a worker
+  thread, started the moment the file is read) gives a MEASURED number by recommendation
+  time — it overlaps the analyzer, costing <1s wall on the sample (4.7s total at 136% CPU).
+  Fallback when the trial is unavailable/slow (30s cap): 5% of the compressed body,
+  `Heuristic` (measured 5.4% on the sample). Never 0/`MeasuredOnSave` — that ranked the
+  guaranteed win last and the under-limit verdict ignored it.
+- **Strip-lightmap is a caution, not a recommendation** (Max's call): applicable-but-
+  destructive actions (`RecommendByDefault == false`) render as ⚠ warnings, excluded from
+  ranking and the verdict, still available via `--strip-lightmap`/menu.
 - **`--attribute`** replays cumulative prefixes to attribute savings per action; the baseline
   prefix must apply `resave` explicitly because an empty session set short-circuits to the
   original bytes. Sample attribution: recompression 420,007 B + orphan-embeds 167,004 B.

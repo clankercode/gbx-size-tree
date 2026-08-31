@@ -22,7 +22,8 @@ public sealed class RecommendationEngine : IRecommendationEngine
 
     public RecommendationReport Recommend(
         MapAnalysis analysis,
-        IReadOnlyDictionary<string, string> settings)
+        IReadOnlyDictionary<string, string> settings,
+        Measure.ResaveTrial? resaveTrial = null)
     {
         if (analysis.Body is null)
         {
@@ -35,6 +36,7 @@ public sealed class RecommendationEngine : IRecommendationEngine
         }
 
         var recommendations = new List<Recommendation>();
+        var cautions = new List<Recommendation>();
         var includeExperimental = settings.TryGetValue("experimental", out var experimental)
             && experimental == "true";
 
@@ -43,7 +45,8 @@ public sealed class RecommendationEngine : IRecommendationEngine
             ActionApplicability applicability;
             try
             {
-                applicability = action.Detect(new ActionDetectContext(analysis, settings, status));
+                applicability = action.Detect(
+                    new ActionDetectContext(analysis, settings, status, ResaveTrial: resaveTrial));
             }
             catch (Exception ex)
             {
@@ -56,14 +59,15 @@ public sealed class RecommendationEngine : IRecommendationEngine
                 continue;
             }
 
-            recommendations.Add(new Recommendation(
+            var recommendation = new Recommendation(
                 ActionId: action.Id,
                 Title: action.Title,
                 Tier: action.Tier,
                 EstimatedSavingsBytes: applicability.EstimatedSavingsBytes,
                 Kind: applicability.Kind,
                 Consequence: action.Consequence,
-                HowTo: HowTo(action.Id)));
+                HowTo: HowTo(action.Id));
+            (action.RecommendByDefault ? recommendations : cautions).Add(recommendation);
         }
 
         AddThumbnailPotential(analysis, settings, recommendations);
@@ -78,7 +82,11 @@ public sealed class RecommendationEngine : IRecommendationEngine
             ? 0
             : CountToReachLimit(analysis.FileBytes, ranked);
 
-        return new RecommendationReport(ranked, alreadyUnderLimit, recommendationsToGetUnderLimit);
+        return new RecommendationReport(
+            ranked,
+            alreadyUnderLimit,
+            recommendationsToGetUnderLimit,
+            cautions.Count > 0 ? cautions : null);
     }
 
     /// <summary>

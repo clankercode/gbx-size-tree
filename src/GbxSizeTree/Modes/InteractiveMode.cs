@@ -27,12 +27,14 @@ public static class InteractiveMode
 
         var sink = new ConsoleStatusSink(toStderr: false);
         var analyzer = MapAnalyzer.CreateDefault(sink);
-        var session = MapSession.Open(inputPath, registry, analyzer, sink);
+        GbxSizeTree.Measure.ResaveTrial? trial = null;
+        var session = MapSession.Open(inputPath, registry, analyzer, sink,
+            bytes => trial = GbxSizeTree.Measure.ResaveTrial.Start(bytes));
         var settings = ActionSelection.BuildSettings(options);
 
         ReportRenderer.Render(console, session.Baseline, options.TopN);
         var engine = new RecommendationEngine(registry, sink);
-        RecommendationRenderer.Render(console, engine.Recommend(session.Baseline, settings));
+        RecommendationRenderer.Render(console, engine.Recommend(session.Baseline, settings, trial));
 
         while (true)
         {
@@ -49,7 +51,7 @@ public static class InteractiveMode
             switch (choice.Split(' ')[0])
             {
                 case "apply":
-                    PromptAndApply(console, session, registry, settings);
+                    PromptAndApply(console, session, registry, settings, trial);
                     break;
                 case "undo":
                     var undone = session.Undo();
@@ -88,7 +90,8 @@ public static class InteractiveMode
     }
 
     private static void PromptAndApply(IAnsiConsole console, MapSession session,
-        ActionRegistry registry, IReadOnlyDictionary<string, string> settings)
+        ActionRegistry registry, IReadOnlyDictionary<string, string> settings,
+        GbxSizeTree.Measure.ResaveTrial? trial)
     {
         var sink = NullStatusSink.Instance;
         var appliedIds = session.Applied.Select(a => a.ActionId).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -99,7 +102,8 @@ public static class InteractiveMode
             {
                 continue;
             }
-            var app = action.Detect(new ActionDetectContext(session.Baseline, settings, sink, session.DetectMap));
+            var app = action.Detect(
+                new ActionDetectContext(session.Baseline, settings, sink, session.DetectMap, trial));
             if (app.Applies)
             {
                 candidates.Add((action, app));

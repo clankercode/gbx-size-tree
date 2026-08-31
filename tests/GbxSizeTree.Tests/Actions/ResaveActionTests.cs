@@ -57,6 +57,28 @@ public sealed class ResaveActionTests
     }
 
     [Fact]
+    public void Sample_DetectWithBackgroundTrial_ReturnsMeasuredSavings()
+    {
+        SampleMap.SkipUnlessAvailable();
+        Gbx.LZO = new Lzo();
+        Gbx.ZLib = new ZLib();
+
+        var bytes = File.ReadAllBytes(SampleMap.Path);
+        var trial = GbxSizeTree.Measure.ResaveTrial.Start(bytes);
+        var analysis = MapAnalyzer.CreateDefault(NullStatusSink.Instance).Analyze(
+            new MapSource.FromBytes(bytes, SampleMap.Path),
+            new AnalyzeOptions());
+
+        var applicability = new ResaveAction().Detect(new ActionDetectContext(
+            analysis, EmptySettings(), NullStatusSink.Instance, ResaveTrial: trial));
+
+        Assert.True(applicability.Applies);
+        Assert.Equal(EstimateKind.Measured, applicability.Kind);
+        // Ground truth from docs/DECISIONS.md (deterministic LZO1x_999 on the pinned GBX.NET).
+        Assert.Equal(420_007, applicability.EstimatedSavingsBytes);
+    }
+
+    [Fact]
     public void Detect_AnalysisWithoutBody_DoesNotApply()
     {
         var analysis = FakeAnalysis.Build() with { Body = null };

@@ -20,10 +20,12 @@ public static class BatchMode
             ? NullStatusSink.Instance
             : new ConsoleStatusSink(toStderr: options.Json);
         var analyzer = MapAnalyzer.CreateDefault(sink);
-        var session = MapSession.Open(inputPath, registry, analyzer, sink);
+        GbxSizeTree.Measure.ResaveTrial? trial = null;
+        var session = MapSession.Open(inputPath, registry, analyzer, sink,
+            bytes => trial = GbxSizeTree.Measure.ResaveTrial.Start(bytes));
         var settings = ActionSelection.BuildSettings(options);
         var recommendations = new RecommendationEngine(registry, sink)
-            .Recommend(session.Baseline, settings);
+            .Recommend(session.Baseline, settings, trial);
 
         if (!options.Json)
         {
@@ -46,7 +48,7 @@ public static class BatchMode
                 return ExitCodes.Usage;
             }
             var applicability = action.Detect(
-                new ActionDetectContext(session.Baseline, settings, sink, session.DetectMap));
+                new ActionDetectContext(session.Baseline, settings, sink, session.DetectMap, trial));
             detects.Add((action, applicability));
         }
 

@@ -17,6 +17,9 @@ public sealed class StripLightmapAction : IMapAction
     public bool DefaultOn => false;
     public int Order => 30;
 
+    /// <summary>Destroys the bake; users must ask for it, the tool must not suggest it.</summary>
+    public bool RecommendByDefault => false;
+
     public ActionApplicability Detect(ActionDetectContext ctx)
     {
         var lightmap = ctx.Analysis.Body?.Lightmap;

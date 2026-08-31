@@ -1,5 +1,6 @@
 using GbxSizeTree.Abstractions;
 using GbxSizeTree.Actions;
+using GbxSizeTree.Actions.Passes;
 using GbxSizeTree.Model;
 using GbxSizeTree.Recommendations;
 using GbxSizeTree.Tests.Fixtures;
@@ -75,6 +76,41 @@ public sealed class RecommendationEngineTests
     }
 
     [Fact]
+    public void Recommend_NotRecommendedActionBecomesCautionAndSkipsVerdict()
+    {
+        var destructive = new FakeMapAction(
+            "destructive", ActionTier.BenignLossy, Savings(1_000_000), recommendByDefault: false);
+
+        // Put the map over the limit by more than every RANKED recommendation combined but
+        // less than the caution's savings: only counting the caution could reach the limit.
+        var rankedSum = CreateEngine(destructive)
+            .Recommend(FakeAnalysis.Build(), EmptySettings)
+            .Ranked.Sum(item => item.EstimatedSavingsBytes);
+        var overLimit = FakeAnalysis.Build() with
+        {
+            FileBytes = Limits.OnlineMapSizeBytes + rankedSum + 500_000,
+        };
+
+        var report = CreateEngine(destructive).Recommend(overLimit, EmptySettings);
+
+        Assert.DoesNotContain(report.Ranked, item => item.ActionId == destructive.Id);
+        var caution = Assert.Single(report.Cautions ?? []);
+        Assert.Equal(destructive.Id, caution.ActionId);
+        Assert.Equal(1_000_000, caution.EstimatedSavingsBytes);
+        Assert.Equal(-1, report.RecommendationsToGetUnderLimit);
+    }
+
+    [Fact]
+    public void Recommend_StripLightmapIsNeverARankedRecommendation()
+    {
+        var report = CreateEngine(new StripLightmapAction())
+            .Recommend(FakeAnalysis.Build(), EmptySettings);
+
+        Assert.DoesNotContain(report.Ranked, item => item.ActionId == "strip-lightmap");
+        Assert.Contains(report.Cautions ?? [], item => item.ActionId == "strip-lightmap");
+    }
+
+    [Fact]
     public void Recommend_DetectExceptionWarnsAndSkipsAction()
     {
         var status = new CapturingStatusSink();
@@ -112,7 +148,8 @@ public sealed class RecommendationEngineTests
     private sealed class FakeMapAction(
         string id,
         ActionTier tier,
-        Func<ActionDetectContext, ActionApplicability> detect) : IMapAction
+        Func<ActionDetectContext, ActionApplicability> detect,
+        bool recommendByDefault = true) : IMapAction
     {
         public string Id { get; } = id;
         public string Title => $"Fake {Id}";
@@ -121,6 +158,7 @@ public sealed class RecommendationEngineTests
         public string HowToManually => string.Empty;
         public bool DefaultOn => false;
         public int Order => 10;
+        public bool RecommendByDefault { get; } = recommendByDefault;
 
         public ActionApplicability Detect(ActionDetectContext ctx) => detect(ctx);
 
