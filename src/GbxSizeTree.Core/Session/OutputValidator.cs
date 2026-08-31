@@ -49,6 +49,7 @@ public static class OutputValidator
         CheckEqual(issues, nameof(MapFacts.MapUid), before.MapUid, after.MapUid);
         CheckEqual(issues, nameof(MapFacts.MapName), before.MapName, after.MapName);
         CheckEqual(issues, nameof(MapFacts.AuthorLogin), before.AuthorLogin, after.AuthorLogin);
+        CheckEqual(issues, nameof(MapFacts.AuthorNickname), before.AuthorNickname, after.AuthorNickname);
         CheckEqual(issues, nameof(MapFacts.BlockCount), before.BlockCount, after.BlockCount);
         CheckEqual(
             issues,
@@ -88,6 +89,7 @@ public static class OutputValidator
             map.MapUid ?? "",
             map.MapName ?? "",
             map.AuthorLogin ?? "",
+            map.AuthorNickname ?? "",
             counts.blocks,
             counts.items,
             counts.baked,

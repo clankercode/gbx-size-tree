@@ -131,7 +131,7 @@ public sealed class MapAnalyzer(
 
         var counts = ElementCounts.Count(map);
         var facts = new MapFacts(
-            map.MapUid ?? "", map.MapName ?? "", map.AuthorLogin ?? "",
+            map.MapUid ?? "", map.MapName ?? "", map.AuthorLogin ?? "", map.AuthorNickname ?? "",
             counts.blocks, counts.items, counts.baked, counts.free,
             lm?.HasLightmaps ?? false, lm?.FrameCount ?? 0, lm?.Version ?? 0,
             zip?.Entries.Count ?? 0);

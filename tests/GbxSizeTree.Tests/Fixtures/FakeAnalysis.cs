@@ -70,7 +70,7 @@ public static class FakeAnalysis
             ScriptMetadata: new ScriptMetadataInfo(400, 3, ["MapType", "Foo", "Bar"]),
             MediaTracker: new MediaTrackerInfo(200, 1, "intro clip"));
 
-        var facts = new MapFacts("FAKEUID", "Fake Map", "fakeauthor",
+        var facts = new MapFacts("FAKEUID", "Fake Map", "fakeauthor", "Fake Author",
             BlockCount: 100, AnchoredObjectCount: 50, BakedBlockCount: 10, FreeBlockCount: 2,
             HasLightmaps: true, LightmapFrameCount: 3, LightmapVersion: 8, EmbeddedEntryCount: 2);
 

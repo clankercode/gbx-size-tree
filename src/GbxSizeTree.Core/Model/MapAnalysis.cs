@@ -27,11 +27,16 @@ public sealed record BodyAnalysis(
     ScriptMetadataInfo? ScriptMetadata,
     MediaTrackerInfo? MediaTracker);
 
-/// <summary>Identity + counts used for validation invariants and per-element rates.</summary>
+/// <summary>
+/// Identity + counts used for validation invariants and per-element rates.
+/// <paramref name="AuthorNickname"/> is the human-readable display name (TM2020's
+/// AuthorLogin is an opaque account id); both keep their raw $-format codes here.
+/// </summary>
 public sealed record MapFacts(
     string MapUid,
     string MapName,
     string AuthorLogin,
+    string AuthorNickname,
     int BlockCount,
     int AnchoredObjectCount,
     int BakedBlockCount,

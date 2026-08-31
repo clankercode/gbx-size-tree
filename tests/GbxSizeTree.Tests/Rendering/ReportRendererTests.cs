@@ -18,6 +18,7 @@ public sealed class ReportRendererTests
 
         Assert.Contains("Unattributed residual", console.Output);
         Assert.Contains("Fake Map.Map.Gbx", console.Output);
+        Assert.Contains("Fake Map by Fake Author", console.Output);
         Assert.Contains("on disk", console.Output);
         Assert.Contains("on disk 11.7 KiB", console.Output);
         Assert.Contains("on disk ≈ 1.8 KiB", console.Output);
@@ -42,6 +43,38 @@ public sealed class ReportRendererTests
         Assert.True(categoryIndex >= 0 && categoryIndex < lightmapIndex);
         Assert.True(lightmapIndex < deltaIndex);
         Assert.True(deltaIndex < treeIndex);
+    }
+
+    [Fact]
+    public void Title_DeformatsMapNameAndFallsBackToLoginWhenNicknameEmpty()
+    {
+        var console = new TestConsole().Width(120);
+        var analysis = FakeAnalysis.Build();
+        analysis = analysis with
+        {
+            Facts = analysis.Facts! with
+            {
+                MapName = "$o$f00Hot$g Lap",
+                AuthorNickname = "",
+                AuthorLogin = "plain-login",
+            },
+        };
+
+        ReportRenderer.Render(console, analysis, topN: 10);
+
+        Assert.Contains("Hot Lap by plain-login", console.Output);
+        Assert.DoesNotContain("$f00", console.Output);
+    }
+
+    [Fact]
+    public void Title_OmitsIdentityLineWithoutFacts()
+    {
+        var console = new TestConsole().Width(120);
+        var analysis = FakeAnalysis.Build() with { Facts = null };
+
+        ReportRenderer.Render(console, analysis, topN: 10);
+
+        Assert.DoesNotContain("by Fake Author", console.Output);
     }
 
     [Fact]

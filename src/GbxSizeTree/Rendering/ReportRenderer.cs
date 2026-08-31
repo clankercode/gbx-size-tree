@@ -48,6 +48,27 @@ public static class ReportRenderer
         var label = Markup.Escape(analysis.SourceLabel);
         var size = Markup.Escape(SizeFormat.Bytes(analysis.FileBytes));
         console.MarkupLine($"[bold]{label}[/] — {size}");
+
+        if (analysis.Facts is not { } facts)
+        {
+            return;
+        }
+
+        var name = TmText.Deformat(facts.MapName);
+        // TM2020's AuthorLogin is an opaque account id; the nickname is the display name.
+        var author = TmText.Deformat(
+            facts.AuthorNickname.Length > 0 ? facts.AuthorNickname : facts.AuthorLogin);
+        var line = (name.Length > 0, author.Length > 0) switch
+        {
+            (true, true) => $"[bold]{Markup.Escape(name)}[/] [dim]by[/] {Markup.Escape(author)}",
+            (true, false) => $"[bold]{Markup.Escape(name)}[/]",
+            (false, true) => $"[dim]by[/] {Markup.Escape(author)}",
+            _ => null,
+        };
+        if (line is not null)
+        {
+            console.MarkupLine(line);
+        }
     }
 
     private static void RenderOnlineLimitDelta(IAnsiConsole console, long fileBytes)

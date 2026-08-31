@@ -198,6 +198,7 @@
       "mapUid": "FAKEUID",
       "mapName": "Fake Map",
       "authorLogin": "fakeauthor",
+      "authorNickname": "Fake Author",
       "blockCount": 100,
       "anchoredObjectCount": 50,
       "bakedBlockCount": 10,
