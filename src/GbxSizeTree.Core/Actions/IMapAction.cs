@@ -45,10 +45,16 @@ public sealed record ActionResult(bool Changed, string Summary, IReadOnlyList<st
     public static ActionResult NoChange(string summary) => new(false, summary, []);
 }
 
+/// <summary>
+/// <paramref name="Map"/> is present when the caller holds a parsed map (batch/interactive) —
+/// actions may use it for MEASURED trial estimates; when null (plain report mode) they must
+/// degrade to computed/heuristic estimates from <paramref name="Analysis"/> alone.
+/// </summary>
 public sealed record ActionDetectContext(
     MapAnalysis Analysis,
     IReadOnlyDictionary<string, string> Settings,
-    IStatusSink Status);
+    IStatusSink Status,
+    GBX.NET.Engines.Game.CGameCtnChallenge? Map = null);
 
 public sealed record ActionApplyContext(
     Gbx Gbx,
