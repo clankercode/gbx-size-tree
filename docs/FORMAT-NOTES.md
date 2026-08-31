@@ -75,17 +75,26 @@ Body (S = skippable):
 | 0x03043069 | S | macroblock indexes: i32 per block + item, then id/flags pairs |
 | 0x0304306C | S | color palette |
 
-## Lightmap chunk 0x0304305B (TM2020, version 8)
+## Lightmap chunk 0x0304305B (TM2020) — layout VERIFIED on-disk 2026-09-01
+
+Confirmed against the sample's bytes (payload at body offset 11,616,752, length 4,696,337:
+`00000000 01000000 00000000 00000000 0A000000 03000000 BC330C00 'RIFF'...`), matching gbx-py's
+struct and the E++ Ghidra research; the earlier "bool HasLightmaps first / version 8 / per-frame
+scalars" description was WRONG.
 
 ```
-bool(i32) HasLightmaps            // false ⇒ chunk ends (~4 B)
-i32 LightmapVersion               // 8
-i32 frameCount                    // 1 = static daytime; 3 = dynamic daylight (~3x webp bytes)
-frameCount × Frame:
-    scalar fields (version-dependent)
-    3 × (i32 len + bytes)         // WebP images — THE BULK, raw in the chunk, NOT inside zlib
-i32 zlibUncompressedSize          // only if any webp blob non-empty
-i32 zlibLen + zlib bytes          // deflate stream holding the CHmsLightMapCache MAPPING node
+i32 chunkVersion                  // 0 observed
+bool(i32) u01                     // effectively HasLightmaps; false ⇒ chunk ends here
+bool(i32) u02, u03                // 0, 0 observed
+-- if !u01: stop --
+SHmsLightMapCacheSmall:
+  i32 cacheVersion                // 10 observed (E++: writer emits 10)
+  i32 frameCount                  // when cacheVersion >= 5; 3 observed (dynamic daylight); else 1
+  frameCount × frame:
+      3 × (i32 len + bytes)       // three counted buffers per frame, WebP ('RIFF..WEBP') in
+                                  // non-zero slots, len MAY be 0 — NO leading scalars in v10
+  i32 zlibUncompressedSize        // only when any buffer non-empty
+  i32 zlibLen + zlib bytes        // deflate stream: CHmsLightMapCache metadata node (0x0602200B)
 ```
 Sample: zlib cache 1,570,755 B (1,838,848 B uncompressed); webp frames additional.
 Strip pattern (gbx-io-proven): `map.HasLightmaps = false; map.LightmapFrames = [new() { Version = 6 }]`.
