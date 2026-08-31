@@ -91,6 +91,19 @@ Sample: zlib cache 1,570,755 B (1,838,848 B uncompressed); webp frames additiona
 Strip pattern (gbx-io-proven): `map.HasLightmaps = false; map.LightmapFrames = [new() { Version = 6 }]`.
 Ultra2 bake preset ⇒ stronger texture compression ⇒ smaller files.
 
+Ghidra-verified detail (Max's E++ research, `~/src/openplanet/my-plugins/tm-editor-plus-plus/research/2026-09-01-MapGbxLightMapEncoding.md`):
+- What the map embeds is the **LightMapCacheSmall** archive (`SHmsLightMapCacheSmall_Archive`): u32 version;
+  (v≥5) u32 sprite/frame count (max 32, production often 3); per frame **three counted byte buffers**
+  — WebP in the non-zero slots, and **slots may be zero-length**; then uncompressed_size + zlib payload.
+- The inflated zlib payload starts with a `CHmsLightMapCache` chunk **0x0602200B** + SKIP — metadata only
+  (quality, samples, mapping vectors, frames); NO atlas pixels inside the zlib.
+- The full-resolution bake atlases (`LightMap%u_HSH%c.webp`, `LightMap%u_LocalBig_Avg.webp`,
+  `ProbeGrid.webp`) live in a separate cache PACK outside the map file (game cache dir) — they are NOT
+  part of .Map.Gbx size and out of scope for this tool.
+- Saved RGB is always half-res of the bake (`YCbCr_to_RGB_Down2x2`); frame webps are reconstructed-RGB /
+  HSH planes. Any future "soften/re-encode shadows" action edits webp pixel data only — never the mapping
+  metadata or sizes.
+
 ## GBX.NET 2.4.4 API essentials
 
 - Startup: `Gbx.LZO = new Lzo(); Gbx.ZLib = new ZLib();`
