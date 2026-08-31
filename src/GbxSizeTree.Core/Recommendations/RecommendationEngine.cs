@@ -24,6 +24,16 @@ public sealed class RecommendationEngine : IRecommendationEngine
         MapAnalysis analysis,
         IReadOnlyDictionary<string, string> settings)
     {
+        if (analysis.Body is null)
+        {
+            // Header-only analysis cannot ground any recommendation; an empty report with a
+            // "cannot" verdict would be misleading, so callers should not render this at all.
+            return new RecommendationReport(
+                [],
+                analysis.FileBytes <= Limits.OnlineMapSizeBytes,
+                analysis.FileBytes <= Limits.OnlineMapSizeBytes ? 0 : -1);
+        }
+
         var recommendations = new List<Recommendation>();
         var includeExperimental = settings.TryGetValue("experimental", out var experimental)
             && experimental == "true";
@@ -56,6 +66,7 @@ public sealed class RecommendationEngine : IRecommendationEngine
                 HowTo: HowTo(action.Id)));
         }
 
+        AddThumbnailPotential(analysis, settings, recommendations);
         recommendations.AddRange(editorSource.Produce(analysis));
 
         var ranked = recommendations
@@ -68,6 +79,51 @@ public sealed class RecommendationEngine : IRecommendationEngine
             : CountToReachLimit(analysis.FileBytes, ranked);
 
         return new RecommendationReport(ranked, alreadyUnderLimit, recommendationsToGetUnderLimit);
+    }
+
+    /// <summary>
+    /// With the default `--thumbnail keep` the thumbnail action detects as not-applicable and
+    /// would never appear in the report, hiding real potential; probe with `strip` (the upper
+    /// bound, exact) so the user learns the option exists.
+    /// </summary>
+    private void AddThumbnailPotential(
+        MapAnalysis analysis,
+        IReadOnlyDictionary<string, string> settings,
+        List<Recommendation> recommendations)
+    {
+        var mode = settings.TryGetValue("mode", out var value) ? value : "keep";
+        if (mode != "keep" || registry.Find("thumbnail") is not { } thumbnail)
+        {
+            return;
+        }
+
+        var probeSettings = settings.ToDictionary(pair => pair.Key, pair => pair.Value);
+        probeSettings["mode"] = "strip";
+
+        ActionApplicability probe;
+        try
+        {
+            probe = thumbnail.Detect(new ActionDetectContext(analysis, probeSettings, status));
+        }
+        catch (Exception ex)
+        {
+            status.Warn($"Thumbnail potential probe failed: {ex.Message}");
+            return;
+        }
+
+        if (!probe.Applies)
+        {
+            return;
+        }
+
+        recommendations.Add(new Recommendation(
+            ActionId: thumbnail.Id,
+            Title: "Shrink or remove the thumbnail",
+            Tier: thumbnail.Tier,
+            EstimatedSavingsBytes: probe.EstimatedSavingsBytes,
+            Kind: probe.Kind,
+            Consequence: "strip removes it entirely (shown estimate); lossless/recompress/downscale keep one.",
+            HowTo: "--thumbnail strip|lossless|recompress:Q|downscale:N"));
     }
 
     private static string HowTo(string actionId) => actionId switch

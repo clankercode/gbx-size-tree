@@ -36,8 +36,12 @@ public static class ReportMode
                 HeaderOnly: options.HeaderOnly,
                 TrialCompressionEstimates: options.EstimateCompressed,
                 TopN: options.TopN));
-        var recommendations = new RecommendationEngine(registry, sink)
-            .Recommend(analysis, ActionSelection.BuildSettings(options));
+        // Header-only analysis grounds no recommendations; rendering an empty table with a
+        // "cannot get under the limit" verdict would be actively misleading.
+        var recommendations = analysis.Body is null
+            ? null
+            : new RecommendationEngine(registry, sink)
+                .Recommend(analysis, ActionSelection.BuildSettings(options));
 
         if (options.Json)
         {
@@ -47,7 +51,10 @@ public static class ReportMode
 
         var console = BuildConsole(options);
         ReportRenderer.Render(console, analysis, options.TopN);
-        RecommendationRenderer.Render(console, recommendations);
+        if (recommendations is not null)
+        {
+            RecommendationRenderer.Render(console, recommendations);
+        }
         return ExitCodes.Ok;
     }
 

@@ -33,11 +33,11 @@ public sealed class ResaveActionTests
 
         var applicability = action.Detect(new ActionDetectContext(analysis, EmptySettings(), NullStatusSink.Instance));
         Assert.True(applicability.Applies);
-        Assert.Equal(0, applicability.EstimatedSavingsBytes);
-        Assert.Equal(EstimateKind.MeasuredOnSave, applicability.Kind);
-        Assert.Equal(
-            "savings are measured at save when LZO1x_999 replaces the game's fast compression level",
-            applicability.Reason);
+        // Nonzero calibrated heuristic (5% of the compressed body) so the recommendation
+        // ranking and under-limit verdict can count this guaranteed win before a save.
+        Assert.Equal((long)(analysis.Body!.CompressedBytes * 0.05), applicability.EstimatedSavingsBytes);
+        Assert.Equal(EstimateKind.Heuristic, applicability.Kind);
+        Assert.Contains("measured at save", applicability.Reason, StringComparison.Ordinal);
 
         var result = action.Apply(new ActionApplyContext(
             gbx, gbx.Node, analysis, EmptySettings(), NullStatusSink.Instance));
