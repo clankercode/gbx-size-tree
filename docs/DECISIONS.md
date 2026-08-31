@@ -93,33 +93,47 @@ the zlib cache holds only mapping metadata, no pixels):
 | WebP q75 | 1,892,244 | −39.5% | 29.2–40.2 dB |
 | JPEG q90 | 2,922,618 | −6.5% | 30.1–39.7 dB |
 
+- **CAVEAT (discovered after the table): two of the five blobs are concatenations of
+  multiple WebP images** (f0s1 = 3×1024², f0s2 = 4×652²), and Pillow only read the first
+  image of each — so the table's f0s1/f0s2 rows compare one re-encoded sub-image against a
+  whole multi-image buffer. See the corrected per-sub-image math below (+0.8% at q90).
 - **No lossless win exists**: the source is lossy VP8; only decode→re-encode is possible
   (generational loss), and lossless re-encoding balloons. Any future `recompress-lightmap`
   action is T2 (BenignLossy) at best.
-- Nadeo's encoder is roughly q95-equivalent on the 1024² slots but wasteful on frame 0's
-  652² slot (q95 re-encode is 66% smaller there).
+- Nadeo's encoder is roughly q95-equivalent on the 1024² diffuse slots; the earlier
+  "wasteful 652² slot" claim was the multi-image artifact above, now retracted.
 - Per Max's Ghidra research (E++ lightmap-encoding note), the map-embedded CacheSmall
   drives the editor/preview lighting; in-game lighting loads from the external cache pack.
 - Test artifacts built via GBX.NET frame-data swap, in `~/Downloads`: `…_lmq90.Map.Gbx`
   (6,909,807 B — under the online limit from the WebP re-encode + resave alone) and
   `…_lmjpg.Map.Gbx` (7,208,355 B, all five blobs JFIF JPEG).
-- **In-game result (2026-09-01): loading a swapped map CRASHED the game** (Max; believed to
-  be the JPEG variant — renamed `.crashed-do-not-load`). Control experiment exonerates the
-  save path: a no-op frame swap (original bytes re-written through GBX.NET's materialized
-  `LightmapFrames`) is **byte-identical** to the validated resave-only output
-  (SHA256 7daaeee8…), so the crash is blob-content-driven. Conclusion: the lightmap loader
-  does not tolerate JPEG in these slots — the webp→jpg idea is dead (dropped at Max's call,
-  and JPEG was worse than WebP at equal quality anyway). A `recompress-lightmap` (WebP q~90,
-  T2) remains plausible but needs an in-game pass of `…_lmq90.Map.Gbx` first.
-- **Crash mechanism Ghidra-confirmed (2026-09-01)**: `Hms_ModelCreateForZone` decodes each
+- **In-game results (2026-09-01, corrected)**: the **q90 WebP swap CRASHED**; the **JPEG
+  swap LOADED but took 726 s** — the game fails every sprite's WebP header probe, silently
+  falls into the regenerate path, and re-bakes the whole lightmap at load. (First report
+  guessed the JPEG variant had crashed; Max's later jpg load test flipped the attribution.)
+  Control experiment exonerates the save path: a no-op frame swap is byte-identical to the
+  validated resave-only output (SHA256 7daaeee8…), so the crash is blob-content-driven.
+- **Crash root cause — multi-sprite buffers (2026-09-01, measured)**: the lightmap blobs are
+  NOT one WebP each. On the sample, frame 0's Data2 holds **3 concatenated 1024² WebPs**
+  (HBasis coefficient planes) and Data3 holds **4 concatenated 652² WebPs**; only
+  Data/f1/f2 are single images. Pillow reads just the first RIFF, so the q90 swap replaced
+  those buffers with single images **shorter than the mapping cache's recorded sprite
+  offsets/lengths** → out-of-bounds slice in `Hms_ModelCreateForZone` → crash. JPEG survives
+  because the first header probe fails before any slicing. Consequence: ANY blob-length
+  change is unsafe unless the zlib mapping-cache descriptor lengths are rewritten too.
+- **Corrected recompression math**: re-encoding every sub-image individually at WebP q90 is
+  **+0.8% overall** (3,125,514 → 3,149,006 B) — the earlier −16% compared single re-encodes
+  against whole multi-image buffers. Only the three 1024² diffuse buffers shrink (−7–8.5%,
+  ~194 KB total); the HBasis planes balloon +60–148%. A `recompress-lightmap` action would
+  need selective re-encoding PLUS a mapping-cache metadata rewrite for ~194 KB of T2-lossy
+  savings — dropped as not worth it (resave+prune already puts the sample 92 KiB under).
+- **Load-path facts Ghidra-confirmed (2026-09-01)**: `Hms_ModelCreateForZone` decodes each
   embedded sprite via a WebP-only path (`FileWebP::ReadHeader` + libwebp YCbCr import) whose
-  results are IGNORED at two levels — a non-WebP blob yields a registered null bitmap and a
-  later null-deref. No format sniffing; WebP is mandatory. The zlib mapping cache is REQUIRED
-  (not editor-only): the per-sprite descriptor table {format=5, buffer index, len} and the
-  mapping vectors come from it. The game stores save-time webp quality in cache metadata and
-  its reuse gate wants ≥91%, but never re-inspects blob bytes — a q90 re-encode passes with
-  untouched metadata. Full trace: research-priv lightmap-encoding addendum (functions renamed
-  in the shared Ghidra DB).
+  results are IGNORED at two levels. No format sniffing; WebP is mandatory. The zlib mapping
+  cache is REQUIRED (not editor-only): the per-sprite descriptor table {format=5, buffer
+  index, len} and the mapping vectors come from it. The game stores save-time webp quality in
+  cache metadata and its reuse gate wants ≥91%, but never re-inspects blob bytes. Full trace:
+  research-priv lightmap-encoding addendum (functions renamed in the shared Ghidra DB).
 
 ## Library pins
 
