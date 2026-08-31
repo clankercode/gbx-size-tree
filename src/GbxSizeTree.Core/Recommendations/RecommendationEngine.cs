@@ -23,7 +23,8 @@ public sealed class RecommendationEngine : IRecommendationEngine
     public RecommendationReport Recommend(
         MapAnalysis analysis,
         IReadOnlyDictionary<string, string> settings,
-        Measure.ResaveTrial? resaveTrial = null)
+        Measure.ResaveTrial? resaveTrial = null,
+        GBX.NET.Engines.Game.CGameCtnChallenge? map = null)
     {
         if (analysis.Body is null)
         {
@@ -46,7 +47,7 @@ public sealed class RecommendationEngine : IRecommendationEngine
             try
             {
                 applicability = action.Detect(
-                    new ActionDetectContext(analysis, settings, status, ResaveTrial: resaveTrial));
+                    new ActionDetectContext(analysis, settings, status, map, resaveTrial));
             }
             catch (Exception ex)
             {
@@ -70,11 +71,16 @@ public sealed class RecommendationEngine : IRecommendationEngine
             (action.RecommendByDefault ? recommendations : cautions).Add(recommendation);
         }
 
-        AddThumbnailPotential(analysis, settings, recommendations);
+        AddThumbnailPotential(analysis, settings, map, recommendations);
         recommendations.AddRange(editorSource.Produce(analysis));
 
+        // Tool-applicable lossless actions rank first regardless of size: when they alone
+        // cover the overage, the verdict must never send the user to re-bake shadows or
+        // shrink the thumbnail. Lossy/editor advice only enters the verdict as spillover.
         var ranked = recommendations
-            .OrderByDescending(recommendation => recommendation.EstimatedSavingsBytes)
+            .OrderByDescending(recommendation =>
+                recommendation.ActionId is not null && recommendation.Tier == ActionTier.Lossless)
+            .ThenByDescending(recommendation => recommendation.EstimatedSavingsBytes)
             .ThenBy(recommendation => recommendation.Tier)
             .ToArray();
         var alreadyUnderLimit = analysis.FileBytes <= Limits.OnlineMapSizeBytes;
@@ -97,6 +103,7 @@ public sealed class RecommendationEngine : IRecommendationEngine
     private void AddThumbnailPotential(
         MapAnalysis analysis,
         IReadOnlyDictionary<string, string> settings,
+        GBX.NET.Engines.Game.CGameCtnChallenge? map,
         List<Recommendation> recommendations)
     {
         var mode = settings.TryGetValue("mode", out var value) ? value : "keep";
@@ -111,7 +118,7 @@ public sealed class RecommendationEngine : IRecommendationEngine
         ActionApplicability probe;
         try
         {
-            probe = thumbnail.Detect(new ActionDetectContext(analysis, probeSettings, status));
+            probe = thumbnail.Detect(new ActionDetectContext(analysis, probeSettings, status, map));
         }
         catch (Exception ex)
         {

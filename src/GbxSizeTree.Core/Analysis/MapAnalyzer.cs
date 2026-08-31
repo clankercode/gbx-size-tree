@@ -33,8 +33,17 @@ public sealed class MapAnalyzer(
         new Drilldown.MediaTrackerDrilldown(),
         status);
 
-    public MapAnalysis Analyze(MapSource source, AnalyzeOptions options)
+    public MapAnalysis Analyze(MapSource source, AnalyzeOptions options) =>
+        Analyze(source, options, out _);
+
+    /// <summary>
+    /// <paramref name="parsedMap"/> exposes the map parsed during analysis (null for
+    /// header-only runs) so callers can hand it to detection for MEASURED estimates
+    /// without a second parse.
+    /// </summary>
+    public MapAnalysis Analyze(MapSource source, AnalyzeOptions options, out CGameCtnChallenge? parsedMap)
     {
+        parsedMap = null;
         var fileBytes = source switch
         {
             MapSource.FromFile f => File.ReadAllBytes(f.Path),
@@ -62,6 +71,7 @@ public sealed class MapAnalyzer(
             gbx = Gbx.Parse<CGameCtnChallenge>(ms);
         }
         var map = gbx.Node;
+        parsedMap = map;
 
         byte[] body;
         RawBodyScan scan;

@@ -23,16 +23,21 @@ public static class RecommendationRenderer
             .AddColumn("Consequence")
             .AddColumn("How");
 
+        var needed = report.RecommendationsToGetUnderLimit;
         for (var index = 0; index < report.Ranked.Count; index++)
         {
             var recommendation = report.Ranked[index];
+            // Rows past the under-limit cutoff are options, not advice: render them dim so
+            // nobody re-bakes shadows a lossless pass would have made unnecessary.
+            var dim = !report.AlreadyUnderLimit && needed > 0 && index >= needed;
+            string Cell(string text) => dim ? $"[dim]{text}[/]" : text;
             table.AddRow(
-                (index + 1).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                Cell((index + 1).ToString(System.Globalization.CultureInfo.InvariantCulture)),
                 Theme.TierBadge(recommendation.Tier),
-                Markup.Escape(recommendation.Title),
-                SizeFormat.ShortBytes(recommendation.EstimatedSavingsBytes),
-                Markup.Escape(recommendation.Consequence),
-                Markup.Escape(recommendation.HowTo));
+                Cell(Markup.Escape(recommendation.Title)),
+                Cell(SizeFormat.ShortBytes(recommendation.EstimatedSavingsBytes)),
+                Cell(Markup.Escape(recommendation.Consequence)),
+                Cell(Markup.Escape(recommendation.HowTo)));
         }
 
         console.Write(table);
@@ -40,15 +45,23 @@ public static class RecommendationRenderer
         {
             console.MarkupLine("[green]Verdict: already under the online limit.[/]");
         }
-        else if (report.RecommendationsToGetUnderLimit < 0)
+        else if (needed < 0)
         {
             console.MarkupLine("[red]Verdict: the available recommendations cannot get this map under the online limit.[/]");
         }
         else
         {
-            console.MarkupLine(
-                $"[yellow]Verdict: apply the first {report.RecommendationsToGetUnderLimit.ToString(System.Globalization.CultureInfo.InvariantCulture)} " +
-                "recommendation(s) to get under the online limit.[/]");
+            var neededText = needed.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var losslessSuffices = report.Ranked.Take(needed).All(recommendation =>
+                recommendation.ActionId is not null
+                && recommendation.Tier == Actions.ActionTier.Lossless);
+            console.MarkupLine(losslessSuffices
+                ? $"[green]Verdict: the first {neededText} recommendation(s) — all lossless, applied by --optimize — get this map under the online limit.[/]"
+                : $"[yellow]Verdict: apply the first {neededText} recommendation(s) to get under the online limit.[/]");
+            if (needed < report.Ranked.Count)
+            {
+                console.MarkupLine("[dim]Dimmed rows are further options, not needed for the limit.[/]");
+            }
         }
 
         foreach (var caution in report.Cautions ?? [])

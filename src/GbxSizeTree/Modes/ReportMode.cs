@@ -42,7 +42,8 @@ public static class ReportMode
             new AnalyzeOptions(
                 HeaderOnly: options.HeaderOnly,
                 TrialCompressionEstimates: options.EstimateCompressed,
-                TopN: options.TopN));
+                TopN: options.TopN),
+            out var parsedMap);
 
         if (options.UnknownChunks)
         {
@@ -64,7 +65,7 @@ public static class ReportMode
         var recommendations = analysis.Body is null
             ? null
             : new RecommendationEngine(registry, sink)
-                .Recommend(analysis, ActionSelection.BuildSettings(options), trial);
+                .Recommend(analysis, ActionSelection.BuildSettings(options), trial, parsedMap);
 
         if (options.Json)
         {

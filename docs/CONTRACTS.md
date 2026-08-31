@@ -44,6 +44,7 @@ file
 
 | Order | Id | Tier | Notes |
 |---|---|---|---|
+| 5 | `prune-chunks` | Lossless | removes 0x05E/0x061/0x064 — chunks the game discards on load (FORMAT-NOTES) |
 | 10 | `orphan-embeds` | Lossless | before embed-zip (don't recompress deleted entries) |
 | 20 | `embed-zip` | Lossless | Deflate-max; Stored variant only with setting `stored=true` |
 | 25 | `lighten-shadows` | BenignLossy | opt-in; setting `shadow-brightness-floor=0..255`; DD2 used 100 |
@@ -78,6 +79,10 @@ ids above, unaffected by casing policy.
 tool must never *suggest* it — it lands in `RecommendationReport.Cautions` (rendered as a
 warning, `cautions` in JSON), is excluded from `ranked` and from the under-limit verdict, and
 stays available via flags and the interactive menu. `strip-lightmap` is the canonical case.
+
+`ranked` orders tool-applicable LOSSLESS actions first (then by savings), so the under-limit
+verdict never counts a lossy or editor-only step that the lossless set alone could cover;
+lossy/editor advice enters the verdict only as spillover when lossless is insufficient.
 
 `--unknown-chunks` is a standalone debug view (exempt from the tree-first invariant): chunks
 missing from `ChunkCatalog`, as plain lines or a `{schemaVersion, unknownChunksReport}` JSON

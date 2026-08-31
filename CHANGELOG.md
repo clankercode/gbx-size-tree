@@ -10,13 +10,16 @@ Initial release.
   items per zip entry, MediaTracker, per-element arrays), with honest LZO framing and
   estimated on-disk attribution reconciled to the real file size.
 - Optimization actions behind three frontends (report / batch flags / interactive
-  session): LZO1x_999 resave, embedded-zip rebuild, orphan-embed removal (lossless,
-  default-on); lightmap strip and thumbnail strip/lossless/recompress/downscale
-  (opt-in). Output validation gate before anything is written; never overwrites input.
+  session): LZO1x_999 resave, embedded-zip rebuild, orphan-embed removal, and dead-chunk
+  pruning (chunks the game provably discards on load) — lossless, default-on; lightmap
+  strip, shadow lightening, and thumbnail strip/lossless/recompress/downscale (opt-in).
+  Output validation gate before anything is written; never overwrites input.
 - Ranked recommendations against the 7,168 KiB online limit, including editor-only
-  advice (re-bake static daylight / lower quality, heavy embedded items). Destructive
-  actions (strip-lightmap) surface as warnings, never as suggestions. Resave savings
-  are measured by a background trial resave started at file-read.
+  advice (re-bake static daylight / lower quality, heavy embedded items). Lossless
+  actions rank first and the verdict prefers them: lossy/editor advice is never counted
+  when lossless alone gets under the limit. Destructive actions (strip-lightmap)
+  surface as warnings, never as suggestions. Resave and embedded-zip savings are
+  measured (background trial resave started at file-read; in-memory ZIP rebuild).
 - `--attribute` per-action marginal savings; `--all-chunks` full chunk table;
   `--unknown-chunks` debug view for ids missing from the chunk catalog; `--json`
   machine-readable envelope (camelCase). The catalog names every TM2020 body chunk,
@@ -26,5 +29,5 @@ Initial release.
   linux-x64 and win-x64 (~16/14 MB).
 
 ### Distribution
-- Measured on the reference map: default lossless pipeline 7,832,571 → 7,245,560 B
-  (7.5% saved), taking it from ~481 KiB over the online limit to 94 KiB under.
+- Measured on the reference map: default lossless pipeline 7,832,571 → 7,245,531 B
+  (7.5% saved), taking it from ~481 KiB over the online limit to 92 KiB under.

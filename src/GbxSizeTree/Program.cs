@@ -31,6 +31,7 @@ var exitCode = ExitCodes.Ok;
 var registry = new ActionRegistry([
     new OrphanEmbedsAction(),
     new EmbeddedZipAction(),
+    new PruneChunksAction(),
     new LightenShadowsAction(),
     new StripLightmapAction(),
     new ThumbnailAction(new ImageSharpJpegRecoder()),

@@ -25,7 +25,7 @@ public static class BatchMode
             bytes => trial = GbxSizeTree.Measure.ResaveTrial.Start(bytes));
         var settings = ActionSelection.BuildSettings(options);
         var recommendations = new RecommendationEngine(registry, sink)
-            .Recommend(session.Baseline, settings, trial);
+            .Recommend(session.Baseline, settings, trial, session.DetectMap);
 
         if (!options.Json)
         {

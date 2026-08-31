@@ -34,8 +34,11 @@ public sealed class RecommendationEngineTests
     }
 
     [Fact]
-    public void Recommend_RanksBySavingsThenTier()
+    public void Recommend_RanksLosslessActionsFirstThenBySavings()
     {
+        // Policy: every tool-applicable lossless action outranks lossy/editor advice even
+        // when the lossy option would save more, so the under-limit verdict prefers a
+        // lossless combination whenever one suffices.
         var smaller = new FakeMapAction("smaller", ActionTier.Lossless, Savings(4_000));
         var benign = new FakeMapAction("benign", ActionTier.BenignLossy, Savings(5_000));
         var lossless = new FakeMapAction("lossless", ActionTier.Lossless, Savings(5_000));
@@ -43,7 +46,7 @@ public sealed class RecommendationEngineTests
         var report = CreateEngine(smaller, benign, lossless)
             .Recommend(FakeAnalysis.Build(), EmptySettings);
 
-        Assert.Equal(["lossless", "benign", "smaller"],
+        Assert.Equal(["lossless", "smaller", "benign"],
             report.Ranked.Take(3).Select(item => item.ActionId));
     }
 
@@ -73,6 +76,42 @@ public sealed class RecommendationEngineTests
         Assert.Equal(-1, unreachable.RecommendationsToGetUnderLimit);
         Assert.True(alreadyUnder.AlreadyUnderLimit);
         Assert.Equal(0, alreadyUnder.RecommendationsToGetUnderLimit);
+    }
+
+    [Fact]
+    public void Recommend_VerdictPrefersLosslessOverBiggerLossySavings()
+    {
+        // Over the limit by 4,000: the lossless action (5,000) alone covers it, so the
+        // verdict must pick it even though the lossy action would save ten times more.
+        var lossless = new FakeMapAction("lossless", ActionTier.Lossless, Savings(5_000));
+        var lossy = new FakeMapAction("lossy", ActionTier.BenignLossy, Savings(50_000));
+        var overLimit = FakeAnalysis.Build() with
+        {
+            FileBytes = Limits.OnlineMapSizeBytes + 4_000,
+        };
+
+        var report = CreateEngine(lossless, lossy).Recommend(overLimit, EmptySettings);
+
+        Assert.Equal("lossless", report.Ranked[0].ActionId);
+        Assert.Equal(1, report.RecommendationsToGetUnderLimit);
+        Assert.All(report.Ranked.Take(report.RecommendationsToGetUnderLimit),
+            item => Assert.Equal(ActionTier.Lossless, item.Tier));
+    }
+
+    [Fact]
+    public void Recommend_PassesMapIntoDetectContexts()
+    {
+        GBX.NET.Engines.Game.CGameCtnChallenge? seen = null;
+        var probe = new FakeMapAction("probe", ActionTier.Lossless, ctx =>
+        {
+            seen = ctx.Map;
+            return new ActionApplicability(true, 1, EstimateKind.Computed, "synthetic");
+        });
+        var map = new GBX.NET.Engines.Game.CGameCtnChallenge();
+
+        CreateEngine(probe).Recommend(FakeAnalysis.Build(), EmptySettings, map: map);
+
+        Assert.Same(map, seen);
     }
 
     [Fact]

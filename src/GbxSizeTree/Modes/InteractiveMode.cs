@@ -34,7 +34,8 @@ public static class InteractiveMode
 
         ReportRenderer.Render(console, session.Baseline, options.TopN);
         var engine = new RecommendationEngine(registry, sink);
-        RecommendationRenderer.Render(console, engine.Recommend(session.Baseline, settings, trial));
+        RecommendationRenderer.Render(
+            console, engine.Recommend(session.Baseline, settings, trial, session.DetectMap));
 
         while (true)
         {

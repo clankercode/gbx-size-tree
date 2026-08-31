@@ -48,7 +48,20 @@
 - `just package` (local zips) and `just release X.Y.Z` (bump+tag, RELEASE.md flow) both
   refuse a dirty worktree — a stale HEAD hash was once stamped into shipped binaries when
   zips were built before the commit.
-- **ChunkCatalog covers all 18 small body chunks** after Max's 2026-09-01 Ghidra pass over
+- **Recommendations receive the parsed map in all three frontends** (Analyze exposes it via
+  an out-param; batch/interactive pass `session.DetectMap`), so `embed-zip`'s Detect always
+  runs its measured in-memory rebuild. On the sample it measures "already optimal" and drops
+  out of the report entirely — previously report mode hit the null-map fallback and ranked a
+  misleading 0 B row.
+- **Ranked recommendations are lossless-first** (Max's call): every tool-applicable T1 action
+  outranks lossy/editor advice regardless of size, so the under-limit verdict never counts a
+  re-bake or thumbnail step the lossless set alone could cover. Rows past the verdict cutoff
+  render dim ("further options, not needed for the limit").
+- **`prune-chunks` (T1, default-on, Order 5)** removes the three body chunks the game
+  provably discards on load (Ghidra: 0x05E parsed-then-freed, 0x061 cleared after read,
+  0x064 temp-vector stub) — 92 B uncompressed on the sample, 29 B on-disk marginal. Default
+  pipeline is now 7,832,571 → **7,245,531 B** (587,040 B, 7.5%), 94,501 B under the limit;
+  output SHA256 7b74bbe1…. after Max's 2026-09-01 Ghidra pass over
   `CGameCtnChallenge_SerializeChunk` (table in FORMAT-NOTES.md; full layouts in his private
   notes). Ghidra overrides GBX.NET naming where they conflict: 0x018 is not laps in TM2020,
   0x036 is medal times + comments (not a thumbnail camera), and 0x05D — the former 5,357 B
