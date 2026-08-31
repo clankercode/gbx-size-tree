@@ -97,6 +97,21 @@ public sealed class EmbeddedZipDrilldown : IEmbeddedZipDrilldown
             return true;
         }
 
+        // Placed custom items reference embeds by zip-relative path WITHOUT the leading
+        // "Items/"/"Blocks/" segment, with backslashes: "MySet\gate.Item.Gbx"
+        // (verified on the sample; docs/FORMAT-NOTES.md). Try path forms first, stems last.
+        var normalized = path.Replace('\\', '/').TrimStart('/');
+        var slash = normalized.IndexOf('/');
+        var withoutRoot = slash > 0 ? normalized[(slash + 1)..] : normalized;
+        foreach (var candidate in (ReadOnlySpan<string>)
+            [normalized, normalized.Replace('/', '\\'), withoutRoot, withoutRoot.Replace('/', '\\')])
+        {
+            if (referencedIdents.Contains(candidate))
+            {
+                return true;
+            }
+        }
+
         if (referencedIdents.Contains(stem))
         {
             return true;
