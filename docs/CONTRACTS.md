@@ -67,3 +67,6 @@ Settings are `IReadOnlyDictionary<string,string>`; keys are per-action, kebab-ca
 
 0 ok · 1 usage · 2 parse/format · 3 output validation failed · 4 I/O · 5 internal.
 `--json`: report (MapAnalysis) on stdout; errors as `JsonErrorEnvelope`; ALL status to stderr.
+JSON property names are **camelCase** throughout (envelope and model; changed pre-release
+2026-09-01); enum *values* stay PascalCase (`ExactOnDisk`). SizeNode `id` values are the frozen
+ids above, unaffected by casing policy.

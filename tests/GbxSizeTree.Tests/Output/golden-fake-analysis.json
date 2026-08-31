@@ -1,258 +1,258 @@
 {
   "schemaVersion": 1,
   "analysis": {
-    "SourceLabel": "<path>",
-    "FileBytes": 12000,
-    "Header": {
-      "TotalBytes": 2000,
-      "Chunks": [
+    "sourceLabel": "<path>",
+    "fileBytes": 12000,
+    "header": {
+      "totalBytes": 2000,
+      "chunks": [
         {
-          "ChunkId": 50606087,
-          "Name": "Thumbnail",
-          "Bytes": 1000,
-          "Heavy": true,
-          "FileOffset": 100
+          "chunkId": 50606087,
+          "name": "Thumbnail",
+          "bytes": 1000,
+          "heavy": true,
+          "fileOffset": 100
         },
         {
-          "ChunkId": 50606085,
-          "Name": "XML",
-          "Bytes": 900,
-          "Heavy": true,
-          "FileOffset": 1100
+          "chunkId": 50606085,
+          "name": "XML",
+          "bytes": 900,
+          "heavy": true,
+          "fileOffset": 1100
         }
       ],
-      "Thumbnail": {
-        "ChunkBytes": 1000,
-        "JpegBytes": 950,
-        "Width": 512,
-        "Height": 512,
-        "CommentLength": 0,
-        "StrippableMetadataBytes": 120
+      "thumbnail": {
+        "chunkBytes": 1000,
+        "jpegBytes": 950,
+        "width": 512,
+        "height": 512,
+        "commentLength": 0,
+        "strippableMetadataBytes": 120
       },
-      "XmlLength": 900
+      "xmlLength": 900
     },
-    "Body": {
-      "UncompressedBytes": 10000,
-      "CompressedBytes": 7000,
-      "Ratio": 0.7,
-      "Chunks": [
+    "body": {
+      "uncompressedBytes": 10000,
+      "compressedBytes": 7000,
+      "ratio": 0.7,
+      "chunks": [
         {
-          "ChunkId": 50606111,
-          "Name": "Blocks",
-          "Category": "Blocks",
-          "Description": "block placements",
-          "Bytes": 4000,
-          "Confidence": "WriterDelta",
-          "BodyOffset": 0,
-          "Skippable": false,
-          "Order": 0,
-          "PrecompressedPayloadBytes": 0
+          "chunkId": 50606111,
+          "name": "Blocks",
+          "category": "Blocks",
+          "description": "block placements",
+          "bytes": 4000,
+          "confidence": "WriterDelta",
+          "bodyOffset": 0,
+          "skippable": false,
+          "order": 0,
+          "precompressedPayloadBytes": 0
         },
         {
-          "ChunkId": 50606171,
-          "Name": "Lightmap",
-          "Category": "Lightmap",
-          "Description": "baked shadows",
-          "Bytes": 2350,
-          "Confidence": "ExactOnDisk",
-          "BodyOffset": 4000,
-          "Skippable": true,
-          "Order": 1,
-          "PrecompressedPayloadBytes": 2300
+          "chunkId": 50606171,
+          "name": "Lightmap",
+          "category": "Lightmap",
+          "description": "baked shadows",
+          "bytes": 2350,
+          "confidence": "ExactOnDisk",
+          "bodyOffset": 4000,
+          "skippable": true,
+          "order": 1,
+          "precompressedPayloadBytes": 2300
         },
         {
-          "ChunkId": 50606164,
-          "Name": "Embedded items",
-          "Category": "EmbeddedItems",
-          "Description": "custom items zip",
-          "Bytes": 3100,
-          "Confidence": "ExactOnDisk",
-          "BodyOffset": 6350,
-          "Skippable": true,
-          "Order": 2,
-          "PrecompressedPayloadBytes": 3000
+          "chunkId": 50606164,
+          "name": "Embedded items",
+          "category": "EmbeddedItems",
+          "description": "custom items zip",
+          "bytes": 3100,
+          "confidence": "ExactOnDisk",
+          "bodyOffset": 6350,
+          "skippable": true,
+          "order": 2,
+          "precompressedPayloadBytes": 3000
         }
       ],
-      "UnattributedBytes": 550,
-      "EmbeddedZip": {
-        "ZipBytes": 3000,
-        "EntriesUncompressedBytes": 6000,
-        "Entries": [
+      "unattributedBytes": 550,
+      "embeddedZip": {
+        "zipBytes": 3000,
+        "entriesUncompressedBytes": 6000,
+        "entries": [
           {
-            "Path": "Items/A.Item.Gbx",
-            "CompressedBytes": 2000,
-            "UncompressedBytes": 4000,
-            "Method": "Deflate",
-            "IsGbx": true,
-            "HasCompressedGbxBody": true,
-            "RecompressibleSavingsEstimate": 500,
-            "IsReferenced": true
+            "path": "Items/A.Item.Gbx",
+            "compressedBytes": 2000,
+            "uncompressedBytes": 4000,
+            "method": "Deflate",
+            "isGbx": true,
+            "hasCompressedGbxBody": true,
+            "recompressibleSavingsEstimate": 500,
+            "isReferenced": true
           },
           {
-            "Path": "Items/Orphan.Item.Gbx",
-            "CompressedBytes": 1000,
-            "UncompressedBytes": 2000,
-            "Method": "Deflate",
-            "IsGbx": true,
-            "HasCompressedGbxBody": false,
-            "IsReferenced": false
+            "path": "Items/Orphan.Item.Gbx",
+            "compressedBytes": 1000,
+            "uncompressedBytes": 2000,
+            "method": "Deflate",
+            "isGbx": true,
+            "hasCompressedGbxBody": false,
+            "isReferenced": false
           }
         ],
-        "ReferencedIdents": [
+        "referencedIdents": [
           "A"
         ]
       },
-      "Lightmap": {
-        "HasLightmaps": true,
-        "Version": 8,
-        "FrameCount": 3,
-        "Frames": [
+      "lightmap": {
+        "hasLightmaps": true,
+        "version": 8,
+        "frameCount": 3,
+        "frames": [
           {
-            "Index": 0,
-            "BlobBytes": [
+            "index": 0,
+            "blobBytes": [
               300,
               200,
               100
             ]
           },
           {
-            "Index": 1,
-            "BlobBytes": [
+            "index": 1,
+            "blobBytes": [
               300,
               200,
               100
             ]
           },
           {
-            "Index": 2,
-            "BlobBytes": [
+            "index": 2,
+            "blobBytes": [
               300,
               200,
               100
             ]
           }
         ],
-        "WebpBytesTotal": 1800,
-        "ZlibCompressedBytes": 500,
-        "ZlibUncompressedBytes": 900,
-        "ChunkBytes": 2350
+        "webpBytesTotal": 1800,
+        "zlibCompressedBytes": 500,
+        "zlibUncompressedBytes": 900,
+        "chunkBytes": 2350
       },
-      "ScriptMetadata": {
-        "ChunkBytes": 400,
-        "EntryCount": 3,
-        "TraitNames": [
+      "scriptMetadata": {
+        "chunkBytes": 400,
+        "entryCount": 3,
+        "traitNames": [
           "MapType",
           "Foo",
           "Bar"
         ]
       },
-      "MediaTracker": {
-        "ChunkBytes": 200,
-        "ClipCount": 1,
-        "Summary": "intro clip"
+      "mediaTracker": {
+        "chunkBytes": 200,
+        "clipCount": 1,
+        "summary": "intro clip"
       }
     },
-    "Facts": {
-      "MapUid": "FAKEUID",
-      "MapName": "Fake Map",
-      "AuthorLogin": "fakeauthor",
-      "BlockCount": 100,
-      "AnchoredObjectCount": 50,
-      "BakedBlockCount": 10,
-      "FreeBlockCount": 2,
-      "HasLightmaps": true,
-      "LightmapFrameCount": 3,
-      "LightmapVersion": 8,
-      "EmbeddedEntryCount": 2
+    "facts": {
+      "mapUid": "FAKEUID",
+      "mapName": "Fake Map",
+      "authorLogin": "fakeauthor",
+      "blockCount": 100,
+      "anchoredObjectCount": 50,
+      "bakedBlockCount": 10,
+      "freeBlockCount": 2,
+      "hasLightmaps": true,
+      "lightmapFrameCount": 3,
+      "lightmapVersion": 8,
+      "embeddedEntryCount": 2
     },
-    "Warnings": [
+    "warnings": [
       {
-        "Code": "fake",
-        "Message": "this analysis is synthetic"
+        "code": "fake",
+        "message": "this analysis is synthetic"
       }
     ],
-    "Tree": {
-      "Id": "file",
-      "Label": "Fake Map.Map.Gbx",
-      "Category": "Other",
-      "UncompressedBytes": 12000,
-      "OnDiskBytes": 12000,
-      "Confidence": "ExactOnDisk",
-      "Children": [
+    "tree": {
+      "id": "file",
+      "label": "Fake Map.Map.Gbx",
+      "category": "Other",
+      "uncompressedBytes": 12000,
+      "onDiskBytes": 12000,
+      "confidence": "ExactOnDisk",
+      "children": [
         {
-          "Id": "header",
-          "Label": "Header",
-          "Category": "Header",
-          "UncompressedBytes": 2000,
-          "OnDiskBytes": 2000,
-          "Confidence": "ExactOnDisk",
-          "Children": [
+          "id": "header",
+          "label": "Header",
+          "category": "Header",
+          "uncompressedBytes": 2000,
+          "onDiskBytes": 2000,
+          "confidence": "ExactOnDisk",
+          "children": [
             {
-              "Id": "header.thumbnail",
-              "Label": "Thumbnail",
-              "Category": "Thumbnail",
-              "UncompressedBytes": 1000,
-              "OnDiskBytes": 1000,
-              "Confidence": "ExactOnDisk",
-              "Detail": "JPEG 512x512",
-              "Children": []
+              "id": "header.thumbnail",
+              "label": "Thumbnail",
+              "category": "Thumbnail",
+              "uncompressedBytes": 1000,
+              "onDiskBytes": 1000,
+              "confidence": "ExactOnDisk",
+              "detail": "JPEG 512x512",
+              "children": []
             },
             {
-              "Id": "header.xml",
-              "Label": "XML metadata",
-              "Category": "Metadata",
-              "UncompressedBytes": 900,
-              "OnDiskBytes": 900,
-              "Confidence": "ExactOnDisk",
-              "Children": []
+              "id": "header.xml",
+              "label": "XML metadata",
+              "category": "Metadata",
+              "uncompressedBytes": 900,
+              "onDiskBytes": 900,
+              "confidence": "ExactOnDisk",
+              "children": []
             }
           ]
         },
         {
-          "Id": "body",
-          "Label": "Body",
-          "Category": "Other",
-          "UncompressedBytes": 10000,
-          "OnDiskBytes": 7000,
-          "Confidence": "ExactOnDisk",
-          "Children": [
+          "id": "body",
+          "label": "Body",
+          "category": "Other",
+          "uncompressedBytes": 10000,
+          "onDiskBytes": 7000,
+          "confidence": "ExactOnDisk",
+          "children": [
             {
-              "Id": "body.blocks",
-              "Label": "Blocks",
-              "Category": "Blocks",
-              "UncompressedBytes": 4000,
-              "EstimatedOnDiskBytes": 1800,
-              "Confidence": "WriterDelta",
-              "Detail": "100 blocks",
-              "Children": []
+              "id": "body.blocks",
+              "label": "Blocks",
+              "category": "Blocks",
+              "uncompressedBytes": 4000,
+              "estimatedOnDiskBytes": 1800,
+              "confidence": "WriterDelta",
+              "detail": "100 blocks",
+              "children": []
             },
             {
-              "Id": "body.lightmap",
-              "Label": "Lightmap",
-              "Category": "Lightmap",
-              "UncompressedBytes": 2350,
-              "EstimatedOnDiskBytes": 2300,
-              "Confidence": "ExactOnDisk",
-              "Detail": "3 frames",
-              "Children": []
+              "id": "body.lightmap",
+              "label": "Lightmap",
+              "category": "Lightmap",
+              "uncompressedBytes": 2350,
+              "estimatedOnDiskBytes": 2300,
+              "confidence": "ExactOnDisk",
+              "detail": "3 frames",
+              "children": []
             },
             {
-              "Id": "body.embedded",
-              "Label": "Embedded items",
-              "Category": "EmbeddedItems",
-              "UncompressedBytes": 3100,
-              "EstimatedOnDiskBytes": 2900,
-              "Confidence": "ExactOnDisk",
-              "Detail": "2 entries",
-              "Children": []
+              "id": "body.embedded",
+              "label": "Embedded items",
+              "category": "EmbeddedItems",
+              "uncompressedBytes": 3100,
+              "estimatedOnDiskBytes": 2900,
+              "confidence": "ExactOnDisk",
+              "detail": "2 entries",
+              "children": []
             },
             {
-              "Id": "body.residual",
-              "Label": "Unattributed residual",
-              "Category": "Residual",
-              "UncompressedBytes": 550,
-              "Confidence": "Estimated",
-              "Children": []
+              "id": "body.residual",
+              "label": "Unattributed residual",
+              "category": "Residual",
+              "uncompressedBytes": 550,
+              "confidence": "Estimated",
+              "children": []
             }
           ]
         }

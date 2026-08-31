@@ -19,7 +19,7 @@ public sealed class JsonReportWriterTests
         Assert.Equal(1, root.GetProperty("schemaVersion").GetInt32());
 
         var analysis = root.GetProperty("analysis");
-        Assert.Equal(12_000, analysis.GetProperty("FileBytes").GetInt64());
+        Assert.Equal(12_000, analysis.GetProperty("fileBytes").GetInt64());
         Assert.False(root.TryGetProperty("recommendations", out _));
 
         var json = output.ToString();
@@ -40,8 +40,8 @@ public sealed class JsonReportWriterTests
 
         using var document = JsonDocument.Parse(output.ToString());
         var report = document.RootElement.GetProperty("recommendations");
-        Assert.False(report.GetProperty("AlreadyUnderLimit").GetBoolean());
-        Assert.Equal(-1, report.GetProperty("RecommendationsToGetUnderLimit").GetInt32());
+        Assert.False(report.GetProperty("alreadyUnderLimit").GetBoolean());
+        Assert.Equal(-1, report.GetProperty("recommendationsToGetUnderLimit").GetInt32());
     }
 
     [Fact]
@@ -52,9 +52,9 @@ public sealed class JsonReportWriterTests
         JsonReportWriter.WriteError(output, 4, "cannot read map");
 
         using var document = JsonDocument.Parse(output.ToString());
-        var error = document.RootElement.GetProperty("Error");
-        Assert.Equal(4, error.GetProperty("Code").GetInt32());
-        Assert.Equal("cannot read map", error.GetProperty("Message").GetString());
+        var error = document.RootElement.GetProperty("error");
+        Assert.Equal(4, error.GetProperty("code").GetInt32());
+        Assert.Equal("cannot read map", error.GetProperty("message").GetString());
     }
 
     [Fact]
@@ -68,9 +68,14 @@ public sealed class JsonReportWriterTests
         JsonReportWriter.Write(output, analysis, recommendations: null);
 
         var actual = JsonReportWriter.Normalize(output.ToString());
-        var expected = File.ReadAllText(GoldenPath()).Replace("\r\n", "\n", StringComparison.Ordinal);
 
-        // To regenerate, copy the assertion's actual output verbatim into golden-fake-analysis.json.
+        // Regenerate with `just golden-update` (sets GBX_SIZE_TREE_UPDATE_GOLDEN=1).
+        if (Environment.GetEnvironmentVariable("GBX_SIZE_TREE_UPDATE_GOLDEN") == "1")
+        {
+            File.WriteAllText(GoldenPath(), actual);
+        }
+
+        var expected = File.ReadAllText(GoldenPath()).Replace("\r\n", "\n", StringComparison.Ordinal);
         Assert.Equal(expected, actual);
     }
 

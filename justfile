@@ -19,6 +19,10 @@ test: build
 test-one FILTER: build
     flock --close /tmp/gbx-size-tree.build.lock dotnet test --no-build -- --filter-class "*{{FILTER}}*"
 
+# Rewrite tests/…/golden-fake-analysis.json from the current serializer output, then verify.
+golden-update: build
+    GBX_SIZE_TREE_UPDATE_GOLDEN=1 flock --close /tmp/gbx-size-tree.build.lock dotnet test --no-build -- --filter-class "*JsonReportWriter*"
+
 # NB: `dotnet run -m:2` forwards -m:2 to the app; build first, then run --no-build.
 run *ARGS: build
     dotnet run --project src/GbxSizeTree --no-build -- {{ARGS}}

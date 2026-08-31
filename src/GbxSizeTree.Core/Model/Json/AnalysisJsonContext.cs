@@ -10,6 +10,7 @@ namespace GbxSizeTree.Model.Json;
 [JsonSourceGenerationOptions(
     WriteIndented = true,
     UseStringEnumConverter = true,
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(MapAnalysis))]
 [JsonSerializable(typeof(RecommendationReport))]
