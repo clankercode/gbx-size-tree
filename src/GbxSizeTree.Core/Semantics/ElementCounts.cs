@@ -1,7 +1,7 @@
 using System.Globalization;
 using GBX.NET.Engines.Game;
 
-namespace GbxSizeTree.Core.Semantics;
+namespace GbxSizeTree.Semantics;
 
 /// <summary>
 /// Counts the CGameCtnChallenge element collections used by the per-element chunks documented in

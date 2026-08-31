@@ -1,6 +1,6 @@
 using GbxSizeTree.Model;
 
-namespace GbxSizeTree.Core.Semantics;
+namespace GbxSizeTree.Semantics;
 
 /// <summary>
 /// Describes the verified CGameCtnChallenge header and TM2020 body chunks documented in

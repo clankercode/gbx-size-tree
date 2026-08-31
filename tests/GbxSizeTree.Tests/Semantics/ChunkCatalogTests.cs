@@ -1,5 +1,5 @@
 using GBX.NET.Engines.Game;
-using GbxSizeTree.Core.Semantics;
+using GbxSizeTree.Semantics;
 using GbxSizeTree.Model;
 
 namespace GbxSizeTree.Tests.Semantics;
