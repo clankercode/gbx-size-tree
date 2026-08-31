@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/GbxSizeTree.Core/GbxSizeTree.Core.csproj" />
+    <Project Path="src/GbxSizeTree/GbxSizeTree.csproj" />
+  </Folder>
+</Solution>

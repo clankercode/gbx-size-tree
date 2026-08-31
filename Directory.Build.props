@@ -1,0 +1,22 @@
+<Project>
+  <!--
+    NOTE: NativeAOT is BANNED for builds on host `xsm` (CachyOS): the x86_64_v4 glibc CRT
+    stamps `x86 ISA needed: x86-64-v4` (AVX-512) into locally linked binaries, which then die
+    on machines without AVX-512 (`exit 127` / "CPU ISA level is lower than required").
+    Self-contained single-file (non-AOT) publish uses Microsoft-built runtime binaries and is safe.
+    Do not "optimize" by adding PublishAot here. If AOT is ever wanted, build on x-alpha/x-tuf and
+    gate with: readelf -n <bin> | grep 'x86 ISA needed'.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <Version>0.1.0</Version>
+    <Authors>Max Kaye (XertroV) + AI</Authors>
+    <PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
+  </PropertyGroup>
+</Project>

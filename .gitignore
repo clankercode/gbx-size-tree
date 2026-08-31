@@ -1,0 +1,10 @@
+bin/
+obj/
+artifacts/
+publish/
+*.user
+.vs/
+.idea/
+.worktrees/
+*_recompressed.Map.Gbx
+/reviews/

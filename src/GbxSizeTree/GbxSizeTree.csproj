@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>gbx-size-tree</AssemblyName>
+    <RootNamespace>GbxSizeTree.Cli</RootNamespace>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../GbxSizeTree.Core/GbxSizeTree.Core.csproj" />
+    <PackageReference Include="Spectre.Console" Version="0.51.1" />
+  </ItemGroup>
+
+</Project>
