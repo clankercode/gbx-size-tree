@@ -36,6 +36,12 @@ public static class InteractiveMode
 
         while (true)
         {
+            if (session.Applied.Count > 0)
+            {
+                console.MarkupLineInterpolated(
+                    $"[dim]applied so far: {string.Join(" → ", session.Applied.Select(a => a.ActionId))}[/]");
+            }
+
             var choice = console.Prompt(new SelectionPrompt<string>()
                 .Title("[bold]What next?[/]")
                 .AddChoices(BuildMenu(session)));
@@ -168,7 +174,7 @@ public static class InteractiveMode
             var written = session.SaveAs(path, options.Force);
             console.MarkupLineInterpolated($"[green]wrote[/] {written}");
         }
-        catch (GbxSizeTreeOutputException ex) when (ex.Message.Contains("--force"))
+        catch (GbxSizeTreeOutputException ex) when (ex.Kind == OutputFailureKind.AlreadyExists)
         {
             if (console.Confirm("Output exists — overwrite?", defaultValue: false))
             {

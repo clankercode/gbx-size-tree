@@ -163,7 +163,8 @@ public sealed class MapSession
         {
             throw new GbxSizeTreeOutputException(
                 "refusing to save: output failed validation — " +
-                string.Join("; ", materialized.Validation.Issues.Select(i => i.Message)));
+                string.Join("; ", materialized.Validation.Issues.Select(i => i.Message)),
+                OutputFailureKind.ValidationFailed);
         }
         var path = OutputPathResolver.Resolve(SourcePath, requestedOutput);
         OutputPathResolver.EnsureWritable(SourcePath, path, force);

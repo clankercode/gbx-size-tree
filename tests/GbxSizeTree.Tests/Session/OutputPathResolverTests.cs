@@ -9,6 +9,11 @@ public sealed class OutputPathResolverTests
     [InlineData("b.map.gbx", "b_recompressed.map.gbx")]
     [InlineData("weird.gbx", "weird_recompressed.gbx")]
     [InlineData("extensionless", "extensionless_recompressed")]
+    // Re-running the tool on its own output must not compound the marker.
+    [InlineData("A_recompressed.Map.Gbx", "A_recompressed2.Map.Gbx")]
+    [InlineData("A_recompressed_recompressed.Map.Gbx", "A_recompressed.Map.Gbx")]
+    [InlineData("A_recompressed2.Map.Gbx", "A_recompressed.Map.Gbx")]
+    [InlineData("extensionless_recompressed", "extensionless_recompressed2")]
     public void Resolve_DefaultOutput_InsertsRecompressedSuffix(string input, string expected)
     {
         var actual = OutputPathResolver.Resolve(input, requestedOutput: null);
@@ -34,6 +39,7 @@ public sealed class OutputPathResolverTests
             () => OutputPathResolver.EnsureWritable(input, output, force: true));
 
         Assert.Equal(4, exception.ExitCode);
+        Assert.Equal(OutputFailureKind.SameAsInput, exception.Kind);
     }
 
     [Fact]
@@ -46,6 +52,7 @@ public sealed class OutputPathResolverTests
                 () => OutputPathResolver.EnsureWritable(output + ".input", output, force: false));
 
             Assert.Contains("--force", exception.Message, StringComparison.Ordinal);
+            Assert.Equal(OutputFailureKind.AlreadyExists, exception.Kind);
         }
         finally
         {
