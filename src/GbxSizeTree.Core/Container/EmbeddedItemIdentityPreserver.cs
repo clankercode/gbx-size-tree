@@ -82,37 +82,62 @@ internal static class EmbeddedItemIdentityPreserver
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(snapshot);
 
+        var currentZipData = map.EmbeddedZipData ?? [];
+        var currentPaths = ReadItemModelPaths(currentZipData);
         if (snapshot.Entries.Count == 0)
         {
+            if (currentPaths.Count > 0)
+            {
+                throw new InvalidDataException(
+                    "Cannot preserve embedded item identities because item-model ZIP entries were added.");
+            }
             return [];
         }
 
-        var currentZipData = map.EmbeddedZipData ?? [];
-        var currentPaths = ReadItemModelPaths(currentZipData);
+        var originalPaths = snapshot.Entries.Select(static entry => entry.Path).ToArray();
+        if (currentPaths.SequenceEqual(originalPaths, StringComparer.Ordinal))
+        {
+            return WritePayload(map, snapshot, snapshot.Entries.Select(static entry => entry.Model).ToArray());
+        }
+
+        if (originalPaths.Distinct(StringComparer.Ordinal).Count() != originalPaths.Length)
+        {
+            throw new InvalidDataException(
+                "Cannot safely change an embedded ZIP containing duplicate item-model paths.");
+        }
+
         var originalByPath = snapshot.Entries
-            .GroupBy(static entry => entry.Path, StringComparer.Ordinal)
-            .ToDictionary(
-                static group => group.Key,
-                static group => new Queue<Ident>(group.Select(static entry => entry.Model)),
-                StringComparer.Ordinal);
+            .Select(static (entry, index) => (entry.Path, entry.Model, Index: index))
+            .ToDictionary(static entry => entry.Path, StringComparer.Ordinal);
         var projectedModels = new List<Ident>(currentPaths.Count);
+        var previousOriginalIndex = -1;
 
         foreach (var path in currentPaths)
         {
-            if (!originalByPath.TryGetValue(path, out var models) || models.Count == 0)
+            if (!originalByPath.TryGetValue(path, out var original)
+                || original.Index <= previousOriginalIndex)
             {
                 throw new InvalidDataException(
-                    $"Cannot preserve embedded item identity for added or renamed ZIP entry '{path}'.");
+                    $"Cannot preserve embedded item identity for added, renamed, or reordered ZIP entry '{path}'.");
             }
-            projectedModels.Add(models.Dequeue());
+            projectedModels.Add(original.Model);
+            previousOriginalIndex = original.Index;
         }
 
+        return WritePayload(map, snapshot, projectedModels);
+    }
+
+    private static IReadOnlyList<Ident> WritePayload(
+        CGameCtnChallenge map,
+        Snapshot snapshot,
+        IReadOnlyList<Ident> projectedModels)
+    {
         var chunk = map.GetChunk<CGameCtnChallenge.Chunk03043054>()
             ?? throw new InvalidDataException("Map has embedded item data but chunk 0x03043054 is missing.");
         ((ISkippableChunk)chunk).Data = BuildPayload(
             snapshot.Version,
             projectedModels,
-            currentZipData,
+            map.EmbeddedZipData ?? [],
             snapshot.Textures);
 
         return projectedModels;

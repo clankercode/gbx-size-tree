@@ -197,5 +197,5 @@ array from ZIP paths on every normal save, which breaks such aliases even when t
 are unchanged. Before saving, gbx-size-tree projects the original ordered mapping onto the
 final ZIP (removals only) and supplies the corrected raw chunk payload through
 `ISkippableChunk.Data`. Output validation then compares the reparsed ordered identities
-case-sensitively. Added or renamed item-model ZIP entries fail closed because no original
-mapping exists for them.
+case-sensitively. Added, renamed, reordered, or ambiguously duplicated item-model ZIP entries
+fail closed because the original ordered mapping cannot be preserved safely.

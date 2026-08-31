@@ -24,7 +24,7 @@ public static class OutputValidator
         out MapFacts after)
         => Validate(before, producedBytes, appliedActions, settings, null, out after);
 
-    public static ValidationReport Validate(
+    internal static ValidationReport Validate(
         MapFacts before,
         byte[] producedBytes,
         IReadOnlyList<IMapAction> appliedActions,
@@ -37,24 +37,14 @@ public static class OutputValidator
         ArgumentNullException.ThrowIfNull(appliedActions);
         ArgumentNullException.ThrowIfNull(settings);
 
+        CGameCtnChallenge map;
         try
         {
             Gbx.LZO = new Lzo();
             Gbx.ZLib = new ZLib();
             using var stream = new MemoryStream(producedBytes, writable: false);
-            var map = Gbx.Parse<CGameCtnChallenge>(stream).Node;
+            map = Gbx.Parse<CGameCtnChallenge>(stream).Node;
             after = FactsFrom(map, producedBytes);
-
-            if (expectedEmbeddedItemModels is not null
-                && !expectedEmbeddedItemModels.SequenceEqual(map.ExpectedEmbeddedItemModels ?? []))
-            {
-                return new ValidationReport(false,
-                [
-                    new ValidationIssue(
-                        "embedded-item-identities",
-                        "Produced map changed the ordered embedded item identity mapping."),
-                ]);
-            }
         }
         catch (Exception ex)
         {
@@ -66,6 +56,13 @@ public static class OutputValidator
         }
 
         var issues = new List<ValidationIssue>();
+        if (expectedEmbeddedItemModels is not null
+            && !expectedEmbeddedItemModels.SequenceEqual(map.ExpectedEmbeddedItemModels ?? []))
+        {
+            issues.Add(new ValidationIssue(
+                "embedded-item-identities",
+                "Produced map changed the ordered embedded item identity mapping."));
+        }
         CheckEqual(issues, nameof(MapFacts.MapUid), before.MapUid, after.MapUid);
         CheckEqual(issues, nameof(MapFacts.MapName), before.MapName, after.MapName);
         CheckEqual(issues, nameof(MapFacts.AuthorLogin), before.AuthorLogin, after.AuthorLogin);

@@ -35,20 +35,24 @@ public sealed class OrphanEmbedsAction : IMapAction
 
     public ActionResult Apply(ActionApplyContext ctx)
     {
-        var orphanPaths = Orphans(ctx.Analysis)
-            .Select(entry => entry.Path)
-            .ToHashSet(StringComparer.Ordinal);
-        if (orphanPaths.Count == 0)
+        var orphanEntries = OrphansWithIndexes(ctx.Analysis);
+        if (orphanEntries.Count == 0)
         {
             removedCount = 0;
             return ActionResult.NoChange("no orphaned embedded items");
         }
 
-        var removedPaths = new List<string>(orphanPaths.Count);
+        var orphanIndexes = orphanEntries.Select(static orphan => orphan.Index).ToHashSet();
+        var removedPaths = new List<string>(orphanIndexes.Count);
         ctx.Map.UpdateEmbeddedZipData(zip =>
         {
-            foreach (var entry in zip.Entries.Where(entry => orphanPaths.Contains(entry.FullName)).ToArray())
+            for (var index = zip.Entries.Count - 1; index >= 0; index--)
             {
+                if (!orphanIndexes.Contains(index))
+                {
+                    continue;
+                }
+                var entry = zip.Entries[index];
                 removedPaths.Add(entry.FullName);
                 entry.Delete();
             }
@@ -74,4 +78,11 @@ public sealed class OrphanEmbedsAction : IMapAction
 
     private static IReadOnlyList<EmbeddedEntryInfo> Orphans(MapAnalysis analysis) =>
         analysis.Body?.EmbeddedZip?.Entries.Where(entry => !entry.IsReferenced).ToArray() ?? [];
+
+    private static IReadOnlyList<(int Index, EmbeddedEntryInfo Entry)> OrphansWithIndexes(
+        MapAnalysis analysis) =>
+        analysis.Body?.EmbeddedZip?.Entries
+            .Select(static (entry, index) => (Index: index, Entry: entry))
+            .Where(static item => !item.Entry.IsReferenced)
+            .ToArray() ?? [];
 }
