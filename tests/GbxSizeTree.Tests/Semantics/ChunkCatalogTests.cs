@@ -60,12 +60,19 @@ public sealed class ChunkCatalogTests
         uint[] ids =
         [
             0x03043002, 0x03043003, 0x03043004, 0x03043005, 0x03043007, 0x03043008,
-            0x03043011, 0x0304301F, 0x0304302A, 0x03043040, 0x03043042, 0x03043043,
+            0x0304300D, 0x03043011, 0x03043018, 0x03043019, 0x0304301F, 0x03043024,
+            0x03043025, 0x03043029, 0x0304302A, 0x03043034, 0x03043036, 0x0304303E,
+            0x03043040, 0x03043042, 0x03043043,
             0x03043044, 0x03043048, 0x03043049, 0x0304304B, 0x03043050, 0x03043051,
             0x03043052, 0x03043053, 0x03043054, 0x03043055, 0x03043056, 0x03043059,
             0x0304305B, 0x0304305F, 0x03043062, 0x03043063, 0x03043065, 0x03043067,
             0x03043068, 0x03043069, 0x0304306B, 0x0304306C,
         ];
+
+        // Deliberately NOT cataloged (unknown even to GBX.NET 2.4.4; --unknown-chunks
+        // must keep surfacing them): 0x022, 0x04F, 0x057, 0x05A, 0x05D, 0x05E, 0x060,
+        // 0x061, 0x064. See docs/FORMAT-NOTES.md.
+        Assert.False(ChunkCatalog.IsKnown(0x0304305D));
 
         Assert.Equal(ids.Length, ChunkCatalog.All.Count);
         Assert.All(ids, id => Assert.Contains(ChunkCatalog.All, chunk => chunk.Id == id));

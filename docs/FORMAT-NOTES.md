@@ -75,6 +75,17 @@ Body (S = skippable):
 | 0x03043069 | S | macroblock indexes: i32 per block + item, then id/flags pairs |
 | 0x0304306C | S | color palette |
 
+### Unknown even to GBX.NET 2.4.4 (kept OUT of ChunkCatalog so `--unknown-chunks` surfaces them)
+
+Verified against the package's XML docs 2026-09-01: GBX.NET parses these as bare `U01`/`Ignore`
+data with no semantic name. Sample-map sizes in parentheses.
+
+- 0x03043022 inline (8 B, a single i32 — observed value 1); 0x0304304F S (17 B);
+  0x03043057 S (20 B); 0x0304305A S (20 B); 0x0304305E S (32 B); 0x03043060 S (20 B);
+  0x03043061 S (32 B); 0x03043064 S (28 B, GBX.NET hints "MT groups?").
+- **0x0304305D S (5,357 B on the sample — the only sizeable one, sits right after the
+  lightmap chunk).** Worth reversing if it grows on other maps.
+
 ## Lightmap chunk 0x0304305B (TM2020) — layout VERIFIED on-disk 2026-09-01
 
 Confirmed against the sample's bytes (payload at body offset 11,616,752, length 4,696,337:

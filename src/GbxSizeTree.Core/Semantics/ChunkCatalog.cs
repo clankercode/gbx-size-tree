@@ -17,9 +17,21 @@ public static class ChunkCatalog
         new ChunkMeta(0x03043007, "Thumbnail", SizeCategory.Thumbnail, "JPEG thumbnail, dimensions, and comments", false, false),
         new ChunkMeta(0x03043008, "Author", SizeCategory.Metadata, "Map author metadata", false, false),
 
+        // Named from the pinned GBX.NET 2.4.4 XML docs (chunk summaries); ids GBX.NET itself
+        // cannot name (bare U01 / Ignore data) stay OUT of the catalog so --unknown-chunks
+        // keeps surfacing them: 0x022, 0x04F, 0x057, 0x05A, 0x05D, 0x05E, 0x060, 0x061, 0x064.
+        new ChunkMeta(0x0304300D, "Vehicle", SizeCategory.Metadata, "Player vehicle identity", false, false),
         new ChunkMeta(0x03043011, "Challenge parameters", SizeCategory.Metadata, "Collector list and challenge parameter references", false, false),
+        new ChunkMeta(0x03043018, "Laps (legacy)", SizeCategory.Metadata, "Lap race flag and lap count", true, false),
+        new ChunkMeta(0x03043019, "Texture mod", SizeCategory.Metadata, "Texture mod pack reference", true, false),
         new ChunkMeta(0x0304301F, "Blocks", SizeCategory.Blocks, "Map identity and placed block data", false, false),
+        new ChunkMeta(0x03043024, "Custom music", SizeCategory.Metadata, "Custom music pack reference", false, false),
+        new ChunkMeta(0x03043025, "Map coord origin/target", SizeCategory.Metadata, "Map coordinate origin and target", false, false),
+        new ChunkMeta(0x03043029, "Password hash (legacy)", SizeCategory.Metadata, "Hashed map password and checksum", true, false),
         new ChunkMeta(0x0304302A, "Boolean metadata", SizeCategory.Metadata, "Legacy challenge boolean value", false, false),
+        new ChunkMeta(0x03043034, "Challenge decals", SizeCategory.Metadata, "Challenge decal data", true, false),
+        new ChunkMeta(0x03043036, "Realtime thumbnail camera", SizeCategory.Metadata, "Realtime thumbnail camera position and comments", true, false),
+        new ChunkMeta(0x0304303E, "Car marks buffer", SizeCategory.Metadata, "Car marks (skid) buffer", true, false),
         new ChunkMeta(0x03043040, "Items", SizeCategory.Items, "Anchored object placement data", true, true),
         new ChunkMeta(0x03043042, "Author information", SizeCategory.Metadata, "Body author information", true, false),
         new ChunkMeta(0x03043043, "Zone genealogies", SizeCategory.Metadata, "Encapsulated zone genealogy data", true, true),
