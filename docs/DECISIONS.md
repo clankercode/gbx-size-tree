@@ -79,6 +79,32 @@
 - Exe project publish props (`SelfContained` etc.) must be gated on `'$(_IsPublishing)' == 'true'` or the test project can't reference the exe (NETSDK1151).
 - SDK 10 `dotnet new sln` creates `.slnx` (not `.sln`).
 
+## Lightmap WebP recompression spike (2026-09-01)
+
+Measured on the sample's 5 non-empty lightmap blobs (of 9 slots; all **lossy VP8**, RGB;
+3,125,514 B total — stored as bare length-prefixed buffers in chunk 0x0304305B, NOT zipped;
+the zlib cache holds only mapping metadata, no pixels):
+
+| Re-encode (Pillow, method=6) | Total bytes | vs original | PSNR range |
+|---|---|---|---|
+| WebP lossless | 7,886,488 | **+152%** | exact |
+| WebP q95 | 3,074,512 | −1.6% | 32.3–46.9 dB |
+| WebP q90 | 2,624,684 | **−16.0%** | 31.5–44.7 dB |
+| WebP q75 | 1,892,244 | −39.5% | 29.2–40.2 dB |
+| JPEG q90 | 2,922,618 | −6.5% | 30.1–39.7 dB |
+
+- **No lossless win exists**: the source is lossy VP8; only decode→re-encode is possible
+  (generational loss), and lossless re-encoding balloons. Any future `recompress-lightmap`
+  action is T2 (BenignLossy) at best.
+- Nadeo's encoder is roughly q95-equivalent on the 1024² slots but wasteful on frame 0's
+  652² slot (q95 re-encode is 66% smaller there).
+- Per Max's Ghidra research (E++ lightmap-encoding note), the map-embedded CacheSmall
+  drives the editor/preview lighting; in-game lighting loads from the external cache pack.
+- Test artifacts built via GBX.NET frame-data swap (re-parse-verified, NOT yet game-tested),
+  in `~/Downloads`: `…_lmq90.Map.Gbx` (6,909,807 B — under the online limit from the WebP
+  re-encode + resave alone) and `…_lmjpg.Map.Gbx` (7,208,355 B, all five blobs JFIF JPEG —
+  probes whether the game's loader sniffs content or requires WebP).
+
 ## Library pins
 
 - GBX.NET **[2.4.4] exact** — `Measure/CumulativeChunkMeasurer` mirrors `CMwNod.Write` internals; upgrading requires re-verifying that loop.
