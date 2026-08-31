@@ -111,6 +111,15 @@ the zlib cache holds only mapping metadata, no pixels):
   does not tolerate JPEG in these slots — the webp→jpg idea is dead (dropped at Max's call,
   and JPEG was worse than WebP at equal quality anyway). A `recompress-lightmap` (WebP q~90,
   T2) remains plausible but needs an in-game pass of `…_lmq90.Map.Gbx` first.
+- **Crash mechanism Ghidra-confirmed (2026-09-01)**: `Hms_ModelCreateForZone` decodes each
+  embedded sprite via a WebP-only path (`FileWebP::ReadHeader` + libwebp YCbCr import) whose
+  results are IGNORED at two levels — a non-WebP blob yields a registered null bitmap and a
+  later null-deref. No format sniffing; WebP is mandatory. The zlib mapping cache is REQUIRED
+  (not editor-only): the per-sprite descriptor table {format=5, buffer index, len} and the
+  mapping vectors come from it. The game stores save-time webp quality in cache metadata and
+  its reuse gate wants ≥91%, but never re-inspects blob bytes — a q90 re-encode passes with
+  untouched metadata. Full trace: research-priv lightmap-encoding addendum (functions renamed
+  in the shared Ghidra DB).
 
 ## Library pins
 
