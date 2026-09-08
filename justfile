@@ -41,6 +41,10 @@ publish-win:
 
 publish: publish-linux publish-win
 
+# Install the linux-x64 single-file publish to ~/.local/bin (creates it if missing).
+install: publish-linux
+    install -Dm755 artifacts/linux-x64/gbx-size-tree ~/.local/bin/gbx-size-tree
+
 # A dirty worktree stamps a stale commit hash into --version (bitten once; see git log).
 _assert-clean:
     @git diff --quiet && git diff --cached --quiet || { echo "refusing: dirty worktree would stamp a stale version into the binaries. Commit first."; exit 1; }
