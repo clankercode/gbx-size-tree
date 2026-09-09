@@ -24,6 +24,7 @@ public sealed record CliOptions
     public int TopN { get; init; } = 20;
     public bool Json { get; init; }
     public CliOutputFormat Format { get; init; } = CliOutputFormat.Console;
+    public bool Styled { get; init; } = true;
     public bool? Color { get; init; }
     public bool Interactive { get; init; }
     public bool NonInteractive { get; init; }
