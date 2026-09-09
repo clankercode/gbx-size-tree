@@ -38,3 +38,4 @@ bugs:
     - file: B037-t37-separate-embedded-added-re.todo
     - file: B038-t38-show-meaningful-embedded-d.todo
     - file: B039-t39-deep-diff-embedded-items-r.todo
+    - file: B040-t40-diff-embedded-map-metadata.todo
