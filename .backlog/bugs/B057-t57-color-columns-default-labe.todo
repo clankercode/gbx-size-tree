@@ -11,10 +11,7 @@ id: B057
 priority: high
 started_at: null
 status: pending
-tags:
-    - chat-astra
-    - T57
-    - source-pending
+tags: []
 title: 'T57: Color columns: Default label uses ordinary styling; other labels use actual color as background, contrast-appropriate foreground and on'
 updated_at: "2026-09-09T06:13:12Z"
 ---
@@ -32,3 +29,5 @@ Outstanding work; not implemented by this ingestion.
 
 ## Source dependencies
 T12, T15, T16
+
+Decision and lane plan: renderer lane, serial with other DiffRenderer edits. Use known Trackmania DifficultyColor labels with explicit palette and contrast-safe foreground, padded one space each side; Default and unknown labels remain ordinary. HTML gets equivalent styled chips; plain/NO_COLOR output remains uncolored.
