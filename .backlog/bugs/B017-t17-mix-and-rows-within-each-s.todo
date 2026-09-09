@@ -11,7 +11,10 @@ id: B017
 priority: high
 started_at: null
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T17
+    - source-done
 title: 'T17: Mix + and - rows within each spatial table; never separate globally by marker.'
 updated_at: "2026-09-09T06:13:50Z"
 ---
