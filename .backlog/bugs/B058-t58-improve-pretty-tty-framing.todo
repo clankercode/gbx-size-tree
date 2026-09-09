@@ -14,7 +14,10 @@ id: B058
 priority: high
 started_at: "2026-09-09T08:39:15Z"
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T58
+    - source-pending
 title: 'T58: Improve pretty-TTY framing/layout/spacing of content above tables (paths, size diff) and below tables (UID, name, author/login etc), st'
 updated_at: "2026-09-09T09:24:33Z"
 ---
