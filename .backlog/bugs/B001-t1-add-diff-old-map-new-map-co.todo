@@ -1,5 +1,5 @@
 ---
-completed_at: null
+completed_at: "2026-09-09T06:13:47Z"
 complexity: medium
 created_at: "2026-09-09T06:11:43Z"
 depends_on: []
@@ -7,9 +7,9 @@ estimate_hours: 1
 id: B001
 priority: high
 started_at: null
-status: pending
+status: done
 tags: []
 title: 'T1: Add diff OLD_MAP NEW_MAP command'
-updated_at: "2026-09-09T06:11:43Z"
+updated_at: "2026-09-09T06:13:47Z"
 ---
 Source task: T1. Source status: done. Add diff OLD_MAP NEW_MAP comparing two map versions. Implemented and verified in this session; imported as completed historical work. Source inventory: /tmp/gbx-size-tree-astra-chat-tasks.md. Dependencies: none.
