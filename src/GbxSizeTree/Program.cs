@@ -58,7 +58,7 @@ try
     {
         if (options.Diff)
         {
-            exitCode = DiffMode.Run(options.InputPaths, options.Format, options.CompareAll, options.Color);
+            exitCode = DiffMode.Run(options.InputPaths, options.Format, options.CompareAll, options.Color, options.Styled);
         }
         else
         {

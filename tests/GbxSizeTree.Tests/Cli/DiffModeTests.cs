@@ -295,6 +295,30 @@ public sealed class DiffModeTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task Run_HtmlForwardsStyleOption(bool styled)
+    {
+        GbxSizeTree.Tests.Fixtures.SampleMap.SkipUnlessAvailable();
+        var start = new System.Diagnostics.ProcessStartInfo("dotnet")
+        {
+            RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false,
+        };
+        foreach (var arg in new[] { typeof(DiffMode).Assembly.Location, "diff",
+            GbxSizeTree.Tests.Fixtures.SampleMap.Path, GbxSizeTree.Tests.Fixtures.SampleMap.Path,
+            "--html", styled ? "--styled" : "--not-styled" })
+            start.ArgumentList.Add(arg);
+        using var process = System.Diagnostics.Process.Start(start)!;
+        var stdout = process.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
+        var stderr = process.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
+        await process.WaitForExitAsync(TestContext.Current.CancellationToken);
+        Assert.True(process.ExitCode == 0, await stderr);
+        var html = await stdout;
+        Assert.Equal(styled, html.Contains("<style>", StringComparison.Ordinal));
+        if (!styled) Assert.DoesNotContain(" style=", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task Run_HtmlForwardsExplicitColorOverride(bool color)
     {
         GbxSizeTree.Tests.Fixtures.SampleMap.SkipUnlessAvailable();
@@ -321,7 +345,7 @@ public sealed class DiffModeTests
             await process.WaitForExitAsync(TestContext.Current.CancellationToken);
             Assert.True(process.ExitCode == 0, await stderr);
             var html = await stdout;
-            Assert.Equal(color, html.Contains("<span style=\"background-color:", StringComparison.Ordinal));
+            Assert.Equal(color, html.Contains("class=\"color-chip\"", StringComparison.Ordinal));
         }
         finally { File.Delete(changed); }
     }

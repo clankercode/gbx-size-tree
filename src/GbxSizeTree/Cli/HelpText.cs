@@ -92,7 +92,9 @@ public static class HelpText
 
         Options:
           --all                    Include all header/body chunk changes
-          --html                   Write an HTML report
+          --html                   Write an HTML report (styled by default)
+          --styled                 Include the default HTML stylesheet
+          --not-styled             Write HTML without CSS or inline styles
           --markdown, --md         Write a Markdown report
           --json                   Write machine-readable JSON to stdout
           --help                   Show this help
