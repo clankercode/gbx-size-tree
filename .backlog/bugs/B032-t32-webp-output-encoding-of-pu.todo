@@ -1,4 +1,6 @@
 ---
+claimed_at: "2026-09-09T14:32:54Z"
+claimed_by: astra
 completed_at: null
 complexity: medium
 created_at: "2026-09-09T06:13:10Z"
@@ -7,14 +9,14 @@ depends_on:
 estimate_hours: 1
 id: B032
 priority: high
-started_at: null
-status: pending
+started_at: "2026-09-09T14:32:54Z"
+status: in_progress
 tags:
     - chat-astra
     - T32
     - source-pending
 title: 'T32: --webp output encoding of purpose-built diff infographic.'
-updated_at: "2026-09-09T06:13:10Z"
+updated_at: "2026-09-09T14:32:54Z"
 ---
 ## Source
 Chat task: T32
