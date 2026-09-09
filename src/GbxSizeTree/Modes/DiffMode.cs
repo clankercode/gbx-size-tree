@@ -39,7 +39,7 @@ public static class DiffMode
         report.LeftItemSnapshots, report.RightItemSnapshots,
         report.LeftEmbeddedSnapshots, report.RightEmbeddedSnapshots,
         report.MapUid, report.MapName, report.AuthorLogin, report.AuthorNickname, report.Password,
-        report.MetadataChanges, report.EmbeddedContributions,
+        report.MetadataChanges, report.EmbeddedContributions, report.EmbeddedPropertyChanges,
         report.LeftContributionBaselineBytes, report.RightContributionBaselineBytes, report.Warnings
     ), DiffJsonContext.Default.DiffJsonReport);
 
@@ -154,26 +154,32 @@ public static class DiffMode
         map.Blocks?.Select(BlockSnapshot.From).OrderBy(x => x.PhysicalPosition).ThenBy(x => x.Key, StringComparer.Ordinal).ToArray() ?? [],
         map.BakedBlocks?.Select(BlockSnapshot.From).OrderBy(x => x.PhysicalPosition).ThenBy(x => x.Key, StringComparer.Ordinal).ToArray() ?? [],
         map.AnchoredObjects?.Select(ItemSnapshot.From).OrderBy(x => x.PhysicalPosition).ThenBy(x => x.Key, StringComparer.Ordinal).ToArray() ?? [],
-        ReadEmbeds(map), MapMetadataSnapshot.Capture(map), map.MapUid ?? "", map.MapName ?? "", map.AuthorLogin ?? "", map.AuthorNickname ?? "", map.Password is not null);
+        ReadEmbeds(map), map.EmbeddedZipData, MapMetadataSnapshot.Capture(map), map.MapUid ?? "", map.MapName ?? "", map.AuthorLogin ?? "", map.AuthorNickname ?? "", map.Password is not null);
 
-    private static DiffReport Compare(Snapshot a, Snapshot b, bool all) => new(
-        a.FileBytes, b.FileBytes, InstanceDiff(a.Blocks, b.Blocks, x => x.PhysicalPosition, x => x.Key),
-        all ? InstanceDiff(a.BakedBlocks, b.BakedBlocks, x => x.PhysicalPosition, x => x.Key) : [],
-        InstanceDiff(a.Items, b.Items, x => x.PhysicalPosition, x => x.Key), EmbeddedDiff(a.Embedded, b.Embedded), all ? MapContentComparison.Compare(a.Chunks, b.Chunks) : [],
-        Different(a.MapUid, b.MapUid), Different(a.MapName, b.MapName),
-        Different(a.AuthorLogin, b.AuthorLogin), Different(a.AuthorNickname, b.AuthorNickname),
-        Different(a.Password.ToString(), b.Password.ToString()))
+    private static DiffReport Compare(Snapshot a, Snapshot b, bool all)
     {
-        MetadataChanges = MapMetadataSnapshot.Compare(a.Metadata, b.Metadata),
-        Warnings = a.Metadata.Values.Concat(b.Metadata.Values)
-            .Where(p => p.Key.EndsWith("/status", StringComparison.Ordinal) && p.Value?.Text?.StartsWith("unavailable:", StringComparison.Ordinal) == true)
-            .Select(p => $"Metadata {p.Key}: {p.Value!.Text}").Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray(),
-        LeftBakedSnapshots = all ? a.BakedBlocks : [], RightBakedSnapshots = all ? b.BakedBlocks : [],
-        LeftBlockSnapshots = a.Blocks, RightBlockSnapshots = b.Blocks,
-        LeftItemSnapshots = a.Items, RightItemSnapshots = b.Items,
-        LeftEmbeddedSnapshots = a.Embedded.Values.OrderBy(x => x.Path, StringComparer.Ordinal).ToArray(),
-        RightEmbeddedSnapshots = b.Embedded.Values.OrderBy(x => x.Path, StringComparer.Ordinal).ToArray(),
-    };
+        var embedded = EmbeddedDiff(a.Embedded, b.Embedded);
+        return new(
+            a.FileBytes, b.FileBytes, InstanceDiff(a.Blocks, b.Blocks, x => x.PhysicalPosition, x => x.Key),
+            all ? InstanceDiff(a.BakedBlocks, b.BakedBlocks, x => x.PhysicalPosition, x => x.Key) : [],
+            InstanceDiff(a.Items, b.Items, x => x.PhysicalPosition, x => x.Key), embedded,
+            all ? MapContentComparison.Compare(a.Chunks, b.Chunks) : [],
+            Different(a.MapUid, b.MapUid), Different(a.MapName, b.MapName),
+            Different(a.AuthorLogin, b.AuthorLogin), Different(a.AuthorNickname, b.AuthorNickname),
+            Different(a.Password.ToString(), b.Password.ToString()))
+        {
+            MetadataChanges = MapMetadataSnapshot.Compare(a.Metadata, b.Metadata),
+            Warnings = a.Metadata.Values.Concat(b.Metadata.Values)
+                .Where(p => p.Key.EndsWith("/status", StringComparison.Ordinal) && p.Value?.Text?.StartsWith("unavailable:", StringComparison.Ordinal) == true)
+                .Select(p => $"Metadata {p.Key}: {p.Value!.Text}").Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray(),
+            LeftBakedSnapshots = all ? a.BakedBlocks : [], RightBakedSnapshots = all ? b.BakedBlocks : [],
+            LeftBlockSnapshots = a.Blocks, RightBlockSnapshots = b.Blocks,
+            LeftItemSnapshots = a.Items, RightItemSnapshots = b.Items,
+            LeftEmbeddedSnapshots = a.Embedded.Values.OrderBy(x => x.Path, StringComparer.Ordinal).ToArray(),
+            RightEmbeddedSnapshots = b.Embedded.Values.OrderBy(x => x.Path, StringComparer.Ordinal).ToArray(),
+            EmbeddedPropertyChanges = EmbeddedPropertyReport.Capture(a.EmbeddedZipData, b.EmbeddedZipData, embedded),
+        };
+    }
 
     private static Change? Different(string a, string b) => a == b ? null : new(a, b);
 
@@ -217,6 +223,7 @@ public static class DiffMode
 
     private sealed record Snapshot(long FileBytes, IReadOnlyDictionary<string, string> Chunks,
         BlockSnapshot[] Blocks, BlockSnapshot[] BakedBlocks, ItemSnapshot[] Items,
-        IReadOnlyDictionary<string, EmbeddedSnapshot> Embedded, MapMetadataSnapshot Metadata,
+        IReadOnlyDictionary<string, EmbeddedSnapshot> Embedded, byte[]? EmbeddedZipData,
+        MapMetadataSnapshot Metadata,
         string MapUid, string MapName, string AuthorLogin, string AuthorNickname, bool Password);
 }

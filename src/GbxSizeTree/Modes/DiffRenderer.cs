@@ -3,6 +3,7 @@ using System.Net;
 using System.Text;
 using GbxSizeTree.Cli.Rendering;
 using GbxSizeTree.Measure;
+using GbxSizeTree.Semantics;
 using Spectre.Console;
 
 namespace GbxSizeTree.Cli.Modes;
@@ -224,6 +225,7 @@ public static class DiffRenderer
     {
         "Embedded files — added/removed" => "embedded-added-removed",
         "Embedded files — modified" => "embedded-modified",
+        "Embedded item properties — modified" => "embedded-properties-modified",
         "Embedded outer-map contribution — non-additive LZO marginal bytes" => "embedded-contributions",
         "Placed items" => "placed-items",
         "Blocks" => "blocks",
@@ -238,6 +240,8 @@ public static class DiffRenderer
         "Mark" => "mark",
         "Name / path" => "name-path",
         "Name" => "name",
+        "Entry path" => "entry-path",
+        "Property path" => "property-path",
         "Field" => "field",
         "Left" => "left",
         "Right" => "right",
@@ -269,6 +273,7 @@ public static class DiffRenderer
     {
         yield return EmbeddedTable("Embedded files — added/removed", report.Embedded.Where(c => c.Left is null || c.Right is null));
         yield return EmbeddedTable("Embedded files — modified", report.Embedded.Where(c => c.Left is not null && c.Right is not null));
+        yield return EmbeddedPropertyTable(report.EmbeddedPropertyChanges);
         yield return new("Embedded outer-map contribution — non-additive LZO marginal bytes",
             ["Mark", "Name / path", EmbeddedSizePresentation.LeftMarginalColumn,
                 EmbeddedSizePresentation.RightMarginalColumn, EmbeddedSizePresentation.ZipColumn,
@@ -347,6 +352,46 @@ public static class DiffRenderer
             : "Content and entry sizes unchanged";
         return left.Path == right.Path ? explanation : explanation + "; path changed";
     }
+
+    private static DiffTable EmbeddedPropertyTable(IReadOnlyList<EmbeddedPropertyEntryDiff> entries) => new(
+        "Embedded item properties — modified", ["Mark", "Entry path", "Property path", "Left", "Right"],
+        entries.OrderBy(entry => entry.Path, StringComparer.Ordinal).SelectMany(entry =>
+        {
+            var rows = entry.Properties.Changes.Select(change => new Row(
+                ["~", entry.Path, change.Path, FormatEmbeddedPropertyValue(change.Left), FormatEmbeddedPropertyValue(change.Right)],
+                Group: entry.Path)).ToList();
+            if (entry.Properties.Changes.Count == 0)
+            {
+                rows.Add(new Row(["~", entry.Path, "Content", "changed (SHA-256)",
+                    "No supported property difference was available."], Group: entry.Path));
+            }
+            foreach (var issue in PropertyIssues(entry))
+            {
+                rows.Add(new Row(["~", entry.Path, $"{issue.Side} coverage: {issue.Issue.Path}",
+                    issue.Side == "Left" ? $"{issue.Issue.Code}: {issue.Issue.Message}" : "--",
+                    issue.Side == "Right" ? $"{issue.Issue.Code}: {issue.Issue.Message}" : "--"], Group: entry.Path));
+            }
+            return rows;
+        }).ToArray(),
+        "Only modified entries with changed SHA-256 are parsed. Coverage diagnostics are explicit; the content hash still proves that the entry changed.");
+
+    private static IEnumerable<(string Side, EmbeddedPropertyIssue Issue)> PropertyIssues(EmbeddedPropertyEntryDiff entry) =>
+        entry.Properties.LeftIssues.Select(issue => (Side: "Left", Issue: issue))
+            .Concat(entry.Properties.RightIssues.Select(issue => (Side: "Right", Issue: issue)))
+            .OrderBy(row => row.Issue.Path, StringComparer.Ordinal)
+            .ThenBy(row => row.Issue.Code, StringComparer.Ordinal)
+            .ThenBy(row => row.Side, StringComparer.Ordinal)
+            .ThenBy(row => row.Issue.Message, StringComparer.Ordinal);
+
+    private static string FormatEmbeddedPropertyValue(EmbeddedPropertyValue? value) => value switch
+    {
+        null => "absent",
+        { Boolean: { } flag } => flag ? "boolean: true" : "boolean: false",
+        { Integer: { } integer } => $"integer: {integer.ToString(CultureInfo.InvariantCulture)}",
+        { Number: { } number } => $"number: {number.ToString("R", CultureInfo.InvariantCulture)}",
+        { NumberBits: { } bits } => $"number: {value.Text} (bits {bits})",
+        _ => $"text: \"{value.Text}\"",
+    };
 
     private static DiffTable ItemTable(IReadOnlyList<ValueChange<ItemSnapshot>> changes)
     {
@@ -442,7 +487,8 @@ public static class DiffRenderer
 
     private static bool IsEmpty(DiffReport r) => r.LeftBytes == r.RightBytes && r.Embedded.Count == 0 && r.Items.Count == 0
         && r.Blocks.Count == 0 && r.BakedBlocks.Count == 0 && r.Chunks.Count == 0
-        && r.MetadataChanges.Count == 0 && r.EmbeddedContributions.Count == 0 && !Metadata(r).Any();
+        && r.MetadataChanges.Count == 0 && r.EmbeddedContributions.Count == 0
+        && r.EmbeddedPropertyChanges.Count == 0 && !Metadata(r).Any();
 
     private static string Summary(IReadOnlyList<Row> rows) => string.Join(" ", new[] { ("+", "added"), ("-", "removed"), ("~", "changed") }
         .Select(x => (x.Item1, x.Item2, Count: rows.Count(r => r.Cells[0] == x.Item1)))

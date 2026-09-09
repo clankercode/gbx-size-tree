@@ -3,12 +3,67 @@ using GBX.NET.Engines.Game;
 using GbxSizeTree.Cli.Modes;
 using GbxSizeTree.Cli.Output;
 using GbxSizeTree.Cli.Rendering;
+using GbxSizeTree.Semantics;
 using Spectre.Console.Testing;
 
 namespace GbxSizeTree.Tests.Rendering;
 
 public sealed class DiffRendererTests
 {
+    [Fact]
+    public void DeepEmbeddedProperties_RenderTypedValuesFallbacksAndSafeMarkup()
+    {
+        const string entryPath = "Embedded/items/<script>asset.Item.Gbx";
+        const string propertyPath = "Item > EntityModel > Prefab > Ent#2 > Solid2Model > Material#1 > Name<script>";
+        var property = new EmbeddedPropertyEntryDiff(entryPath, "old", "new", new(
+            [new(propertyPath, new("Grass"), new("Plastic")),
+                new("Material > IsNatural", new("false", Boolean: false), new("true", Boolean: true)),
+                new("Material > Version", new("1", Integer: 1), new("2", Integer: 2))],
+            true,
+            [new("partial-coverage", "Input<script>", "Only explicit properties<script>.")],
+            [new("unsupported", "Input", "Unknown<script>.")]));
+        var report = Empty() with { EmbeddedPropertyChanges = [property] };
+
+        foreach (var output in Outputs(report))
+        {
+            Assert.Contains("Embedded item properties — modified", output);
+            Assert.Contains("Material#1", output.Replace("\\", "", StringComparison.Ordinal));
+            Assert.Contains("text:", output);
+            Assert.Contains("boolean: false", output);
+            Assert.Contains("boolean: true", output);
+            Assert.Contains("integer: 1", output);
+            Assert.Contains("integer: 2", output);
+            Assert.Contains("partial-coverage", output.Replace("\\", "", StringComparison.Ordinal));
+            Assert.Contains("unsupported", output);
+        }
+        var html = DiffRenderer.RenderHtml(report, "left", "right", styled: false);
+        Assert.Contains("id=\"category-embedded-properties-modified\" class=\"diff-category category-embedded-properties-modified\"", html);
+        Assert.Contains("id=\"table-embedded-properties-modified\" class=\"diff-table category-table\"", html);
+        Assert.Contains("column-entry-path", html);
+        Assert.Contains("column-property-path", html);
+        Assert.DoesNotContain("<script>", html);
+        Assert.DoesNotContain(" style=", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void DeepEmbeddedProperties_DoNotRenderUnchangedEntryNoise()
+    {
+        var report = Empty() with
+        {
+            Embedded = [new(new("changed.Item.Gbx", "old", 4, 4), new("changed.Item.Gbx", "new", 4, 4)),
+                new(new("unchanged.Item.Gbx", "same", 4, 4), new("unchanged.Item.Gbx", "same", 4, 4))],
+            EmbeddedPropertyChanges = [new("changed.Item.Gbx", "old", "new",
+                new([new("Material > Name", new("Grass"), new("Stone"))], true, [], []))],
+        };
+
+        var html = DiffRenderer.RenderHtml(report, "left", "right");
+        var deepStart = html.IndexOf("<section id=\"category-embedded-properties-modified\"", StringComparison.Ordinal);
+        var deepEnd = html.IndexOf("</section>", deepStart, StringComparison.Ordinal);
+        var deepSection = html[deepStart..deepEnd];
+        Assert.Contains("changed.Item.Gbx", deepSection);
+        Assert.DoesNotContain("unchanged.Item.Gbx", deepSection);
+    }
+
     [Fact]
     public void SpatialOrder_KeepsNearbyClusterTogetherInsteadOfSortingByOneAxis()
     {
@@ -691,6 +746,11 @@ public sealed class DiffRendererTests
                 new("custom<script>", new(Text: "old"), new(Text: "new"))],
             EmbeddedContributions = [new(null, new("dir/a", 10, 20, 5, null)), new(null, new("dir/b", 10, 20, -2, null)),
                 new(new("else/c", 20, 30, null, "not measured<script>"), new("else/c", 21, 31, 2, null))],
+            EmbeddedPropertyChanges = [new("aModified", "h", "i", new(
+                [new("Item > EntityModel > Prefab > Ent#2 > Solid2Model > Material#1 > Name",
+                    new("Grass<script>"), new("Plastic"))], true,
+                [new("partial-coverage", "Input", "Explicit supported fields only.")],
+                [new("partial-coverage", "Input", "Explicit supported fields only.")]))],
             LeftContributionBaselineBytes = 1_000,
             RightContributionBaselineBytes = 1_100,
             Warnings = ["warning<script>"],
@@ -698,13 +758,13 @@ public sealed class DiffRendererTests
         };
         var html = DiffRenderer.RenderHtml(report, "old<script>.Map.Gbx", "new[red].Map.Gbx", colorOption: true);
         var plainHtml = DiffRenderer.RenderHtml(report, "old<script>.Map.Gbx", "new[red].Map.Gbx", colorOption: true, styled: false);
-        Assert.Equal(8, html.Split("class=\"diff-table category-table\"", StringSplitOptions.None).Length - 1);
+        Assert.Equal(9, html.Split("class=\"diff-table category-table\"", StringSplitOptions.None).Length - 1);
         Assert.Equal(17, html.Split("class=\"color-chip\"", StringSplitOptions.None).Length - 1);
         Assert.DoesNotContain("<script>", html);
         Assert.DoesNotContain("<style", plainHtml, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(" style=", plainHtml, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("class=\"color-chip\"", plainHtml);
-        foreach (var category in new[] { "Warning:", "Embedded files — added/removed", "Embedded files — modified", "Embedded outer-map contribution", "Placed items", "Blocks", "Baked blocks", "Map metadata", "Chunks", "Map name" })
+        foreach (var category in new[] { "Warning:", "Embedded files — added/removed", "Embedded files — modified", "Embedded item properties — modified", "Embedded outer-map contribution", "Placed items", "Blocks", "Baked blocks", "Map metadata", "Chunks", "Map name" })
             Assert.Contains(category, plainHtml);
         if (Environment.GetEnvironmentVariable("GBX_RENDER_ARTIFACT_DIR") is { Length: > 0 } directory)
         {

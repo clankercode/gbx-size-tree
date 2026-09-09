@@ -3,6 +3,8 @@ using System.IO.Compression;
 using System.Text.Json;
 using GBX.NET;
 using GBX.NET.Engines.Game;
+using GBX.NET.Engines.GameData;
+using GBX.NET.Engines.Plug;
 using GbxSizeTree.Cli.Modes;
 
 namespace GbxSizeTree.Tests.Cli;
@@ -361,6 +363,69 @@ public sealed class DiffModeTests
         finally { File.Delete(changed); }
     }
 
+    [Fact]
+    public void CompareMaps_DeepDiffsSameLengthModifiedItemPropertiesAtOriginalFullPath()
+    {
+        const string path = "Embedded/items/Folder/asset.Item.Gbx";
+        var left = MapWithEmbeddedBytes((path, ItemBytes("Grass")), ("unchanged.Item.Gbx", [1, 2, 3]));
+        var right = MapWithEmbeddedBytes((path, ItemBytes("Stone")), ("unchanged.Item.Gbx", [1, 2, 3]));
+
+        var report = DiffMode.CompareMaps(left, right);
+
+        var entry = Assert.Single(report.EmbeddedPropertyChanges);
+        Assert.Equal(path, entry.Path);
+        Assert.True(entry.Properties.ContentChanged);
+        var embedded = Assert.Single(report.Embedded, value => value.Left?.Path == path && value.Right?.Path == path);
+        Assert.Equal(embedded.Left!.Uncompressed, embedded.Right!.Uncompressed);
+        var change = Assert.Single(entry.Properties.Changes,
+            value => value.Path.EndsWith("Material > Name", StringComparison.Ordinal));
+        Assert.Equal("Grass", change.Left!.Text);
+        Assert.Equal("Stone", change.Right!.Text);
+        Assert.DoesNotContain(report.EmbeddedPropertyChanges, value => value.Path == "unchanged.Item.Gbx");
+
+        using var json = JsonDocument.Parse(DiffMode.RenderJson(report));
+        var jsonEntry = json.RootElement.GetProperty("EmbeddedPropertyChanges")[0];
+        Assert.Equal(path, jsonEntry.GetProperty("Path").GetString());
+        var jsonChange = jsonEntry.GetProperty("Properties").GetProperty("Changes")
+            .EnumerateArray().Single(value => value.GetProperty("Path").GetString()!.EndsWith("Material > Name", StringComparison.Ordinal));
+        Assert.Equal("Grass", jsonChange.GetProperty("Left").GetProperty("Text").GetString());
+        Assert.Equal("Stone", jsonChange.GetProperty("Right").GetProperty("Text").GetString());
+    }
+
+    [Fact]
+    public void CompareMaps_DeepDiffFallbackRetainsChangedHashAndNeverImpliesEquality()
+    {
+        var left = MapWithEmbeddedBytes(("broken.Item.Gbx", [.. "GBX"u8, 1, 2, 3]));
+        var right = MapWithEmbeddedBytes(("broken.Item.Gbx", [.. "GBX"u8, 1, 2, 4]));
+
+        var report = DiffMode.CompareMaps(left, right);
+        var entry = Assert.Single(report.EmbeddedPropertyChanges);
+
+        Assert.NotEqual(entry.LeftSha256, entry.RightSha256);
+        Assert.True(entry.Properties.ContentChanged);
+        Assert.Empty(entry.Properties.Changes);
+        Assert.Contains(entry.Properties.LeftIssues, issue => issue.Code == "parse");
+        foreach (var output in new[]
+        {
+            DiffRenderer.RenderMarkdown(report, "left", "right"),
+            DiffRenderer.RenderHtml(report, "left", "right", styled: false),
+        })
+        {
+            Assert.Contains("changed (SHA-256)", output.Replace("\\", "", StringComparison.Ordinal));
+            Assert.Contains("No supported property difference was available", output);
+            Assert.DoesNotContain("No differences in the compared fields", output);
+        }
+    }
+
+    private static byte[] ItemBytes(string materialName)
+    {
+        var material = new CPlugMaterialUserInst { MaterialName = materialName };
+        material.Chunks.Create<CPlugMaterialUserInst.Chunk090FD000>();
+        using var stream = new MemoryStream();
+        new Gbx<CPlugMaterialUserInst>(material).Save(stream);
+        return stream.ToArray();
+    }
+
     private static void SaveEmbeddedMap(CGameCtnChallenge map, string path)
     {
         Gbx.LZO = new GBX.NET.LZO.Lzo();
@@ -369,6 +434,20 @@ public sealed class DiffModeTests
     }
 
     private static CGameCtnChallenge MapWithEmbed(string path, string content) => MapWithEmbeds((path, content));
+
+    private static CGameCtnChallenge MapWithEmbeddedBytes(params (string Path, byte[] Content)[] entries)
+    {
+        using var stream = new MemoryStream();
+        using (var zip = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var (path, content) in entries)
+            {
+                using var output = zip.CreateEntry(path, CompressionLevel.NoCompression).Open();
+                output.Write(content);
+            }
+        }
+        return new() { EmbeddedZipData = stream.ToArray() };
+    }
 
     private static CGameCtnChallenge MapWithEmbeds(params (string Path, string Content)[] entries)
     {
