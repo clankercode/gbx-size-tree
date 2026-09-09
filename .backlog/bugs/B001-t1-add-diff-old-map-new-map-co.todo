@@ -8,7 +8,10 @@ id: B001
 priority: high
 started_at: null
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T1
+    - source-done
 title: 'T1: Add diff OLD_MAP NEW_MAP command'
 updated_at: "2026-09-09T06:13:47Z"
 ---
