@@ -50,3 +50,4 @@ bugs:
     - file: B049-t49-overall-local-comparison-a.todo
     - file: B050-t50-comprehensive-sequential-t.todo
     - file: B051-t51-exact-paragraph-initial-ta.todo
+    - file: B052-t52-persist-all-tasks-in-tempo.todo

@@ -1,0 +1,29 @@
+---
+complexity: medium
+created_at: "2026-09-09T06:13:12Z"
+depends_on: []
+estimate_hours: 1
+id: B052
+priority: high
+status: pending
+tags:
+    - chat-astra
+    - T52
+    - source-done
+title: 'T52: Persist ALL tasks in temporary file headed exactly ''main tasks from chat session by astra'' before compaction.'
+updated_at: "2026-09-09T06:13:12Z"
+---
+## Source
+Chat task: T52
+Source status: done
+Inventory: /tmp/gbx-size-tree-astra-chat-tasks.md
+Session: 01a08304-d48f-7631-913b-60e05abe13f3
+
+## Scope and acceptance criteria
+Persist ALL tasks in temporary file headed exactly 'main tasks from chat session by astra' before compaction.
+
+## State at ingestion
+Historical implementation verified before ingestion.
+
+## Source dependencies
+T50, T51
