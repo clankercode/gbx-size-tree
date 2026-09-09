@@ -30,3 +30,4 @@ bugs:
     - file: B029-t29-actual-map-console-html-ma.todo
     - file: B030-t30-commit-merge-completed-wor.todo
     - file: B031-t31-png-output-encoding-of-pur.todo
+    - file: B032-t32-webp-output-encoding-of-pu.todo
