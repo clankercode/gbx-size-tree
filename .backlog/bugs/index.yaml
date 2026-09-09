@@ -14,3 +14,4 @@ bugs:
     - file: B013-t13-compact-placed-item-paths.todo
     - file: B014-t14-proper-aligned-tables-with.todo
     - file: B015-t15-placed-item-columns-path-p.todo
+    - file: B016-t16-block-baked-columns-name-c.todo
