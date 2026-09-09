@@ -27,9 +27,10 @@ public static class DiffImageWriter
         }
 
         var normalizedOutput = Path.GetFullPath(outputPath);
+        var canonicalOutput = ResolveCanonicalPath(normalizedOutput);
         if (inputPaths.Any(path => string.Equals(
-                Path.GetFullPath(path),
-                normalizedOutput,
+                ResolveCanonicalPath(path),
+                canonicalOutput,
                 OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)))
         {
             throw new DiffImageOutputException(
@@ -82,6 +83,27 @@ public static class DiffImageWriter
         }
 
         WriteFile(encoded, Path.GetFullPath(outputPath), force, File.Move);
+    }
+
+    private static string ResolveCanonicalPath(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        var root = Path.GetPathRoot(fullPath)!;
+        var canonical = root;
+        foreach (var segment in fullPath[root.Length..].Split(
+                     Path.DirectorySeparatorChar,
+                     StringSplitOptions.RemoveEmptyEntries))
+        {
+            var candidate = Path.Combine(canonical, segment);
+            FileSystemInfo entry = Directory.Exists(candidate)
+                ? new DirectoryInfo(candidate)
+                : new FileInfo(candidate);
+            canonical = entry.LinkTarget is not null
+                ? entry.ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? candidate
+                : candidate;
+        }
+
+        return Path.GetFullPath(canonical);
     }
 
     private static IImageEncoder Encoder(CliOutputFormat format) => format switch

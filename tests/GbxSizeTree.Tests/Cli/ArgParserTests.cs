@@ -257,8 +257,6 @@ public class ArgParserTests
     [InlineData("--all-chunks")]
     [InlineData("--unknown-chunks")]
     [InlineData("--top", "5")]
-    [InlineData("-n")]
-    [InlineData("--non-interactive")]
     [InlineData("-O")]
     [InlineData("--optimize")]
     [InlineData("--strip-lightmap")]
@@ -287,6 +285,8 @@ public class ArgParserTests
     [Theory]
     [InlineData("--all")]
     [InlineData("--no-pause")]
+    [InlineData("-n")]
+    [InlineData("--non-interactive")]
     public void Parse_ImageOutputAllowsNonPresentationDiffFlags(string flag)
     {
         var (options, error) = ArgParser.Parse([

@@ -25,8 +25,9 @@ var version = Assembly.GetExecutingAssembly()
     .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "dev";
 
 var (options, parseError) = ArgParser.Parse(args);
-var imageOutputRequested = args.TakeWhile(argument => argument != "--").Any(argument =>
-    argument is "--png" or "--webp");
+var imageOutputRequested = options is not null
+    ? options.Format is CliOutputFormat.Png or CliOutputFormat.Webp
+    : LaunchModeDetector.RawImageOutputRequested(args);
 var probe = LaunchModeDetector.ProbeCurrent();
 var launchKind = LaunchModeDetector.Detect(probe);
 var exitCode = ExitCodes.Ok;

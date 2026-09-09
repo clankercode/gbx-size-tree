@@ -296,7 +296,7 @@ public static class ArgParser
         }
 
         if (imageOutput && (headerOnly || estimateCompressed || allChunks || unknownChunks
-                || topN != 20 || nonInteractive || optimize || stripLightmap
+                || topN != 20 || optimize || stripLightmap
                 || shadowBrightnessFloor is not null || thumbnailMode != "keep" || embedStored
                 || actions.Count > 0 || noActions.Count > 0 || dryRun || attribute || experimental
                 || verbose || quiet))

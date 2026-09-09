@@ -73,6 +73,32 @@ public static class LaunchModeDetector
             Environment.GetEnvironmentVariable("TERM"));
     }
 
+    internal static bool RawImageOutputRequested(IReadOnlyList<string> arguments)
+    {
+        for (var i = 0; i < arguments.Count; i++)
+        {
+            switch (arguments[i])
+            {
+                case "--":
+                    return false;
+                case "--top":
+                case "-o":
+                case "--output":
+                case "--lighten-shadows":
+                case "--thumbnail":
+                case "--action":
+                case "--no-action":
+                    i++;
+                    break;
+                case "--png":
+                case "--webp":
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
     private static bool IsTruthy(string? value) => value?.Trim().ToUpperInvariant() is
         "1" or "TRUE" or "YES" or "ON";
 }

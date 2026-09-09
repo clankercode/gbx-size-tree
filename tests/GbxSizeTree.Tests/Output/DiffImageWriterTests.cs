@@ -147,6 +147,63 @@ public sealed class DiffImageWriterTests
         Assert.Contains("is a directory", directoryTarget.Message);
     }
 
+    [Fact]
+    public void ValidateDestination_RejectsInputSymlinkTarget()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "Symbolic link creation may require elevated privileges on Windows.");
+        using var directory = new TemporaryDirectory();
+        var inputTarget = Path.Combine(directory.Path, "source.Map.Gbx");
+        var inputLink = Path.Combine(directory.Path, "source-link.Map.Gbx");
+        File.WriteAllText(inputTarget, "source");
+        File.CreateSymbolicLink(inputLink, inputTarget);
+
+        var exception = Assert.Throws<DiffImageOutputException>(() =>
+            DiffImageWriter.ValidateDestination(inputTarget, [inputLink, "other.Map.Gbx"], true, true));
+
+        Assert.Equal(ExitCodes.IoError, exception.ExitCode);
+        Assert.Contains("differ from both input paths", exception.Message);
+        Assert.Equal("source", File.ReadAllText(inputTarget));
+    }
+
+    [Fact]
+    public void ValidateDestination_RejectsOutputSymlinkToInput()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "Symbolic link creation may require elevated privileges on Windows.");
+        using var directory = new TemporaryDirectory();
+        var input = Path.Combine(directory.Path, "source.Map.Gbx");
+        var outputLink = Path.Combine(directory.Path, "report.png");
+        File.WriteAllText(input, "source");
+        File.CreateSymbolicLink(outputLink, input);
+
+        var exception = Assert.Throws<DiffImageOutputException>(() =>
+            DiffImageWriter.ValidateDestination(outputLink, [input, "other.Map.Gbx"], true, true));
+
+        Assert.Equal(ExitCodes.IoError, exception.ExitCode);
+        Assert.Contains("differ from both input paths", exception.Message);
+        Assert.Equal("source", File.ReadAllText(input));
+    }
+
+    [Fact]
+    public void ValidateDestination_RejectsOutputThroughSymlinkedParent()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "Symbolic link creation may require elevated privileges on Windows.");
+        using var directory = new TemporaryDirectory();
+        var realDirectory = Path.Combine(directory.Path, "real");
+        var linkedDirectory = Path.Combine(directory.Path, "linked");
+        Directory.CreateDirectory(realDirectory);
+        Directory.CreateSymbolicLink(linkedDirectory, realDirectory);
+        var input = Path.Combine(realDirectory, "source.Map.Gbx");
+        File.WriteAllText(input, "source");
+        var output = Path.Combine(linkedDirectory, "source.Map.Gbx");
+
+        var exception = Assert.Throws<DiffImageOutputException>(() =>
+            DiffImageWriter.ValidateDestination(output, [input, "other.Map.Gbx"], true, true));
+
+        Assert.Equal(ExitCodes.IoError, exception.ExitCode);
+        Assert.Contains("differ from both input paths", exception.Message);
+        Assert.Equal("source", File.ReadAllText(input));
+    }
+
     private static Image<Rgba32> TestImage()
     {
         var image = new Image<Rgba32>(2, 2);
