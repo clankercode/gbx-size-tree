@@ -12,7 +12,10 @@ id: B031
 priority: high
 started_at: "2026-09-09T14:32:54Z"
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T31
+    - source-pending
 title: 'T31: --png output encoding of purpose-built diff infographic.'
 updated_at: "2026-09-09T16:10:13Z"
 ---
