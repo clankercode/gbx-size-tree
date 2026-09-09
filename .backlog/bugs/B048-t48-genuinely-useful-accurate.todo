@@ -16,10 +16,7 @@ id: B048
 priority: high
 started_at: "2026-09-09T09:21:33Z"
 status: in_progress
-tags:
-    - chat-astra
-    - T48
-    - source-inprog
+tags: []
 title: 'T48: Genuinely useful accurate diff help: explain baked gating, color flags, coverage limitations and new output/style flags when implemente'
 updated_at: "2026-09-09T09:21:33Z"
 ---
@@ -41,3 +38,5 @@ T6, T8, T9, T12, T23, T24
 Decision and sequencing: Final CLI/docs lane after output flags and data coverage stabilize (despite existing dependencies already done). Decision: help documents actual coverage and opaque fallbacks, baked gating, NO_COLOR behavior, styles, binary outputs and OLD_MAP NEW_MAP examples; never overclaim semantic interpretation.
 
 Parallel lane: HelpText.cs and documentation/tests only, disjoint from active renderer integration, deep helper, and measurement budget. Document current implemented features accurately; image flags must be added in final follow-up after encoders land. Do not claim pending image support exists.
+
+Final followup begins alongside image/progress lanes with disjoint HelpText/docs/tests ownership. Document agreed PNG/losslessWebP binary/atomic-output contract and transient terminal stderr progress; final tests and merge only after actual flags/progress integrate. No unsupported current release claims.
