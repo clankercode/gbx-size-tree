@@ -32,8 +32,15 @@ public static class DiffRenderer
         foreach (var warning in report.Warnings)
             console.MarkupLine($"[bold]Warning:[/] {Escape(warning)}");
         var tables = Tables(report).Where(t => t.Rows.Count > 0).ToArray();
-        foreach (var data in tables)
+        foreach (var source in tables)
         {
+            var data = console.Profile.Width < 140 && source.Columns.Contains("What changed")
+                ? source with
+                {
+                    Columns = ["Mark", "Name / path", "Details"],
+                    Rows = source.Rows.Select(row => row with { Cells = [row.Cells[0], row.Cells[1],
+                        $"ZIP: {row.Cells[2]}; Raw: {row.Cells[3]}; Ratio: {row.Cells[4]}; {row.Cells[5]}"] }).ToArray(),
+                } : source;
             var table = new Table().Border(TableBorder.Simple).ShowRowSeparators();
             foreach (var column in data.Columns)
             {
@@ -162,12 +169,39 @@ public static class DiffRenderer
         : $"unavailable: {value.UnavailableReason ?? "not measured"}";
 
     private static DiffTable EmbeddedTable(string title, IEnumerable<ValueChange<EmbeddedSnapshot>> changes) => new(
-        title, ["Mark", "Name / path", "Compressed", "Uncompressed", "Ratio"],
+        title, ["Mark", "Name / path", "Compressed", "Uncompressed", "Ratio", "What changed"],
         changes.OrderBy(c => (c.Right ?? c.Left)?.Path, StringComparer.Ordinal).Select(c => new Row(
             [Marker(c.Left, c.Right), Transition(c, x => DisplayPath(x.Path), onlyDifferent: true),
-                Transition(c, x => x.Compressed.ToString(CultureInfo.InvariantCulture)),
-                Transition(c, x => x.Uncompressed.ToString(CultureInfo.InvariantCulture)),
-                Transition(c, x => x.Uncompressed == 0 ? "--" : x.Ratio.ToString("P2", CultureInfo.InvariantCulture))])).ToArray());
+                EmbeddedBytes(c, x => x.Compressed), EmbeddedBytes(c, x => x.Uncompressed),
+                Transition(c, x => x.Uncompressed == 0 ? "--" : x.Ratio.ToString("P2", CultureInfo.InvariantCulture)),
+                EmbeddedExplanation(c)])).ToArray(),
+        "Sizes are entry ZIP-compressed and raw bytes, not total ZIP archive or outer-map size. " +
+        "Signed deltas are right minus left (absent = 0). Archive overhead and compression settings are not measured; " +
+        "a changed ZIP size with changed content does not by itself prove a compression-setting change.");
+
+    private static string EmbeddedBytes(ValueChange<EmbeddedSnapshot> change, Func<EmbeddedSnapshot, long> size)
+    {
+        var delta = (change.Right is null ? 0 : size(change.Right)) - (change.Left is null ? 0 : size(change.Left));
+        return $"{Transition(change, x => size(x).ToString(CultureInfo.InvariantCulture))} ({delta.ToString("+0;-0;0", CultureInfo.InvariantCulture)} B)";
+    }
+
+    private static string EmbeddedExplanation(ValueChange<EmbeddedSnapshot> change)
+    {
+        if (change.Left is null) return "Entry added";
+        if (change.Right is null) return "Entry removed";
+        var left = change.Left;
+        var right = change.Right;
+        var content = left.Sha256 != right.Sha256;
+        var raw = left.Uncompressed != right.Uncompressed;
+        var zip = left.Compressed != right.Compressed;
+        var explanation = content
+            ? "Content changed (SHA-256); " + (!raw && !zip ? "raw and ZIP sizes unchanged"
+                : $"raw size {(raw ? "changed" : "unchanged")}; ZIP size {(zip ? "changed" : "unchanged")}")
+            : raw ? "Hash unchanged but raw size changed (inconsistent snapshot); ZIP size " + (zip ? "changed" : "unchanged")
+            : zip ? "Content unchanged; ZIP encoding size changed (compression-only)"
+            : "Content and entry sizes unchanged";
+        return left.Path == right.Path ? explanation : explanation + "; path changed";
+    }
 
     private static DiffTable ItemTable(IReadOnlyList<ValueChange<ItemSnapshot>> changes)
     {

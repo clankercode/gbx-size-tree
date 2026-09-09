@@ -111,6 +111,50 @@ public sealed class DiffRendererTests
         }
     }
 
+    [Theory]
+    [InlineData("new-hash", 20, 100, "Content changed (SHA-256); raw and ZIP sizes unchanged")]
+    [InlineData("old-hash", 15, 100, "Content unchanged; ZIP encoding size changed (compression-only)")]
+    [InlineData("new-hash", 15, 90, "Content changed (SHA-256); raw size changed; ZIP size changed")]
+    [InlineData("new-hash", 20, 120, "Content changed (SHA-256); raw size changed; ZIP size unchanged")]
+    public void Embedded_ExplainsContentAndCompressionWithoutInferringArchiveSize(string hash, long zip, long raw, string explanation)
+    {
+        var report = Empty() with
+        {
+            Embedded = [new(new("asset.bin", "old-hash", 20, 100), new("asset.bin", hash, zip, raw))],
+        };
+        foreach (var output in Outputs(report))
+        {
+            var plain = output.Replace("\\", "");
+            Assert.Contains(explanation, plain);
+            Assert.Contains($"20 → {zip} ({zip - 20:+0;-0;0} B)", plain);
+            Assert.Contains($"100 → {raw} ({raw - 100:+0;-0;0} B)", plain);
+            Assert.Contains("not total ZIP archive or outer-map size", plain);
+            Assert.DoesNotContain("old-hash", plain);
+            Assert.DoesNotContain("new-hash", plain);
+        }
+    }
+
+    [Fact]
+    public void Embedded_AddRemoveDeltasUseAbsentAsZeroAndKeepEmptyEntries()
+    {
+        var report = Empty() with
+        {
+            Embedded = [new(null, new("added", "hash", 10, 20)), new(new("removed", "hash", 30, 40), null),
+                new(null, new("empty", "hash", 0, 0))],
+        };
+        foreach (var output in Outputs(report))
+        {
+            var plain = output.Replace("\\", "");
+            Assert.Contains("10 (+10 B)", plain);
+            Assert.Contains("20 (+20 B)", plain);
+            Assert.Contains("30 (-30 B)", plain);
+            Assert.Contains("40 (-40 B)", plain);
+            Assert.Contains("0 (0 B)", plain);
+            Assert.Contains("Entry added", plain);
+            Assert.Contains("Entry removed", plain);
+        }
+    }
+
     [Fact]
     public void Items_HavePositionRotationColorAndMeaningfulProperties()
     {
