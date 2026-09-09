@@ -1,22 +1,20 @@
 ---
 claimed_at: "2026-09-09T06:26:44Z"
 claimed_by: astra
-completed_at: null
+completed_at: "2026-09-09T07:39:00Z"
 complexity: medium
 created_at: "2026-09-09T06:13:07Z"
 depends_on:
     - B001
+duration_minutes: 72.27637843161666
 estimate_hours: 1
 id: B007
 priority: high
 started_at: "2026-09-09T06:26:44Z"
-status: in_progress
-tags:
-    - chat-astra
-    - T7
-    - source-inprog
+status: done
+tags: []
 title: 'T7: Map metadata comparison by default'
-updated_at: "2026-09-09T06:26:44Z"
+updated_at: "2026-09-09T07:39:00Z"
 ---
 ## Source
 Chat task: T7
