@@ -1,15 +1,18 @@
 ---
+completed_at: null
 complexity: medium
 created_at: "2026-09-09T06:13:09Z"
-depends_on: []
+depends_on:
+    - B026
+    - B027
+    - B028
+    - B029
 estimate_hours: 1
 id: B030
 priority: high
+started_at: null
 status: pending
-tags:
-    - chat-astra
-    - T30
-    - source-done
+tags: []
 title: 'T30: Commit/merge completed work logically and run just install'
 updated_at: "2026-09-09T06:13:09Z"
 ---
