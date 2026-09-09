@@ -26,10 +26,7 @@ id: B044
 priority: high
 started_at: null
 status: pending
-tags:
-    - chat-astra
-    - T44
-    - source-pending
+tags: []
 title: 'T44: Validate new requests with regression tests, real maps, visual infographic review, styled/unstyled HTML checks'
 updated_at: "2026-09-09T06:13:11Z"
 ---
@@ -47,3 +44,5 @@ Outstanding work; not implemented by this ingestion.
 
 ## Source dependencies
 T31, T32, T33, T34, T35, T37, T38, T39, T40, T41, T42, T43, T47, T48, T56, T57, T58, T59
+
+Decision and sequencing: Integrated verification lane after all listed blockers close. Run full repository gate, real-map diff, installed-release checks, desktop/mobile styled and plain HTML behavior, terminal color/narrow layouts, password removal and visual image review.
