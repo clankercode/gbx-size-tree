@@ -120,7 +120,7 @@ public static class DiffRenderer
         yield return EmbeddedTable("Embedded files — modified", report.Embedded.Where(c => c.Left is not null && c.Right is not null));
         yield return ItemTable(report.Items);
         yield return BlockTable("Blocks", report.Blocks);
-        yield return BlockTable("Baked blocks", report.BakedBlocks);
+        yield return BlockTable("Baked blocks", report.BakedBlocks, showGridPosition: true);
         yield return new("Chunks", ["Mark", "Name", "Size"], report.Chunks.OrderBy(c => c.Key, StringComparer.Ordinal)
             .Select(c => new Row([Marker(c.Left, c.Right), c.Key ?? "chunk", c.Left is not null && c.Right is not null ? $"{c.Left} → {c.Right}" : c.Left ?? c.Right ?? "--"])).ToArray());
     }
@@ -149,12 +149,12 @@ public static class DiffRenderer
         return SpatialTable("Placed items", changes, columns, x => x.PhysicalPosition, x => x.Key, x => x.Color);
     }
 
-    private static DiffTable BlockTable(string title, IReadOnlyList<ValueChange<BlockSnapshot>> changes)
+    private static DiffTable BlockTable(string title, IReadOnlyList<ValueChange<BlockSnapshot>> changes, bool showGridPosition = false)
     {
         var columns = new List<Column<BlockSnapshot>>
         {
             new("Name", x => x.Name), new("Coord", x => x.IsFree ? "--" : x.Coord),
-            new("Pos", x => DisplayVector(x.PhysicalPosition)),
+            new("Pos", x => x.IsFree || showGridPosition ? DisplayVector(x.PhysicalPosition) : "--"),
             new("Direction", x => x.IsFree ? "--" : x.Direction),
             new("Variant", x => x.Variant.ToString(CultureInfo.InvariantCulture)),
             new("Subvariant", x => x.SubVariant.ToString(CultureInfo.InvariantCulture)),

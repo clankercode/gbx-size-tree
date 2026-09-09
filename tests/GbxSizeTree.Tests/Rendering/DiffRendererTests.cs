@@ -363,6 +363,35 @@ public sealed class DiffRendererTests
         };
     }
 
+    [Fact]
+    public void BlockPositions_HideOrdinaryAndGhostMidpointsButKeepFreeBakedAndSortOrder()
+    {
+        var normal = BlockSnapshot.From(new CGameCtnBlock { Name = "normalBlock", Coord = new(2, 2, 2) });
+        var ghost = BlockSnapshot.From(new CGameCtnBlock { Name = "ghost", Coord = new(1, 1, 1), IsGhost = true });
+        var free = BlockSnapshot.From(new CGameCtnBlock { Name = "free", IsFree = true }) with
+        {
+            PhysicalPosition = new(1.234567, 2, 3), Rotation = new(.1, .2, .3),
+        };
+        var report = Empty() with { Blocks = [new(null, normal), new(null, ghost), new(null, free)] };
+        foreach (var output in Outputs(report))
+        {
+            Assert.DoesNotContain("80.0, 20.0, 80.0", output);
+            Assert.DoesNotContain("48.0, 12.0, 48.0", output);
+            Assert.Contains("1.235, 2.0, 3.0", output);
+            Assert.True(output.IndexOf("free", StringComparison.Ordinal) < output.IndexOf("ghost", StringComparison.Ordinal));
+            Assert.True(output.IndexOf("ghost", StringComparison.Ordinal) < output.IndexOf("normalBlock", StringComparison.Ordinal));
+        }
+        Assert.Contains("<td>normalBlock</td><td>(2, 2, 2)</td><td>--</td>", DiffRenderer.RenderHtml(report, "a", "b"));
+        Assert.Contains("<td>ghost</td><td>(1, 1, 1)</td><td>--</td>", DiffRenderer.RenderHtml(report, "a", "b"));
+        foreach (var output in Outputs(report with { Blocks = [], BakedBlocks = report.Blocks }))
+        {
+            Assert.Contains("80.0, 20.0, 80.0", output);
+            Assert.Contains("48.0, 12.0, 48.0", output);
+            Assert.Contains("1.235, 2.0, 3.0", output);
+        }
+        Assert.Equal(new SpatialPosition(80, 20, 80), normal.PhysicalPosition);
+    }
+
     private static IEnumerable<string> Outputs(DiffReport report)
     {
         var console = new TestConsole().Width(500);
