@@ -11,7 +11,10 @@ id: B041
 priority: high
 started_at: "2026-09-09T08:03:02Z"
 status: in_progress
-tags: []
+tags:
+    - chat-astra
+    - T41
+    - source-pending
 title: 'T41: --html supports --styled and --not-styled; default styled.'
 updated_at: "2026-09-09T08:03:02Z"
 ---
