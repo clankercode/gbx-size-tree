@@ -1,0 +1,29 @@
+---
+complexity: medium
+created_at: "2026-09-09T06:13:07Z"
+depends_on: []
+estimate_hours: 1
+id: B003
+priority: high
+status: pending
+tags:
+    - chat-astra
+    - T3
+    - source-done
+title: 'T3: Detect embedded additions/removals and same-path content changes; show filenames not hashes in human output.'
+updated_at: "2026-09-09T06:13:07Z"
+---
+## Source
+Chat task: T3
+Source status: done
+Inventory: /tmp/gbx-size-tree-astra-chat-tasks.md
+Session: 01a08304-d48f-7631-913b-60e05abe13f3
+
+## Scope and acceptance criteria
+Detect embedded additions/removals and same-path content changes; show filenames not hashes in human output.
+
+## State at ingestion
+Historical implementation verified before ingestion.
+
+## Source dependencies
+T1
