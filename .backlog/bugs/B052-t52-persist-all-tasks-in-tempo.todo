@@ -1,15 +1,16 @@
 ---
+completed_at: null
 complexity: medium
 created_at: "2026-09-09T06:13:12Z"
-depends_on: []
+depends_on:
+    - B050
+    - B051
 estimate_hours: 1
 id: B052
 priority: high
+started_at: null
 status: pending
-tags:
-    - chat-astra
-    - T52
-    - source-done
+tags: []
 title: 'T52: Persist ALL tasks in temporary file headed exactly ''main tasks from chat session by astra'' before compaction.'
 updated_at: "2026-09-09T06:13:12Z"
 ---
