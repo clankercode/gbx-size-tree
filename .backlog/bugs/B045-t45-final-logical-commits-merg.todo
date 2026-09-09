@@ -31,10 +31,7 @@ id: B045
 priority: high
 started_at: null
 status: pending
-tags:
-    - chat-astra
-    - T45
-    - source-pending
+tags: []
 title: 'T45: Final logical commits/merge/install for outstanding/new implementation.'
 updated_at: "2026-09-09T06:13:11Z"
 ---
@@ -52,3 +49,5 @@ Outstanding work; not implemented by this ingestion.
 
 ## Source dependencies
 T5, T7, T21, T22, T31, T32, T33, T34, T35, T37, T38, T39, T40, T41, T42, T43, T44, T47, T48, T56, T57, T58, T59
+
+Decision and sequencing: Final delivery lane after all listed blockers close. Logical commits and reviewed merges occur per slice; final just install and installed smoke checks run on clean master. No push or release publication requested.
