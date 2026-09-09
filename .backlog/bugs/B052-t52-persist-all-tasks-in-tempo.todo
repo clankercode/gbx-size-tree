@@ -10,7 +10,10 @@ id: B052
 priority: high
 started_at: null
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T52
+    - source-done
 title: 'T52: Persist ALL tasks in temporary file headed exactly ''main tasks from chat session by astra'' before compaction.'
 updated_at: "2026-09-09T06:13:56Z"
 ---
