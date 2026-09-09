@@ -195,6 +195,44 @@ public sealed class DiffContentTests
         Assert.Contains("External-node", error.Message);
     }
 
+    [Fact]
+    public void CompareFiles_AllFallsBackToContentOnlyForOpaqueNonMapContainers()
+    {
+        var left = Container(Skip(0x03043FFF, [1, 2]));
+        var right = Container(Skip(0x03043FFF, [1, 9]));
+        var leftPath = Path.GetTempFileName();
+        var rightPath = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllBytes(leftPath, left);
+            File.WriteAllBytes(rightPath, right);
+            Assert.ThrowsAny<Exception>(() => DiffMode.CompareFiles(leftPath, rightPath));
+            var report = DiffMode.CompareFiles(leftPath, rightPath, all: true);
+            Assert.Contains(report.Chunks, c => c.Key == "content:decompressed-body" && c.Left != c.Right);
+            Assert.Contains(report.Chunks, c => c.Key == "content-only-fallback" && c.Left is not null);
+            Assert.Empty(report.Blocks);
+            Assert.Null(report.MapUid);
+        }
+        finally { File.Delete(leftPath); File.Delete(rightPath); }
+    }
+
+    [Fact]
+    public void CompareFiles_AllFallbackReportsRemovalWithoutFalseEquality()
+    {
+        var leftPath = Path.GetTempFileName();
+        var rightPath = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllBytes(leftPath, Container(Skip(0x03043FFF, [1])));
+            File.WriteAllBytes(rightPath, Container([]));
+            var report = DiffMode.CompareFiles(leftPath, rightPath, all: true);
+            Assert.NotEmpty(report.Chunks);
+            Assert.Contains(report.Chunks, c => c.Key == "body:03043FFF" && c.Right is null);
+            Assert.Contains(report.Chunks, c => c.Key == "content-only-fallback");
+        }
+        finally { File.Delete(leftPath); File.Delete(rightPath); }
+    }
+
     private static byte[] Skip(uint id, byte[] payload)
     {
         using var stream = new MemoryStream();

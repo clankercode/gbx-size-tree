@@ -42,8 +42,44 @@ public static class DiffMode
         changes.Select(c => new Change(c.Left is null ? null : format(c.Left), c.Right is null ? null : format(c.Right)));
 
     /// <summary>Compares parsed map placements and, with all, original serialized content.</summary>
-    public static DiffReport CompareFiles(string left, string right, bool all = false) =>
-        Compare(Read(left, all), Read(right, all), all);
+    public static DiffReport CompareFiles(string left, string right, bool all = false)
+    {
+        if (!all) return Compare(Read(left, false), Read(right, false), false);
+        var leftBytes = File.ReadAllBytes(left);
+        var rightBytes = File.ReadAllBytes(right);
+        var leftContent = MapContentComparison.Capture(leftBytes);
+        var rightContent = MapContentComparison.Capture(rightBytes);
+        try
+        {
+            return Compare(ReadBytes(leftBytes), ReadBytes(rightBytes), true);
+        }
+        catch (Exception) when (IsMapParseFailure())
+        {
+            return ContentOnlyReport(leftBytes.Length, rightBytes.Length, leftContent, rightContent);
+        }
+
+        bool IsMapParseFailure() => true;
+    }
+
+    private static Snapshot ReadBytes(byte[] bytes)
+    {
+        Gbx.LZO = new GBX.NET.LZO.Lzo();
+        Gbx.ZLib = new GBX.NET.ZLib.ZLib();
+        using var stream = new MemoryStream(bytes, writable: false);
+        var map = Gbx.Parse<CGameCtnChallenge>(stream).Node;
+        return Capture(map, bytes.Length, MapContentComparison.Capture(bytes));
+    }
+
+    private static DiffReport ContentOnlyReport(long leftBytes, long rightBytes,
+        IReadOnlyDictionary<string, string> left, IReadOnlyDictionary<string, string> right)
+    {
+        var chunks = MapContentComparison.Compare(left, right).ToList();
+        chunks.Insert(0, new Change(
+            "GBX.NET map parse failed; semantic fields unavailable",
+            "GBX.NET map parse failed; semantic fields unavailable",
+            "content-only-fallback"));
+        return new DiffReport(leftBytes, rightBytes, [], [], [], [], chunks, null, null, null, null, null);
+    }
 
     private static Snapshot Read(string path, bool all)
     {
