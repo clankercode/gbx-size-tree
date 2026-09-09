@@ -1,4 +1,6 @@
 ---
+claimed_at: "2026-09-09T11:05:31Z"
+claimed_by: astra
 completed_at: null
 complexity: medium
 created_at: "2026-09-09T06:13:10Z"
@@ -13,14 +15,11 @@ depends_on:
 estimate_hours: 1
 id: B033
 priority: high
-started_at: null
-status: pending
-tags:
-    - chat-astra
-    - T33
-    - source-pending
+started_at: "2026-09-09T11:05:31Z"
+status: in_progress
+tags: []
 title: 'T33: Visually excellent dedicated diff infographic: colorful, well composed, readable and understandable; not a trivial screencap of another'
-updated_at: "2026-09-09T06:13:10Z"
+updated_at: "2026-09-09T11:05:31Z"
 ---
 ## Source
 Chat task: T33

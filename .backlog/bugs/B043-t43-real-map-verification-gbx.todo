@@ -1,4 +1,6 @@
 ---
+claimed_at: "2026-09-09T11:05:31Z"
+claimed_by: astra
 completed_at: null
 complexity: medium
 created_at: "2026-09-09T06:13:11Z"
@@ -10,14 +12,11 @@ depends_on:
 estimate_hours: 1
 id: B043
 priority: high
-started_at: null
-status: pending
-tags:
-    - chat-astra
-    - T43
-    - source-pending
+started_at: "2026-09-09T11:05:31Z"
+status: in_progress
+tags: []
 title: 'T43: Real-map verification: gbx-size-tree diff ~/tm-docs/Maps/SB2/Sweet\ 2\ burger\ v205.Map.gbx ~/tm-docs/Maps/SB2/Sweet\ 2\ burger\ v206.M'
-updated_at: "2026-09-09T06:13:11Z"
+updated_at: "2026-09-09T11:05:31Z"
 ---
 ## Source
 Chat task: T43
