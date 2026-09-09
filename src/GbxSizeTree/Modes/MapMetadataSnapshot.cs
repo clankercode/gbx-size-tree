@@ -64,6 +64,7 @@ public sealed class MapMetadataSnapshot
             ["validation.forScriptModes"] = Flag(map.ChallengeParameters?.IsValidatedForScriptModes),
             ["validation.timeLimitMs"] = Number(map.ChallengeParameters?.TimeLimit.TotalMilliseconds),
         };
+        EmbeddedMetadataCapture.Capture(map, values);
         return new(values);
     }
 
