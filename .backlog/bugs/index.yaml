@@ -34,3 +34,4 @@ bugs:
     - file: B033-t33-visually-excellent-dedicat.todo
     - file: B034-t34-all-human-facing-pos-rot-f.todo
     - file: B035-t35-stop-printing-item-scale-a.todo
+    - file: B036-t36-sort-embedded-files-by-pat.todo

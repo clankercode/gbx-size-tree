@@ -1,0 +1,29 @@
+---
+complexity: medium
+created_at: "2026-09-09T06:13:10Z"
+depends_on: []
+estimate_hours: 1
+id: B036
+priority: high
+status: pending
+tags:
+    - chat-astra
+    - T36
+    - source-done
+title: 'T36: Sort embedded files by path name'
+updated_at: "2026-09-09T06:13:10Z"
+---
+## Source
+Chat task: T36
+Source status: done
+Inventory: /tmp/gbx-size-tree-astra-chat-tasks.md
+Session: 01a08304-d48f-7631-913b-60e05abe13f3
+
+## Scope and acceptance criteria
+Sort embedded files by path name. Preserve sorting within new groups T37.
+
+## State at ingestion
+Historical implementation verified before ingestion.
+
+## Source dependencies
+T3
