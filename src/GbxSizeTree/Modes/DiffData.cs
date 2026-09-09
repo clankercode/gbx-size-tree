@@ -13,13 +13,31 @@ public readonly record struct SpatialPosition(double X, double Y, double Z) : IC
     // TM2020 grid cells are 32 × 8 × 32 metres. Convert before multiplying to avoid integer overflow.
     public static SpatialPosition Midpoint(Int3 coord) => new(((double)coord.X + .5) * 32, ((double)coord.Y + .5) * 8, ((double)coord.Z + .5) * 32);
 
-    // Lexicographic X/Z/Y ordering preserves signed, fractional and large coordinates without quantization.
+    // Compare interleaved centimetre coordinates (Morton order) without truncating a packed key.
     public int CompareTo(SpatialPosition other)
     {
+        Span<ulong> a = stackalloc ulong[] { Cell(X), Cell(Y), Cell(Z) };
+        Span<ulong> b = stackalloc ulong[] { Cell(other.X), Cell(other.Y), Cell(other.Z) };
+        var axis = 0;
+        var leading = 64;
+        for (var i = 0; i < 3; i++)
+        {
+            var count = System.Numerics.BitOperations.LeadingZeroCount(a[i] ^ b[i]);
+            if (count < leading) { leading = count; axis = i; }
+        }
+        if (leading < 64) return a[axis].CompareTo(b[axis]);
         var x = X.CompareTo(other.X);
         if (x != 0) return x;
         var z = Z.CompareTo(other.Z);
         return z != 0 ? z : Y.CompareTo(other.Y);
+    }
+
+    private static ulong Cell(double value)
+    {
+        var scaled = Math.Floor(value * 100);
+        var cell = double.IsNaN(scaled) ? 0L : scaled <= long.MinValue ? long.MinValue
+            : scaled >= long.MaxValue ? long.MaxValue : (long)scaled;
+        return unchecked((ulong)cell) ^ (1UL << 63);
     }
 
     public override string ToString() => string.Create(CultureInfo.InvariantCulture, $"({X:G}, {Y:G}, {Z:G})");

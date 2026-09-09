@@ -31,12 +31,26 @@ public static class DiffRenderer
         var tables = Tables(report).Where(t => t.Rows.Count > 0).ToArray();
         foreach (var data in tables)
         {
-            var table = new Table().Border(TableBorder.None);
-            foreach (var column in data.Columns) table.AddColumn(column);
+            var table = new Table().Border(TableBorder.Simple).ShowRowSeparators();
+            foreach (var column in data.Columns)
+            {
+                var heading = console.Profile.Width < 140 ? column switch
+                {
+                    "Compressed" => "Comp. B", "Uncompressed" => "Raw B", "Position" => "Pos",
+                    "Rotation" => "Rot", "Direction" => "Dir", "Variant" => "Var", "Subvariant" => "Sub",
+                    "Animation" => "Anim", "Lightmap" => "Light", _ => column,
+                } : column;
+                var cell = new TableColumn(new Markup($"[bold]{Escape(heading)}[/]"));
+                if (column is "Compressed" or "Uncompressed" or "Ratio" or "Scale" or "Variant" or "Subvariant") cell.RightAligned();
+                table.AddColumn(cell);
+            }
             foreach (var row in data.Rows)
             {
                 var cells = row.Cells.Select(Escape).ToArray();
                 cells[0] = Colorize(cells[0], MarkerColor(cells[0]), color);
+                for (var i = 1; i < cells.Length; i++)
+                    cells[i] = Colorize(cells[i], data.Columns[i] is "Pos" or "Position" or "Coord" ? "cyan"
+                        : data.Columns[i] is "Rotation" or "Direction" ? "yellow" : "default", color);
                 table.AddRow(cells);
             }
             console.MarkupLine($"[bold]{data.Title}[/] [grey]({Summary(data.Rows)})[/]");
@@ -69,23 +83,25 @@ public static class DiffRenderer
 
     public static string RenderHtml(DiffReport report, string oldPath, string newPath)
     {
-        var b = new StringBuilder($"<h2>Diff: <code>{Html(oldPath)}</code> → <code>{Html(newPath)}</code></h2><p>Size: {report.LeftBytes:N0} → {report.RightBytes:N0} bytes</p>");
+        var b = new StringBuilder("<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Map diff</title><style>body{font:14px system-ui;margin:24px;color:#18212b;background:#fafbfc}h2{overflow-wrap:anywhere}section{overflow-x:auto}table{border-collapse:collapse;margin:12px 0 28px;font-variant-numeric:tabular-nums}th,td{padding:8px 12px;border-bottom:1px solid #d5dce3;text-align:left;white-space:nowrap}th{background:#e9eef3}tbody tr:nth-child(even){background:#f0f4f7}td:first-child{font-weight:bold}.added td:first-child{color:#137333}.removed td:first-child{color:#b3261e}.changed td:first-child{color:#946000}td:nth-child(2){white-space:normal;min-width:240px;overflow-wrap:anywhere}@media(max-width:600px){body{margin:12px}}</style></head><body>");
+        b.Append($"<h2>Diff: <code>{Html(oldPath)}</code> → <code>{Html(newPath)}</code></h2><p>Size: {report.LeftBytes:N0} → {report.RightBytes:N0} bytes</p>");
         foreach (var table in Tables(report).Where(t => t.Rows.Count > 0))
         {
-            b.Append($"<h3>{table.Title} ({Summary(table.Rows)})</h3><table><thead><tr>");
+            b.Append($"<h3>{table.Title} ({Summary(table.Rows)})</h3><section><table><thead><tr>");
             foreach (var column in table.Columns) b.Append($"<th>{Html(column)}</th>");
             b.Append("</tr></thead><tbody>");
             foreach (var row in table.Rows)
             {
-                b.Append("<tr>");
+                b.Append($"<tr class=\"{(row.Cells[0] == "+" ? "added" : row.Cells[0] == "-" ? "removed" : "changed")}\">");
                 foreach (var cell in row.Cells) b.Append($"<td>{Html(cell)}</td>");
                 b.Append("</tr>");
             }
-            b.Append("</tbody></table>");
+            b.Append("</tbody></table></section>");
         }
         foreach (var (label, change) in Metadata(report))
             b.Append($"<p>~ <strong>{label}</strong>: {Html(change.Left ?? "removed")} → {Html(change.Right ?? "added")}</p>");
         if (IsEmpty(report)) b.Append("<p>No differences in the compared fields.</p>");
+        b.Append("</body></html>");
         return b.ToString();
     }
 
@@ -108,8 +124,8 @@ public static class DiffRenderer
     {
         var columns = new List<Column<ItemSnapshot>>
         {
-            new("Name / path", x => DisplayPath(x.Path)), new("Position", x => x.Position),
-            new("Rotation", x => x.Rotation.ToString()), new("Color", x => x.Color),
+            new("Name / path", x => CompactPath(x.Path)), new("Position", x => DisplayVector(x.PhysicalPosition)),
+            new("Rotation", x => DisplayVector(x.Rotation)), new("Color", x => x.Color),
         };
         var values = changes.SelectMany(c => new[] { c.Left, c.Right }).OfType<ItemSnapshot>().ToArray();
         if (values.Any(x => x.Scale != 1)) columns.Add(new("Scale", x => x.Scale.ToString("G", CultureInfo.InvariantCulture)));
@@ -160,6 +176,18 @@ public static class DiffRenderer
         var a = value(change.Left);
         var b = value(change.Right);
         return a == b && onlyDifferent ? a : $"{a} → {b}";
+    }
+
+    private static string DisplayVector(SpatialPosition p) => FormattableString.Invariant($"({p.X:0.###}, {p.Y:0.###}, {p.Z:0.###})");
+
+    public static string CompactPath(string path)
+    {
+        var separator = path.Contains('\\') ? '\\' : '/';
+        var parts = path.Replace('\\', '/').Split('/');
+        for (var i = 0; i < parts.Length - 1; i++)
+            if (parts[i].Length > 4) parts[i] = parts[i][..3] + "…";
+        if (parts[^1].EndsWith(".Item.Gbx", StringComparison.OrdinalIgnoreCase)) parts[^1] = parts[^1][..^9];
+        return string.Join(separator, parts);
     }
 
     private static string DisplayPath(string path) => path.StartsWith("Embedded/items/", StringComparison.OrdinalIgnoreCase)

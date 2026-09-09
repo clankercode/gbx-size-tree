@@ -118,7 +118,7 @@ public sealed class DiffModeTests
     {
         var positions = new[] { new SpatialPosition(2048, 0, 0), new(-.125, 0, 0), new(.25, 0, 0), new(.125, 0, 0), new(1e20, 0, 0) };
         Assert.Equal(new[] { -.125, .125, .25, 2048, 1e20 }, positions.Order().Select(p => p.X));
-        Assert.True(new SpatialPosition(0, 4, 1).CompareTo(new(0, 0, 2)) < 0);
+        Assert.True(new SpatialPosition(0, 4, 1).CompareTo(new(0, 0, 2)) > 0);
         Assert.True(new SpatialPosition(0, 1, 0).CompareTo(new(0, 2, 0)) < 0);
         Assert.Equal(((double)int.MaxValue + .5) * 32, SpatialPosition.Midpoint(new(int.MaxValue, 0, 0)).X);
         var culture = CultureInfo.CurrentCulture;

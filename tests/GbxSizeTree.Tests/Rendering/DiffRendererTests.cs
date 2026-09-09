@@ -10,6 +10,23 @@ namespace GbxSizeTree.Tests.Rendering;
 public sealed class DiffRendererTests
 {
     [Fact]
+    public void SpatialOrder_KeepsNearbyClusterTogetherInsteadOfSortingByOneAxis()
+    {
+        var near = new SpatialPosition(1, 0, 1);
+        var adjacent = new SpatialPosition(1.1, 0, 1);
+        var distant = new SpatialPosition(1.05, 0, 1000);
+        var ordered = new[] { distant, adjacent, near }.Order().ToArray();
+        Assert.Equal(new[] { near, adjacent, distant }, ordered);
+    }
+
+    [Fact]
+    public void CompactPath_FollowsDirectoryRuleAndPreservesOtherExtensions()
+    {
+        Assert.Equal(@"BF2\Gen…\New…\Flat\MiniFlatDirt", DiffRenderer.CompactPath(@"BF2\General\NewQuaterPlatforms\Flat\MiniFlatDirt.Item.Gbx"));
+        Assert.Equal("Gen…/asset.Block.Gbx", DiffRenderer.CompactPath("General/asset.Block.Gbx"));
+    }
+
+    [Fact]
     public void Render_OrdersAssetsBeforeInstancesAndShowsMarkersAndTotals()
     {
         var report = Empty() with
@@ -204,7 +221,7 @@ public sealed class DiffRendererTests
         var report = Empty() with { Items = changes };
         Assert.Equal(DiffRenderer.RenderHtml(report, "a", "b"),
             DiffRenderer.RenderHtml(report with { Items = changes.Reverse().ToArray() }, "a", "b"));
-        Assert.Contains("z|position=(999,999,999).Item.Gbx", DiffRenderer.RenderHtml(report, "a", "b"));
+        Assert.Contains("z|position=(999,999,999)", DiffRenderer.RenderHtml(report, "a", "b"));
     }
 
     [Fact]
