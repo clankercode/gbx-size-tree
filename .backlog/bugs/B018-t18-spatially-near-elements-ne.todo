@@ -9,7 +9,10 @@ id: B018
 priority: high
 started_at: null
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T18
+    - source-done
 title: 'T18: Spatially near elements near in each list; same-coordinate rows grouped; deterministic Morton ordering with exact tie breaks'
 updated_at: "2026-09-09T06:13:50Z"
 ---
