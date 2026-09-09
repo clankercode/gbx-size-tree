@@ -1,33 +1,49 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
-using System.Text.RegularExpressions;
+using System.Text.Json;
 using GBX.NET;
 using GBX.NET.Engines.Game;
-using GbxSizeTree.Cli;
 using GbxSizeTree.Container;
-using GbxSizeTree.Semantics;
 
 namespace GbxSizeTree.Cli.Modes;
 
 public static class DiffMode
 {
-    [UnconditionalSuppressMessage("Trimming", "IL2026")]
     public static int Run(IReadOnlyList<string> paths, CliOutputFormat format, bool all, bool? colorOption)
     {
         if (paths.Count != 2) throw new ArgumentException("diff requires exactly two map paths.");
-        var left = Read(paths[0]);
-        var right = Read(paths[1]);
-        var result = Compare(left, right, all);
+        var report = Compare(Read(paths[0]), Read(paths[1]), all);
         if (format == CliOutputFormat.Json)
-            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(result, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+            Console.WriteLine(RenderJson(report));
         else if (format == CliOutputFormat.Html)
-            Console.WriteLine(DiffRenderer.RenderHtml(ToReport(result), paths[0], paths[1]));
+            Console.WriteLine(DiffRenderer.RenderHtml(report, paths[0], paths[1]));
         else if (format == CliOutputFormat.Markdown)
-            Console.WriteLine(DiffRenderer.RenderMarkdown(ToReport(result), paths[0], paths[1]));
+            Console.WriteLine(DiffRenderer.RenderMarkdown(report, paths[0], paths[1]));
         else
-            DiffRenderer.Render(DiffRenderer.BuildConsole(colorOption), ToReport(result), paths[0], paths[1]);
+            DiffRenderer.Render(DiffRenderer.BuildConsole(colorOption), report, paths[0], paths[1]);
         return ExitCodes.Ok;
     }
+
+    // Keep the JSON envelope and string-valued changes compatible; snapshots carry typed detail.
+    [UnconditionalSuppressMessage("Trimming", "IL2026")]
+    public static string RenderJson(DiffReport report) => JsonSerializer.Serialize(new
+    {
+        report.LeftBytes, report.RightBytes,
+        Blocks = Legacy(report.Blocks, x => x.Key),
+        BakedBlocks = Legacy(report.BakedBlocks, x => x.Key),
+        Items = Legacy(report.Items, x => x.Key),
+        Embedded = report.Embedded.Select(c => new Change(c.Left?.ToValue(), c.Right?.ToValue(), (c.Right ?? c.Left)?.Path)),
+        EmbeddedChanges = report.Embedded,
+        report.Chunks,
+        report.LeftBakedSnapshots, report.RightBakedSnapshots,
+        report.LeftBlockSnapshots, report.RightBlockSnapshots,
+        report.LeftItemSnapshots, report.RightItemSnapshots,
+        report.LeftEmbeddedSnapshots, report.RightEmbeddedSnapshots,
+        report.MapUid, report.MapName, report.AuthorLogin, report.AuthorNickname, report.Password,
+    }, new JsonSerializerOptions { WriteIndented = true, NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals });
+
+    private static IEnumerable<Change> Legacy<T>(IEnumerable<ValueChange<T>> changes, Func<T, string> format) where T : class =>
+        changes.Select(c => new Change(c.Left is null ? null : format(c.Left), c.Right is null ? null : format(c.Right)));
 
     private static Snapshot Read(string path)
     {
@@ -42,67 +58,81 @@ public static class DiffMode
         var body = DecompressedBody.GetBody(bytes);
         foreach (var region in new SkippableChunkScanner().Scan(body).Regions)
             chunks[$"body:{region.ChunkId:X8}"] = region.Length;
-        var blocks = map.Blocks?.Select(CreateBlockSnapshot).OrderBy(Locality).ThenBy(x => x.Key, StringComparer.Ordinal).ToArray() ?? [];
-        var baked = map.BakedBlocks?.Select(CreateBlockSnapshot).OrderBy(Locality).ThenBy(x => x.Key, StringComparer.Ordinal).ToArray() ?? [];
-        var items = map.AnchoredObjects?.Select(CreateItemSnapshot).OrderBy(Locality).ThenBy(x => x.Key, StringComparer.Ordinal).ToArray() ?? [];
-        var embeds = ReadEmbeds(map);
-        return new Snapshot(bytes.Length, chunks, blocks, baked, items, embeds,
-            map.MapUid ?? "", map.MapName ?? "", map.AuthorLogin ?? "", map.AuthorNickname ?? "", map.Password is not null);
+        return Capture(map, bytes.Length, chunks);
     }
 
-    private static DiffResult Compare(Snapshot a, Snapshot b, bool all) => new(
-        a.FileBytes, b.FileBytes, SetDiff(a.Blocks.Select(x => x.Key), b.Blocks.Select(x => x.Key)),
-        all ? SetDiff(a.BakedBlocks.Select(x => x.Key), b.BakedBlocks.Select(x => x.Key)) : [],
-        SetDiff(a.Items.Select(x => x.Key), b.Items.Select(x => x.Key)), SetDiff(a.Embedded, b.Embedded), all ? SetDiff(a.Chunks, b.Chunks) : [],
-        all ? a.BakedBlocks : [], all ? b.BakedBlocks : [], a.Blocks, b.Blocks, a.Items, b.Items,
-        ToEmbedSnapshots(a.Embedded), ToEmbedSnapshots(b.Embedded),
-        a.MapUid != b.MapUid ? new Change(a.MapUid, b.MapUid) : null,
-        a.MapName != b.MapName ? new Change(a.MapName, b.MapName) : null,
-        a.AuthorLogin != b.AuthorLogin ? new Change(a.AuthorLogin, b.AuthorLogin) : null,
-        a.AuthorNickname != b.AuthorNickname ? new Change(a.AuthorNickname, b.AuthorNickname) : null,
-        a.Password != b.Password ? new Change(a.Password.ToString(), b.Password.ToString()) : null);
+    public static DiffReport CompareMaps(CGameCtnChallenge left, CGameCtnChallenge right, bool all = false) =>
+        Compare(Capture(left, 0, new Dictionary<string, long>()), Capture(right, 0, new Dictionary<string, long>()), all);
 
-    private static Dictionary<string, EmbedSnapshot> ReadEmbeds(CGameCtnChallenge map)
+    private static Snapshot Capture(CGameCtnChallenge map, long fileBytes, IReadOnlyDictionary<string, long> chunks) => new(
+        fileBytes, chunks,
+        map.Blocks?.Select(BlockSnapshot.From).OrderBy(x => x.PhysicalPosition).ThenBy(x => x.Key, StringComparer.Ordinal).ToArray() ?? [],
+        map.BakedBlocks?.Select(BlockSnapshot.From).OrderBy(x => x.PhysicalPosition).ThenBy(x => x.Key, StringComparer.Ordinal).ToArray() ?? [],
+        map.AnchoredObjects?.Select(ItemSnapshot.From).OrderBy(x => x.PhysicalPosition).ThenBy(x => x.Key, StringComparer.Ordinal).ToArray() ?? [],
+        ReadEmbeds(map), map.MapUid ?? "", map.MapName ?? "", map.AuthorLogin ?? "", map.AuthorNickname ?? "", map.Password is not null);
+
+    private static DiffReport Compare(Snapshot a, Snapshot b, bool all) => new(
+        a.FileBytes, b.FileBytes, InstanceDiff(a.Blocks, b.Blocks, x => x.PhysicalPosition, x => x.Key),
+        all ? InstanceDiff(a.BakedBlocks, b.BakedBlocks, x => x.PhysicalPosition, x => x.Key) : [],
+        InstanceDiff(a.Items, b.Items, x => x.PhysicalPosition, x => x.Key), EmbeddedDiff(a.Embedded, b.Embedded), all ? ChunkDiff(a.Chunks, b.Chunks) : [],
+        Different(a.MapUid, b.MapUid), Different(a.MapName, b.MapName),
+        Different(a.AuthorLogin, b.AuthorLogin), Different(a.AuthorNickname, b.AuthorNickname),
+        Different(a.Password.ToString(), b.Password.ToString()))
     {
-        var result = new Dictionary<string, EmbedSnapshot>(StringComparer.OrdinalIgnoreCase);
+        LeftBakedSnapshots = all ? a.BakedBlocks : [], RightBakedSnapshots = all ? b.BakedBlocks : [],
+        LeftBlockSnapshots = a.Blocks, RightBlockSnapshots = b.Blocks,
+        LeftItemSnapshots = a.Items, RightItemSnapshots = b.Items,
+        LeftEmbeddedSnapshots = a.Embedded.Values.OrderBy(x => x.Path, StringComparer.Ordinal).ToArray(),
+        RightEmbeddedSnapshots = b.Embedded.Values.OrderBy(x => x.Path, StringComparer.Ordinal).ToArray(),
+    };
+
+    private static Change? Different(string a, string b) => a == b ? null : new(a, b);
+
+    private static Dictionary<string, EmbeddedSnapshot> ReadEmbeds(CGameCtnChallenge map)
+    {
+        var result = new Dictionary<string, EmbeddedSnapshot>(StringComparer.Ordinal);
         if (map.EmbeddedZipData is not { Length: > 0 }) return result;
         using var archive = map.OpenReadEmbeddedZipData();
         foreach (var entry in archive.Entries)
         {
-            using var input = entry.Open(); using var sha = SHA256.Create();
-            result[entry.FullName] = new EmbedSnapshot(entry.FullName, Convert.ToHexString(sha.ComputeHash(input)), entry.CompressedLength, entry.Length,
-                entry.Length == 0 ? 0 : (double)entry.CompressedLength / entry.Length);
+            using var input = entry.Open();
+            var snapshot = new EmbeddedSnapshot(entry.FullName, Convert.ToHexString(SHA256.HashData(input)), entry.CompressedLength, entry.Length);
+            if (!result.TryAdd(entry.FullName, snapshot))
+                throw new InvalidDataException($"Duplicate embedded ZIP path: {entry.FullName}");
         }
         return result;
     }
 
-    private static BlockSnapshot CreateBlockSnapshot(CGameCtnBlock block) => new(BlockKey(block), block.Coord.ToString());
-    private static ItemSnapshot CreateItemSnapshot(CGameCtnAnchoredObject item) => new(ItemKey(item), item.AbsolutePositionInMap.ToString());
-    private static int Locality(BlockSnapshot x) => LocalityKey(x.Coord);
-    private static int Locality(ItemSnapshot x) => LocalityKey(x.Position);
-    private static int LocalityKey(string value)
+    private static IReadOnlyList<ValueChange<T>> InstanceDiff<T>(IEnumerable<T> a, IEnumerable<T> b,
+        Func<T, SpatialPosition?> position, Func<T, string> key) where T : class
     {
-        var n = Regex.Matches(value, "-?\\d+").Cast<Match>().Select(x => int.Parse(x.Value)).Take(3).ToArray();
-        var x = n.ElementAtOrDefault(0); var y = n.ElementAtOrDefault(1); var z = n.ElementAtOrDefault(2);
-        return (x & 0x3ff) | ((z & 0x3ff) << 10) ^ ((y & 0x3ff) << 20);
+        var left = a.GroupBy(x => x).ToDictionary(g => g.Key, g => g.Count());
+        var right = b.GroupBy(x => x).ToDictionary(g => g.Key, g => g.Count());
+        var changes = new List<ValueChange<T>>();
+        foreach (var value in left.Keys.Union(right.Keys))
+        {
+            var delta = right.GetValueOrDefault(value) - left.GetValueOrDefault(value);
+            for (var i = 0; i < Math.Abs(delta); i++)
+                changes.Add(delta < 0 ? new(value, null) : new(null, value));
+        }
+        return changes.OrderBy(c => position((c.Right ?? c.Left)!))
+            .ThenBy(c => key((c.Right ?? c.Left)!), StringComparer.Ordinal)
+            .ThenBy(c => c.Left is null ? 1 : 0).ToArray();
     }
-    private static string BlockKey(CGameCtnBlock block) => $"{block.Name}|coord={block.Coord}|pos=--|rotation={block.Direction}|variant={block.Variant}|subvariant={block.SubVariant}";
-    private static string ItemKey(CGameCtnAnchoredObject item) => $"{item.ItemModel?.Id ?? "<unknown>"}|position={item.AbsolutePositionInMap}|rotation={item.YawPitchRoll}|scale={item.Scale}";
-    private static IReadOnlyList<Change> SetDiff(IEnumerable<string> a, IEnumerable<string> b) => a.Except(b).Select(x => new Change(x, null)).Concat(b.Except(a).Select(x => new Change(null, x))).ToArray();
-    private static IReadOnlyList<Change> SetDiff(IReadOnlyDictionary<string, long> a, IReadOnlyDictionary<string, long> b) => a.Keys.Union(b.Keys).Where(k => !a.TryGetValue(k, out var av) || !b.TryGetValue(k, out var bv) || av != bv).Select(k => new Change(a.TryGetValue(k, out var av) ? $"{av} bytes" : null, b.TryGetValue(k, out var bv) ? $"{bv} bytes" : null, k)).ToArray();
-    private static IReadOnlyList<Change> SetDiff(IReadOnlyDictionary<string, string> a, IReadOnlyDictionary<string, string> b) => a.Keys.Union(b.Keys).Where(k => !a.TryGetValue(k, out var av) || !b.TryGetValue(k, out var bv) || av != bv).Select(k => new Change(a.TryGetValue(k, out var av) ? av : null, b.TryGetValue(k, out var bv) ? bv : null, k)).ToArray();
-    private static IReadOnlyList<Change> SetDiff(IReadOnlyDictionary<string, EmbedSnapshot> a, IReadOnlyDictionary<string, EmbedSnapshot> b) =>
-        a.Keys.Union(b.Keys).Where(k => !a.TryGetValue(k, out var av) || !b.TryGetValue(k, out var bv) || av != bv)
-            .Select(k => new Change(a.TryGetValue(k, out var av) ? av.ToValue() : null, b.TryGetValue(k, out var bv) ? bv.ToValue() : null, k)).ToArray();
-    private static IReadOnlyList<EmbedSnapshot> ToEmbedSnapshots(IReadOnlyDictionary<string, EmbedSnapshot> embeds) => embeds.Values.ToArray();
 
-    private static DiffReport ToReport(DiffResult result) => new(result.LeftBytes, result.RightBytes, result.Blocks.Select(c => new Change(c.Left,c.Right,c.Key)).ToArray(), result.BakedBlocks.Select(c => new Change(c.Left,c.Right,c.Key)).ToArray(), result.Items.Select(c => new Change(c.Left,c.Right,c.Key)).ToArray(), result.Embedded.Select(c => new Change(c.Left,c.Right,c.Key)).ToArray(), result.Chunks.Select(c => new Change(c.Left,c.Right,c.Key)).ToArray(), ToExternal(result.MapUid),ToExternal(result.MapName),ToExternal(result.AuthorLogin),ToExternal(result.AuthorNickname),ToExternal(result.Password));
-    private static Change? ToExternal(Change? c) => c is null ? null : new(c.Left,c.Right,c.Key);
-    private sealed record Snapshot(long FileBytes,IReadOnlyDictionary<string,long> Chunks,BlockSnapshot[] Blocks,BlockSnapshot[] BakedBlocks,ItemSnapshot[] Items,IReadOnlyDictionary<string,EmbedSnapshot> Embedded,string MapUid,string MapName,string AuthorLogin,string AuthorNickname,bool Password);
-    private sealed record BlockSnapshot(string Key,string Coord); private sealed record ItemSnapshot(string Key,string Position);
-    private sealed record EmbedSnapshot(string Path, string Sha256, long Compressed, long Uncompressed, double Ratio)
-    {
-        public string ToValue() => $"{Path}|compressed={Compressed}|uncompressed={Uncompressed}|ratio={Ratio:0.####}";
-    }
-    private sealed record DiffResult(long LeftBytes,long RightBytes,IReadOnlyList<global::GbxSizeTree.Cli.Modes.Change> Blocks,IReadOnlyList<global::GbxSizeTree.Cli.Modes.Change> BakedBlocks,IReadOnlyList<global::GbxSizeTree.Cli.Modes.Change> Items,IReadOnlyList<global::GbxSizeTree.Cli.Modes.Change> Embedded,IReadOnlyList<global::GbxSizeTree.Cli.Modes.Change> Chunks,BlockSnapshot[] LeftBakedSnapshots,BlockSnapshot[] RightBakedSnapshots,BlockSnapshot[] LeftBlockSnapshots,BlockSnapshot[] RightBlockSnapshots,ItemSnapshot[] LeftItemSnapshots,ItemSnapshot[] RightItemSnapshots,IReadOnlyList<EmbedSnapshot> LeftEmbeddedSnapshots,IReadOnlyList<EmbedSnapshot> RightEmbeddedSnapshots,global::GbxSizeTree.Cli.Modes.Change? MapUid,global::GbxSizeTree.Cli.Modes.Change? MapName,global::GbxSizeTree.Cli.Modes.Change? AuthorLogin,global::GbxSizeTree.Cli.Modes.Change? AuthorNickname,global::GbxSizeTree.Cli.Modes.Change? Password);
+    private static IReadOnlyList<ValueChange<EmbeddedSnapshot>> EmbeddedDiff(
+        IReadOnlyDictionary<string, EmbeddedSnapshot> a, IReadOnlyDictionary<string, EmbeddedSnapshot> b) =>
+        a.Keys.Union(b.Keys, StringComparer.Ordinal).OrderBy(k => k, StringComparer.Ordinal)
+            .Where(k => !a.TryGetValue(k, out var av) || !b.TryGetValue(k, out var bv) || av != bv)
+            .Select(k => new ValueChange<EmbeddedSnapshot>(a.GetValueOrDefault(k), b.GetValueOrDefault(k))).ToArray();
+
+    private static IReadOnlyList<Change> ChunkDiff(IReadOnlyDictionary<string, long> a, IReadOnlyDictionary<string, long> b) =>
+        a.Keys.Union(b.Keys).OrderBy(k => k, StringComparer.Ordinal)
+            .Where(k => !a.TryGetValue(k, out var av) || !b.TryGetValue(k, out var bv) || av != bv)
+            .Select(k => new Change(a.TryGetValue(k, out var av) ? $"{av} bytes" : null, b.TryGetValue(k, out var bv) ? $"{bv} bytes" : null, k)).ToArray();
+
+    private sealed record Snapshot(long FileBytes, IReadOnlyDictionary<string, long> Chunks,
+        BlockSnapshot[] Blocks, BlockSnapshot[] BakedBlocks, ItemSnapshot[] Items,
+        IReadOnlyDictionary<string, EmbeddedSnapshot> Embedded,
+        string MapUid, string MapName, string AuthorLogin, string AuthorNickname, bool Password);
 }

@@ -1,5 +1,7 @@
 # Changelog
 
+- 2026-09-09: Diff output now uses typed category tables and numeric physical-position ordering; JSON retains its envelope and string changes with richer snapshots (`src/GbxSizeTree/Modes/`).
+
 ## [0.1.0] - 2026-09-01
 
 Initial release.

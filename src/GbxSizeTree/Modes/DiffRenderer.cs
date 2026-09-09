@@ -1,29 +1,19 @@
 using System.Globalization;
 using System.Net;
 using System.Text;
-using System.Text.RegularExpressions;
-using GbxSizeTree.Cli.Modes;
-using GbxSizeTree.Cli.Output;
-using GbxSizeTree.Cli.Rendering;
 using Spectre.Console;
 
 namespace GbxSizeTree.Cli.Modes;
 
 public static class DiffRenderer
 {
-    private static readonly Regex Attribute = new(@"(?:^|\|)(?<name>coord|position|pos)=(?<value>[^|]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-
-    /// <summary>Allows callers to replace the embedded-size presentation without changing diff data.</summary>
-    public static Func<string, string> EmbeddedSizeFormatter { get; set; } = FormatEmbeddedSize;
-
     public static bool ShouldUseColor(bool? requested, bool redirected, string? terminal, bool noColor) =>
         requested ?? (!redirected && !noColor && !string.Equals(terminal, "dumb", StringComparison.OrdinalIgnoreCase));
 
     public static IAnsiConsole BuildConsole(bool? colorOption)
     {
-        var enabled = colorOption ?? (!Console.IsOutputRedirected
-            && !string.Equals(Environment.GetEnvironmentVariable("TERM"), "dumb", StringComparison.OrdinalIgnoreCase)
-            && string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NO_COLOR")));
+        var enabled = ShouldUseColor(colorOption, Console.IsOutputRedirected,
+            Environment.GetEnvironmentVariable("TERM"), !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NO_COLOR")));
         return AnsiConsole.Create(new AnsiConsoleSettings
         {
             Out = new AnsiConsoleOutput(Console.Out),
@@ -38,147 +28,174 @@ public static class DiffRenderer
         console.MarkupLine($"[bold]Diff[/]: {Escape(oldPath)} [grey]→[/] {Escape(newPath)}");
         var delta = report.RightBytes - report.LeftBytes;
         console.MarkupLine($"Size: {report.LeftBytes:N0} [grey]→[/] {report.RightBytes:N0} bytes {Delta(delta, color)}");
-        RenderChanges(console, "Embedded files", report.Embedded, color, embedded: true);
-        RenderChanges(console, "Placed items", report.Items, color, item: true);
-        RenderChanges(console, "Blocks", report.Blocks, color, coordinates: true);
-        RenderChanges(console, "Baked blocks", report.BakedBlocks, color, coordinates: true);
-        RenderChanges(console, "Chunks", report.Chunks, color);
-        RenderMetadata(console, report, color);
-        if (report.Embedded.Count == 0 && report.Items.Count == 0 && report.Blocks.Count == 0 && report.BakedBlocks.Count == 0
-            && report.Chunks.Count == 0 && report.MapUid is null && report.MapName is null && report.AuthorLogin is null
-            && report.AuthorNickname is null && report.Password is null && delta == 0)
+        var tables = Tables(report).Where(t => t.Rows.Count > 0).ToArray();
+        foreach (var data in tables)
+        {
+            var table = new Table().Border(TableBorder.None);
+            foreach (var column in data.Columns) table.AddColumn(column);
+            foreach (var row in data.Rows)
+            {
+                var cells = row.Cells.Select(Escape).ToArray();
+                cells[0] = Colorize(cells[0], MarkerColor(cells[0]), color);
+                table.AddRow(cells);
+            }
+            console.MarkupLine($"[bold]{data.Title}[/] [grey]({Summary(data.Rows)})[/]");
+            console.Write(table);
+            console.WriteLine();
+        }
+        var metadata = Metadata(report).ToArray();
+        foreach (var (label, change) in metadata)
+            console.MarkupLine($"{Colorize("~", "yellow", color)} [bold]{label}[/]: {Escape(change.Left ?? "removed")} [grey]→[/] {Escape(change.Right ?? "added")}");
+        if (tables.Length == 0 && metadata.Length == 0 && delta == 0)
             console.MarkupLine("[grey]No differences in the compared fields.[/]");
     }
 
     public static string RenderMarkdown(DiffReport report, string oldPath, string newPath)
     {
-        var b = new StringBuilder($"## Diff: `{oldPath}` → `{newPath}`\n\nSize: {report.LeftBytes:N0} → {report.RightBytes:N0} bytes\n");
-        AppendMarkdown(b, "Embedded files", report.Embedded, true, false, false);
-        AppendMarkdown(b, "Placed items", report.Items, false, true, false);
-        AppendMarkdown(b, "Blocks", report.Blocks, false, false, true);
-        AppendMarkdown(b, "Baked blocks", report.BakedBlocks, false, false, true);
-        AppendMarkdown(b, "Chunks", report.Chunks, false, false, false);
+        var b = new StringBuilder($"## Diff: {MarkdownCell(oldPath)} → {MarkdownCell(newPath)}\n\nSize: {report.LeftBytes:N0} → {report.RightBytes:N0} bytes\n");
+        foreach (var table in Tables(report).Where(t => t.Rows.Count > 0))
+        {
+            b.Append($"\n### {table.Title} ({Summary(table.Rows)})\n\n");
+            b.AppendLine("| " + string.Join(" | ", table.Columns) + " |");
+            b.AppendLine("| " + string.Join(" | ", table.Columns.Select(_ => "---")) + " |");
+            foreach (var row in table.Rows)
+                b.AppendLine("| " + string.Join(" | ", row.Cells.Select(MarkdownCell)) + " |");
+        }
+        foreach (var (label, change) in Metadata(report))
+            b.AppendLine($"\n~ **{label}**: {MarkdownCell(change.Left ?? "removed")} → {MarkdownCell(change.Right ?? "added")}");
+        if (IsEmpty(report)) b.AppendLine("\nNo differences in the compared fields.");
         return b.ToString();
     }
 
     public static string RenderHtml(DiffReport report, string oldPath, string newPath)
     {
-        var b = new StringBuilder($"<h2>Diff: <code>{WebUtility.HtmlEncode(oldPath)}</code> → <code>{WebUtility.HtmlEncode(newPath)}</code></h2><p>Size: {report.LeftBytes:N0} → {report.RightBytes:N0} bytes</p>");
-        AppendHtml(b, "Embedded files", report.Embedded, true, false, false);
-        AppendHtml(b, "Placed items", report.Items, false, true, false);
-        AppendHtml(b, "Blocks", report.Blocks, false, false, true);
-        AppendHtml(b, "Baked blocks", report.BakedBlocks, false, false, true);
-        AppendHtml(b, "Chunks", report.Chunks, false, false, false);
+        var b = new StringBuilder($"<h2>Diff: <code>{Html(oldPath)}</code> → <code>{Html(newPath)}</code></h2><p>Size: {report.LeftBytes:N0} → {report.RightBytes:N0} bytes</p>");
+        foreach (var table in Tables(report).Where(t => t.Rows.Count > 0))
+        {
+            b.Append($"<h3>{table.Title} ({Summary(table.Rows)})</h3><table><thead><tr>");
+            foreach (var column in table.Columns) b.Append($"<th>{Html(column)}</th>");
+            b.Append("</tr></thead><tbody>");
+            foreach (var row in table.Rows)
+            {
+                b.Append("<tr>");
+                foreach (var cell in row.Cells) b.Append($"<td>{Html(cell)}</td>");
+                b.Append("</tr>");
+            }
+            b.Append("</tbody></table>");
+        }
+        foreach (var (label, change) in Metadata(report))
+            b.Append($"<p>~ <strong>{label}</strong>: {Html(change.Left ?? "removed")} → {Html(change.Right ?? "added")}</p>");
+        if (IsEmpty(report)) b.Append("<p>No differences in the compared fields.</p>");
         return b.ToString();
     }
 
-    private static void RenderChanges(IAnsiConsole console, string title, IReadOnlyList<Change> changes, bool color, bool embedded = false, bool item = false, bool coordinates = false)
+    private static IEnumerable<DiffTable> Tables(DiffReport report)
     {
-        if (changes.Count == 0) return;
-        var table = new Table().Border(TableBorder.None).AddColumn(" ").AddColumn(embedded ? "Name / path" : item ? "Name / path" : "Name");
-        if (coordinates) { table.AddColumn("Coord"); table.AddColumn("Pos"); table.AddColumn("Rotation"); }
-        if (item) table.AddColumn("Scale");
-        if (embedded) { table.AddColumn("Compressed"); table.AddColumn("Uncompressed"); table.AddColumn("Ratio"); }
-        foreach (var change in SortChanges(changes, coordinates))
+        yield return new("Embedded files", ["Mark", "Name / path", "Compressed", "Uncompressed", "Ratio"],
+            report.Embedded.OrderBy(c => (c.Right ?? c.Left)?.Path, StringComparer.Ordinal).Select(c => new Row(
+                [Marker(c.Left, c.Right), Transition(c, x => DisplayPath(x.Path), onlyDifferent: true),
+                    Transition(c, x => x.Compressed.ToString(CultureInfo.InvariantCulture)),
+                    Transition(c, x => x.Uncompressed.ToString(CultureInfo.InvariantCulture)),
+                    Transition(c, x => x.Uncompressed == 0 ? "--" : x.Ratio.ToString("P2", CultureInfo.InvariantCulture))])).ToArray());
+        yield return ItemTable(report.Items);
+        yield return BlockTable("Blocks", report.Blocks);
+        yield return BlockTable("Baked blocks", report.BakedBlocks);
+        yield return new("Chunks", ["Mark", "Name", "Size"], report.Chunks.OrderBy(c => c.Key, StringComparer.Ordinal)
+            .Select(c => new Row([Marker(c.Left, c.Right), c.Key ?? "chunk", c.Left is not null && c.Right is not null ? $"{c.Left} → {c.Right}" : c.Left ?? c.Right ?? "--"])).ToArray());
+    }
+
+    private static DiffTable ItemTable(IReadOnlyList<ValueChange<ItemSnapshot>> changes)
+    {
+        var columns = new List<Column<ItemSnapshot>>
         {
-            var value = change.Right ?? change.Left ?? change.Key ?? "change";
-            var marker = change.Left is null ? "+" : change.Right is null ? "-" : "~";
-            var path = Compact(value, embedded, item);
-            var coord = coordinates ? Field(value, "coord") : null;
-            var pos = coordinates ? Field(value, "position") ?? Field(value, "pos") : null;
-            var rotation = coordinates ? Field(value, "rotation") : null;
-            var scale = item ? Field(value, "scale") : null;
-            var row = new List<string> { Colorize(marker, marker == "+" ? "green" : marker == "-" ? "red" : "yellow", color), Escape(path) };
-            if (coordinates) { row.Add(Escape(coord ?? "--")); row.Add(Escape(pos ?? "--")); row.Add(Escape(rotation ?? "--")); }
-            if (item) row.Add(Escape(scale ?? "--"));
-            if (embedded)
-            {
-                var sizes = EmbeddedSizes(value);
-                row.Add(Escape(sizes.Compressed)); row.Add(Escape(sizes.Uncompressed)); row.Add(Escape(sizes.Ratio));
-            }
-            table.AddRow(row.ToArray());
-        }
-        console.MarkupLine($"[bold]{Escape(title)}[/] [grey]({Summary(changes, color)})[/]");
-        console.Write(table);
-        console.WriteLine();
+            new("Name / path", x => DisplayPath(x.Path)), new("Position", x => x.Position),
+            new("Rotation", x => x.Rotation.ToString()), new("Color", x => x.Color),
+        };
+        var values = changes.SelectMany(c => new[] { c.Left, c.Right }).OfType<ItemSnapshot>().ToArray();
+        if (values.Any(x => x.Scale != 1)) columns.Add(new("Scale", x => x.Scale.ToString("G", CultureInfo.InvariantCulture)));
+        if (values.Any(x => x.Pivot != default)) columns.Add(new("Pivot", x => x.Pivot.ToString()));
+        AddVarying(columns, values, "Animation", x => x.AnimationPhase);
+        AddVarying(columns, values, "Lightmap", x => x.LightmapQuality);
+        AddVarying(columns, values, "Flags", x => x.Flags.ToString(CultureInfo.InvariantCulture));
+        return SpatialTable("Placed items", changes, columns, x => x.PhysicalPosition, x => x.Key);
     }
 
-    private static string Summary(IReadOnlyList<Change> c, bool color) => string.Join(" ", new[] { Colorize($"+{c.Count(x => x.Left is null)} added", "green", color), Colorize($"-{c.Count(x => x.Right is null)} removed", "red", color), Colorize($"~{c.Count(x => x.Left is not null && x.Right is not null)} changed", "yellow", color) }.Where(x => !x.StartsWith("+0") && !x.StartsWith("-0") && !x.StartsWith("~0")));
-
-    private static IEnumerable<Change> SortChanges(IReadOnlyList<Change> changes, bool spatial) => spatial
-        ? changes.OrderBy(c => SpatialKey(c.Right ?? c.Left ?? c.Key ?? "change")).ThenBy(c => c.Right ?? c.Left ?? c.Key, StringComparer.Ordinal)
-        : changes.OrderBy(c => c.Right ?? c.Left ?? c.Key, StringComparer.Ordinal);
-
-    private static int SpatialKey(string value)
+    private static DiffTable BlockTable(string title, IReadOnlyList<ValueChange<BlockSnapshot>> changes)
     {
-        var position = Field(value, "position") ?? Field(value, "pos") ?? Field(value, "coord") ?? string.Empty;
-        var numbers = Regex.Matches(position, "-?\\d+").Cast<Match>().Select(m => int.Parse(m.Value)).Take(3).ToArray();
-        var x = numbers.ElementAtOrDefault(0); var y = numbers.ElementAtOrDefault(1); var z = numbers.ElementAtOrDefault(2);
-        return (x & 0x3ff) | ((z & 0x3ff) << 10) ^ ((y & 0x3ff) << 20);
-    }
-
-    private static (string Compressed, string Uncompressed, string Ratio) EmbeddedSizes(string value)
-    {
-        static string Read(string text, string name) => Regex.Match(text, $"{name}=([0-9]+)", RegexOptions.IgnoreCase).Groups[1].Value is { Length: > 0 } result ? result : "--";
-        var compressed = Read(value, "compressed");
-        var uncompressed = Read(value, "uncompressed");
-        var ratio = Regex.Match(value, @"ratio=([0-9.]+)", RegexOptions.IgnoreCase).Groups[1].Value;
-        return (compressed, uncompressed, ratio.Length > 0 ? $"{double.Parse(ratio, System.Globalization.CultureInfo.InvariantCulture):P0}" : "--");
-    }
-
-    private static string Compact(string value, bool embedded, bool item)
-    {
-        var s = value;
-        var separator = s.IndexOf('|');
-        var path = separator >= 0 ? s[..separator] : s;
-        var suffix = separator >= 0 ? s[separator..] : string.Empty;
-        if (embedded && path.StartsWith("Embedded/items/", StringComparison.OrdinalIgnoreCase))
-            path = path[15..];
-        if (embedded || item)
+        var columns = new List<Column<BlockSnapshot>>
         {
-            var parts = path.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
-            for (var i = 0; i < parts.Length; i++)
-            {
-                if (i == parts.Length - 1)
-                    parts[i] = parts[i].EndsWith(".Item.Gbx", StringComparison.OrdinalIgnoreCase)
-                        ? parts[i][..^9] : parts[i];
-                else if (parts[i].Length > 4)
-                    parts[i] = parts[i][..3] + '…';
-            }
-            path = string.Join('\\', parts);
-        }
-        return path + suffix;
+            new("Name", x => x.Name), new("Coord", x => x.IsFree ? "--" : x.Coord),
+            new("Pos", x => x.PhysicalPosition?.ToString() ?? "--"),
+            new("Direction", x => x.IsFree ? "--" : x.Direction),
+            new("Variant", x => x.Variant.ToString(CultureInfo.InvariantCulture)),
+            new("Subvariant", x => x.SubVariant.ToString(CultureInfo.InvariantCulture)),
+        };
+        var values = changes.SelectMany(c => new[] { c.Left, c.Right }).OfType<BlockSnapshot>().ToArray();
+        if (values.Any(x => x.IsFree)) columns.Add(new("Rotation", x => x.Rotation?.ToString() ?? "--"));
+        if (values.Any(x => x.IsFree || x.IsGhost)) columns.Add(new("Mode", x => x.IsFree ? "Free" : x.IsGhost ? "Ghost" : "Normal"));
+        AddVarying(columns, values, "Ground", x => x.IsGround.ToString());
+        AddVarying(columns, values, "Color", x => x.Color);
+        AddVarying(columns, values, "Lightmap", x => x.LightmapQuality);
+        AddVarying(columns, values, "Flags", x => x.Flags.ToString(CultureInfo.InvariantCulture));
+        return SpatialTable(title, changes, columns, x => x.PhysicalPosition, x => x.Key);
     }
-    private static string? Field(string value, string name) => Attribute.Matches(value).FirstOrDefault(m => string.Equals(m.Groups["name"].Value, name, StringComparison.OrdinalIgnoreCase))?.Groups["value"].Value;
 
-    public static string FormatEmbeddedSize(string value)
+    private static void AddVarying<T>(List<Column<T>> columns, T[] values, string name, Func<T, string> value) where T : class
     {
-        var size = Regex.Match(value, @"(?:map|compressed|raw|uncompressed|size)\s*[:=]\s*([0-9][0-9,]*)", RegexOptions.IgnoreCase);
-        return size.Success ? size.Groups[1].Value : "--";
+        if (values.Select(value).Distinct(StringComparer.Ordinal).Skip(1).Any()) columns.Add(new(name, value));
     }
 
-    private static string MarkdownCell(string value) => value.Replace("\\", "\\\\").Replace("|", "\\|").Replace("\r", "").Replace("\n", "\\n");
+    private static DiffTable SpatialTable<T>(string title, IReadOnlyList<ValueChange<T>> changes,
+        List<Column<T>> columns, Func<T, SpatialPosition?> position, Func<T, string> key) where T : class => new(
+        title, new[] { "Mark" }.Concat(columns.Select(c => c.Name)).ToArray(),
+        changes.OrderBy(c => position((c.Right ?? c.Left)!))
+            .ThenBy(c => key((c.Right ?? c.Left)!), StringComparer.Ordinal)
+            .ThenBy(c => c.Left is null ? 1 : 0)
+            .Select(c => new Row(new[] { Marker(c.Left, c.Right) }.Concat(columns.Select(col => Transition(c, col.Value, onlyDifferent: true))).ToArray())).ToArray());
 
-    private static void AppendMarkdown(StringBuilder b, string title, IReadOnlyList<Change> changes, bool embedded, bool item, bool coordinates)
+    private static string Transition<T>(ValueChange<T> change, Func<T, string> value, bool onlyDifferent = false) where T : class
     {
-        if (changes.Count == 0) return;
-        b.Append($"\n### {title}\n\n| Mark | Path |" + (coordinates ? " Coord | Pos |" : "") + (embedded ? " Size |" : "") + "\n|---|---|" + (coordinates ? "---|---|" : "") + (embedded ? "---|" : "") + "\n");
-        foreach (var c in changes)
-        {
-            var v = c.Right ?? c.Left ?? c.Key ?? "change";
-            b.Append($"| {(c.Left is null ? "+" : c.Right is null ? "-" : "~")} | {MarkdownCell(Compact(v, embedded, item))} |");
-            if (coordinates) b.Append($" {MarkdownCell(Field(v, "coord") ?? "--")} | {MarkdownCell(Field(v, "position") ?? Field(v, "pos") ?? "--")} |");
-            if (embedded) b.Append($" {MarkdownCell(EmbeddedSizeFormatter(v))} |");
-            b.AppendLine();
-        }
+        if (change.Left is null) return change.Right is null ? "--" : value(change.Right);
+        if (change.Right is null) return value(change.Left);
+        var a = value(change.Left);
+        var b = value(change.Right);
+        return a == b && onlyDifferent ? a : $"{a} → {b}";
     }
 
-    private static void AppendHtml(StringBuilder b, string title, IReadOnlyList<Change> changes, bool embedded, bool item, bool coordinates) { if (changes.Count == 0) return; b.Append($"<h3>{title}</h3><table><thead><tr><th>Mark</th><th>Path</th>{(coordinates ? "<th>Coord</th><th>Pos</th>" : "")}{(embedded ? "<th>Size</th>" : "")}</tr></thead><tbody>"); foreach (var c in changes) { var v = c.Right ?? c.Left ?? c.Key ?? "change"; b.Append($"<tr><td>{(c.Left is null ? "+" : c.Right is null ? "-" : "~")}</td><td>{WebUtility.HtmlEncode(Compact(v, embedded, item))}</td>"); if (coordinates) b.Append($"<td>{WebUtility.HtmlEncode(Field(v, "coord") ?? "--")}</td><td>{WebUtility.HtmlEncode(Field(v, "position") ?? Field(v, "pos") ?? "--")}</td>"); if (embedded) b.Append($"<td>{WebUtility.HtmlEncode(EmbeddedSizeFormatter(v))}</td>"); b.Append("</tr>"); } b.Append("</tbody></table>"); }
-    private static void RenderMetadata(IAnsiConsole c, DiffReport r, bool color) { foreach (var (label, change) in new[] { ("Map UID", r.MapUid), ("Map name", r.MapName), ("Author login", r.AuthorLogin), ("Author nickname", r.AuthorNickname), ("Password chunk", r.Password) }) if (change is not null) c.MarkupLine($"{Colorize("~", "yellow", color)} [bold]{Escape(label)}[/]: {Escape(change.Left ?? "removed")} [grey]→[/] {Escape(change.Right ?? "added")}"); }
+    private static string DisplayPath(string path) => path.StartsWith("Embedded/items/", StringComparison.OrdinalIgnoreCase)
+        ? path["Embedded/items/".Length..] : path;
+
+    private static IEnumerable<(string Label, Change Change)> Metadata(DiffReport r)
+    {
+        foreach (var (label, change) in new[] { ("Map UID", r.MapUid), ("Map name", r.MapName), ("Author login", r.AuthorLogin), ("Author nickname", r.AuthorNickname), ("Password chunk", r.Password) })
+            if (change is not null) yield return (label, change);
+    }
+
+    private static bool IsEmpty(DiffReport r) => r.LeftBytes == r.RightBytes && r.Embedded.Count == 0 && r.Items.Count == 0
+        && r.Blocks.Count == 0 && r.BakedBlocks.Count == 0 && r.Chunks.Count == 0 && !Metadata(r).Any();
+
+    private static string Summary(IReadOnlyList<Row> rows) => string.Join(" ", new[] { ("+", "added"), ("-", "removed"), ("~", "changed") }
+        .Select(x => (x.Item1, x.Item2, Count: rows.Count(r => r.Cells[0] == x.Item1)))
+        .Where(x => x.Count > 0).Select(x => $"{x.Item1}{x.Count} {x.Item2}"));
+    private static string Marker(object? left, object? right) => left is null ? "+" : right is null ? "-" : "~";
+    private static string MarkerColor(string marker) => marker == "+" ? "green" : marker == "-" ? "red" : "yellow";
     private static string Delta(long v, bool color) => v > 0 ? Colorize($"(+{v:N0})", "red", color) : v < 0 ? Colorize($"({v:N0})", "green", color) : "";
     private static string Colorize(string text, string color, bool enabled) => enabled ? $"[{color}]{text}[/]" : text;
-    private static string Escape(string text) => Markup.Escape(text.Replace("\u001b", "\\u001b").Replace("\r", "\\r").Replace("\n", "\\n"));
-}
+    private static string Safe(string text) => string.Concat(text.Select(c => char.IsControl(c) ? $"\\u{(int)c:x4}" : c.ToString()));
+    private static string Escape(string text) => Markup.Escape(Safe(text));
+    private static string Html(string text) => WebUtility.HtmlEncode(Safe(text));
+    private static string MarkdownCell(string text)
+    {
+        var b = new StringBuilder();
+        foreach (var c in Safe(text))
+        {
+            if ("\\`*_{}[]()#+-!|>~".Contains(c)) b.Append('\\');
+            b.Append(c == '<' ? "&lt;" : c == '&' ? "&amp;" : c.ToString());
+        }
+        return b.ToString();
+    }
 
-public sealed record DiffReport(long LeftBytes, long RightBytes, IReadOnlyList<Change> Blocks, IReadOnlyList<Change> BakedBlocks, IReadOnlyList<Change> Items, IReadOnlyList<Change> Embedded, IReadOnlyList<Change> Chunks, Change? MapUid, Change? MapName, Change? AuthorLogin, Change? AuthorNickname, Change? Password);
-public sealed record Change(string? Left, string? Right, string? Key = null);
+    private sealed record Column<T>(string Name, Func<T, string> Value);
+    private sealed record Row(string[] Cells);
+    private sealed record DiffTable(string Title, string[] Columns, IReadOnlyList<Row> Rows);
+}
