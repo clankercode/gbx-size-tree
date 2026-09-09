@@ -10,7 +10,10 @@ id: B020
 priority: high
 started_at: null
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T20
+    - source-done
 title: 'T20: Embedded columns actual filename/path, compressed bytes, uncompressed bytes, ratio; old -> new for modified'
 updated_at: "2026-09-09T06:13:51Z"
 ---
