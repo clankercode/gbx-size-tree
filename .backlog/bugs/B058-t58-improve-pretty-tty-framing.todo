@@ -11,10 +11,7 @@ id: B058
 priority: high
 started_at: null
 status: pending
-tags:
-    - chat-astra
-    - T58
-    - source-pending
+tags: []
 title: 'T58: Improve pretty-TTY framing/layout/spacing of content above tables (paths, size diff) and below tables (UID, name, author/login etc), st'
 updated_at: "2026-09-09T06:13:13Z"
 ---
@@ -32,3 +29,5 @@ Outstanding work; not implemented by this ingestion.
 
 ## Source dependencies
 T7, T11, T14
+
+Decision and sequencing: Presentation lane after B007 closes. Decision: balanced path/size header and clearly framed metadata section with wrapped safe text; preserve plain/NO_COLOR output readability and narrow-terminal behavior.
