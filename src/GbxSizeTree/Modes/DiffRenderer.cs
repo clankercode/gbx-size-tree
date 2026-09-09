@@ -11,7 +11,7 @@ public static class DiffRenderer
 {
     private static readonly EmbeddedSizePresentation EmbeddedSizes = new();
 
-    private const string HtmlStyles = "body{font:14px system-ui;margin:24px;color:#18212b;background:#fafbfc}h2{overflow-wrap:anywhere}.summary,.metadata{padding:12px 16px;border:1px solid #d5dce3;border-radius:10px;background:#fff}.warning{color:#7a2e0b}section{overflow-x:auto}table{border-collapse:collapse;margin:12px 0 28px;font-variant-numeric:tabular-nums}th,td{padding:8px 12px;border-bottom:1px solid #d5dce3;text-align:left;white-space:nowrap}th{background:#e9eef3}tbody tr:nth-child(even){background:#f0f4f7}td:first-child{font-weight:bold}.added td:first-child{color:#137333}.removed td:first-child{color:#b3261e}.changed td:first-child{color:#946000}td:nth-child(2){white-space:normal;min-width:240px;overflow-wrap:anywhere}.color-chip{display:inline-block;min-width:3.5em;padding:.18em .65em;border-radius:999px;text-align:center;line-height:1.25;font-weight:600;box-sizing:border-box}@media(max-width:600px){body{margin:12px}.summary,.metadata{padding:10px 12px}}";
+    private const string HtmlStyles = "body{font:14px system-ui;margin:24px;color:#18212b;background:#fafbfc}h2{overflow-wrap:anywhere}.summary,.metadata{padding:12px 16px;border:1px solid #d5dce3;border-radius:10px;background:#fff}.warning{color:#7a2e0b}section{overflow-x:auto}table{border-collapse:collapse;margin:12px 0 28px;font-variant-numeric:tabular-nums}th,td{padding:8px 12px;text-align:left;white-space:nowrap}th{background:#e9eef3;border-bottom:1px solid #d5dce3}tbody+tbody tr:first-child td{border-top:1px solid #aab8c5;padding-top:16px}tbody tr:nth-child(even){background:#f0f4f7}td:first-child{font-weight:bold}.added td:first-child{color:#137333}.removed td:first-child{color:#b3261e}.changed td:first-child{color:#946000}td:nth-child(2){white-space:normal;min-width:240px;overflow-wrap:anywhere}.color-chip{display:inline-block;min-width:3.5em;padding:.18em .65em;border-radius:999px;text-align:center;line-height:1.25;font-weight:600;box-sizing:border-box}@media(max-width:600px){body{margin:12px}.summary,.metadata{padding:10px 12px}}";
 
     public static bool ShouldUseColor(bool? requested, bool redirected, string? terminal, bool noColor) =>
         requested ?? (!redirected && !noColor && !string.Equals(terminal, "dumb", StringComparison.OrdinalIgnoreCase));
@@ -47,7 +47,7 @@ public static class DiffRenderer
                     Rows = source.Rows.Select(row => row with { Cells = [row.Cells[0], row.Cells[1],
                         $"ZIP: {row.Cells[2]}; Raw: {row.Cells[3]}; Ratio: {row.Cells[4]}; {row.Cells[5]}"] }).ToArray(),
                 } : source;
-            var table = new Table().Border(TableBorder.Simple).ShowRowSeparators();
+            var table = new Table().Border(TableBorder.Simple);
             foreach (var column in data.Columns)
             {
                 var heading = console.Profile.Width < 140 ? column switch
@@ -61,8 +61,11 @@ public static class DiffRenderer
                 if (column is "Compressed" or "Uncompressed" or "Ratio" or "Variant" or "Subvariant") cell.RightAligned();
                 table.AddColumn(cell);
             }
+            string? previousGroup = null;
             foreach (var row in data.Rows)
             {
+                if (previousGroup is not null && previousGroup != row.Group) table.AddEmptyRow();
+                previousGroup = row.Group;
                 var cells = row.Cells.Select(Escape).ToArray();
                 cells[0] = Colorize(cells[0], MarkerColor(cells[0]), color);
                 for (var i = 1; i < cells.Length; i++)
@@ -123,8 +126,14 @@ public static class DiffRenderer
             if (table.Note is not null) b.AppendLine(MarkdownCell(table.Note) + "\n");
             b.AppendLine("| " + string.Join(" | ", table.Columns) + " |");
             b.AppendLine("| " + string.Join(" | ", table.Columns.Select(_ => "---")) + " |");
+            string? previousGroup = null;
             foreach (var row in table.Rows)
+            {
+                if (previousGroup is not null && previousGroup != row.Group)
+                    b.AppendLine("| " + string.Join(" | ", table.Columns.Select(_ => "")) + " |");
+                previousGroup = row.Group;
                 b.AppendLine("| " + string.Join(" | ", row.Cells.Select(MarkdownCell)) + " |");
+            }
         }
         foreach (var (label, change) in Metadata(report))
             b.AppendLine($"\n~ **{label}**: {MarkdownCell(change.Left ?? "removed")} → {MarkdownCell(change.Right ?? "added")}");
@@ -149,8 +158,11 @@ public static class DiffRenderer
             b.Append("<section><table><thead><tr>");
             foreach (var column in table.Columns) b.Append($"<th>{Html(column)}</th>");
             b.Append("</tr></thead><tbody>");
+            string? previousGroup = null;
             foreach (var row in table.Rows)
             {
+                if (previousGroup is not null && previousGroup != row.Group) b.Append("</tbody><tbody>");
+                previousGroup = row.Group;
                 var rowClass = row.Cells[0] == "+" ? "added" : row.Cells[0] == "-" ? "removed" : "changed";
                 b.Append($"<tr class=\"{rowClass}\">");
                 for (var i = 0; i < row.Cells.Length; i++)
@@ -185,12 +197,15 @@ public static class DiffRenderer
             ["Mark", "Name / path", EmbeddedSizePresentation.LeftMarginalColumn,
                 EmbeddedSizePresentation.RightMarginalColumn, EmbeddedSizePresentation.ZipColumn,
                 EmbeddedSizePresentation.RawColumn],
-            report.EmbeddedContributions.OrderBy(c => (c.Right ?? c.Left)?.Path, StringComparer.Ordinal)
+            report.EmbeddedContributions.OrderBy(c => ChangeOrder(c.Left, c.Right))
+                .ThenBy(c => DirectoryContext((c.Right ?? c.Left)!.Path), StringComparer.Ordinal)
+                .ThenBy(c => (c.Right ?? c.Left)!.Path, StringComparer.Ordinal)
                 .Select(c =>
                 {
                     var cells = EmbeddedSizes.FormatEntry(ContributionEntry(c.Left), ContributionEntry(c.Right));
                     return new Row([Marker(c.Left, c.Right), (c.Right ?? c.Left)?.Path ?? "--",
-                        ContributionMarginal(c.Left), ContributionMarginal(c.Right), cells.ZipBytes, cells.RawBytes]);
+                        ContributionMarginal(c.Left), ContributionMarginal(c.Right), cells.ZipBytes, cells.RawBytes],
+                        Group: Marker(c.Left, c.Right) + DirectoryContext((c.Right ?? c.Left)!.Path));
                 }).ToArray(),
             EmbeddedSizes.FormatOuterNote(report.LeftContributionBaselineBytes, report.RightContributionBaselineBytes) +
             " Default: at most 8 removal trials per map; remaining entries are unavailable.");
@@ -199,9 +214,11 @@ public static class DiffRenderer
         yield return BlockTable("Baked blocks", report.BakedBlocks, showGridPosition: true);
         yield return new("Map metadata", ["Mark", "Field", "Left", "Right"],
             report.MetadataChanges.Where(c => LegacyMetadata(report, c.Path) is null).OrderBy(c => c.Path, StringComparer.Ordinal)
-                .Select(c => new Row([Marker(c.Left, c.Right), c.Path, MetadataValue(c.Left), MetadataValue(c.Right)])).ToArray());
+                .Select(c => new Row([Marker(c.Left, c.Right), c.Path, MetadataValue(c.Left), MetadataValue(c.Right)],
+                    Group: SectionContext(c.Path, '.'))).ToArray());
         yield return new("Chunks", ["Mark", "Name", "Size"], report.Chunks.OrderBy(c => c.Key, StringComparer.Ordinal)
-            .Select(c => new Row([Marker(c.Left, c.Right), c.Key ?? "chunk", c.Left is not null && c.Right is not null ? $"{c.Left} → {c.Right}" : c.Left ?? c.Right ?? "--"])).ToArray());
+            .Select(c => new Row([Marker(c.Left, c.Right), c.Key ?? "chunk", c.Left is not null && c.Right is not null ? $"{c.Left} → {c.Right}" : c.Left ?? c.Right ?? "--"],
+                Group: SectionContext(c.Key ?? "chunk", ':'))).ToArray());
     }
 
     private static string MetadataValue(MapMetadataValue? value) => value switch
@@ -223,14 +240,17 @@ public static class DiffRenderer
     private static DiffTable EmbeddedTable(string title, IEnumerable<ValueChange<EmbeddedSnapshot>> changes) => new(
         title, ["Mark", "Name / path", EmbeddedSizePresentation.ZipColumn,
             EmbeddedSizePresentation.RawColumn, EmbeddedSizePresentation.RatioColumn, "What changed"],
-        changes.OrderBy(c => (c.Right ?? c.Left)?.Path, StringComparer.Ordinal).Select(c =>
-        {
-            var cells = EmbeddedSizes.FormatEntry(
-                c.Left is null ? null : new(c.Left.Compressed, c.Left.Uncompressed),
-                c.Right is null ? null : new(c.Right.Compressed, c.Right.Uncompressed));
-            return new Row([Marker(c.Left, c.Right), Transition(c, x => DisplayPath(x.Path), onlyDifferent: true),
-                cells.ZipBytes, cells.RawBytes, cells.ZipToRawRatio, EmbeddedExplanation(c)]);
-        }).ToArray(),
+        changes.OrderBy(c => ChangeOrder(c.Left, c.Right))
+            .ThenBy(c => DirectoryContext((c.Right ?? c.Left)!.Path), StringComparer.Ordinal)
+            .ThenBy(c => (c.Right ?? c.Left)!.Path, StringComparer.Ordinal).Select(c =>
+            {
+                var cells = EmbeddedSizes.FormatEntry(
+                    c.Left is null ? null : new(c.Left.Compressed, c.Left.Uncompressed),
+                    c.Right is null ? null : new(c.Right.Compressed, c.Right.Uncompressed));
+                return new Row([Marker(c.Left, c.Right), Transition(c, x => DisplayPath(x.Path), onlyDifferent: true),
+                    cells.ZipBytes, cells.RawBytes, cells.ZipToRawRatio, EmbeddedExplanation(c)],
+                    Group: Marker(c.Left, c.Right) + DirectoryContext((c.Right ?? c.Left)!.Path));
+            }).ToArray(),
         EmbeddedSizes.EntryNote +
         " Archive overhead and compression settings are not measured; a changed ZIP size with changed content does not by itself prove a compression-setting change.");
 
@@ -295,11 +315,13 @@ public static class DiffRenderer
     private static DiffTable SpatialTable<T>(string title, IReadOnlyList<ValueChange<T>> changes,
         List<Column<T>> columns, Func<T, SpatialPosition?> position, Func<T, string> key, Func<T, string> color) where T : class => new(
         title, new[] { "Mark" }.Concat(columns.Select(c => c.Name)).ToArray(),
-        changes.OrderBy(c => position((c.Right ?? c.Left)!))
-            .ThenBy(c => key((c.Right ?? c.Left)!), StringComparer.Ordinal)
-            .ThenBy(c => c.Left is null ? 1 : 0)
-            .Select(c => new Row(new[] { Marker(c.Left, c.Right) }.Concat(columns.Select(col => Transition(c, col.Value, onlyDifferent: true))).ToArray(),
-                new(c.Left is null ? null : color(c.Left), c.Right is null ? null : color(c.Right)))).ToArray());
+        DiffSpatialGroups.Order(changes, position, key).Select(entry =>
+        {
+            var c = entry.Change;
+            return new Row(new[] { Marker(c.Left, c.Right) }.Concat(columns.Select(col => Transition(c, col.Value, onlyDifferent: true))).ToArray(),
+                new(c.Left is null ? null : color(c.Left), c.Right is null ? null : color(c.Right)),
+                entry.Group.ToString(CultureInfo.InvariantCulture));
+        }).ToArray());
 
     private static string Transition<T>(ValueChange<T> change, Func<T, string> value, bool onlyDifferent = false) where T : class
     {
@@ -393,7 +415,17 @@ public static class DiffRenderer
             : $"[{foreground} on {background}] {text} [/]";
     }
 
+    private static string DirectoryContext(string path)
+    {
+        path = path.Replace('\\', '/');
+        var slash = path.LastIndexOf('/');
+        return slash < 0 ? "" : path[..slash];
+    }
+
+    private static string SectionContext(string path, char separator) => path.Split(separator)[0];
+    private static int ChangeOrder(object? left, object? right) => right is null ? 0 : left is null ? 1 : 2;
+
     private sealed record Column<T>(string Name, Func<T, string> Value);
-    private sealed record Row(string[] Cells, ValueChange<string>? Color = null);
+    private sealed record Row(string[] Cells, ValueChange<string>? Color = null, string Group = "");
     private sealed record DiffTable(string Title, string[] Columns, IReadOnlyList<Row> Rows, string? Note = null);
 }
