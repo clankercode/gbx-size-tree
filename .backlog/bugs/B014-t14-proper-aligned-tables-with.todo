@@ -9,7 +9,10 @@ id: B014
 priority: high
 started_at: null
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T14
+    - source-done
 title: 'T14: Proper aligned tables with headers, numeric alignment, row separation, abbreviated headers for limited terminal width, consistent conso'
 updated_at: "2026-09-09T06:13:49Z"
 ---
