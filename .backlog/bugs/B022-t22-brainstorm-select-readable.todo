@@ -12,7 +12,10 @@ id: B022
 priority: high
 started_at: "2026-09-09T08:03:27Z"
 status: in_progress
-tags: []
+tags:
+    - chat-astra
+    - T22
+    - source-inprog
 title: 'T22: Brainstorm/select readable embedded-size presentation conveying change and compression quality, with a seam for trying alternatives'
 updated_at: "2026-09-09T08:03:27Z"
 ---
