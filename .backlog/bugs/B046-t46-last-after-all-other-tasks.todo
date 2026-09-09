@@ -66,7 +66,10 @@ id: B046
 priority: high
 started_at: null
 status: pending
-tags: []
+tags:
+    - chat-astra
+    - T46
+    - source-pending
 title: 'T46: LAST, after all other tasks: brainstorm further improvements for everyday-user automation of attractive diffs to GitHub channels and cl'
 updated_at: "2026-09-09T06:13:11Z"
 ---
