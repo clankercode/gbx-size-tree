@@ -1,0 +1,29 @@
+---
+complexity: medium
+created_at: "2026-09-09T06:13:09Z"
+depends_on: []
+estimate_hours: 1
+id: B029
+priority: high
+status: pending
+tags:
+    - chat-astra
+    - T29
+    - source-done
+title: 'T29: Actual-map console/HTML/Markdown/JSON checks, desktop/mobile HTML, pseudo-terminal color, empty diffs and installed JSON'
+updated_at: "2026-09-09T06:13:09Z"
+---
+## Source
+Chat task: T29
+Source status: done
+Inventory: /tmp/gbx-size-tree-astra-chat-tasks.md
+Session: 01a08304-d48f-7631-913b-60e05abe13f3
+
+## Scope and acceptance criteria
+Actual-map console/HTML/Markdown/JSON checks, desktop/mobile HTML, pseudo-terminal color, empty diffs and installed JSON. Previously tested v180/v195, NOT new v205/v206.
+
+## State at ingestion
+Historical implementation verified before ingestion.
+
+## Source dependencies
+T4, T12, T23, T24
