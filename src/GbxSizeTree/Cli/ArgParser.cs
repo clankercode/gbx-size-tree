@@ -26,6 +26,8 @@ public static class ArgParser
         var json = false;
         var html = false;
         var markdown = false;
+        var png = false;
+        var webp = false;
         var styled = true;
         var styledSpecified = false;
         var notStyledSpecified = false;
@@ -108,6 +110,12 @@ public static class ArgParser
                 case "--markdown":
                 case "--md":
                     markdown = true;
+                    break;
+                case "--png":
+                    png = true;
+                    break;
+                case "--webp":
+                    webp = true;
                     break;
                 case "--styled":
                     styled = true;
@@ -247,12 +255,74 @@ public static class ArgParser
             return (null, "--styled and --not-styled cannot be combined.");
         }
 
+        var formatCount = (json ? 1 : 0) + (html ? 1 : 0) + (markdown ? 1 : 0)
+            + (png ? 1 : 0) + (webp ? 1 : 0);
+        if (formatCount > 1)
+        {
+            return (null, "--json, --html, --markdown/--md, --png, and --webp cannot be combined.");
+        }
+
+        var format = html ? CliOutputFormat.Html
+            : markdown ? CliOutputFormat.Markdown
+            : json ? CliOutputFormat.Json
+            : png ? CliOutputFormat.Png
+            : webp ? CliOutputFormat.Webp
+            : CliOutputFormat.Console;
+        var imageOutput = format is CliOutputFormat.Png or CliOutputFormat.Webp;
+
+        if (imageOutput && !diff)
+        {
+            return (null, "--png and --webp can only be used with diff.");
+        }
+
+        if (imageOutput && interactive)
+        {
+            return (null, "--png/--webp cannot be used with -i/--interactive.");
+        }
+
+        if (imageOutput && pause == true)
+        {
+            return (null, "--png/--webp cannot be used with --pause.");
+        }
+
+        if (imageOutput && (styledSpecified || notStyledSpecified))
+        {
+            return (null, "--styled/--not-styled cannot be used with --png/--webp.");
+        }
+
+        if (imageOutput && color is not null)
+        {
+            return (null, "--color/--no-color cannot be used with --png/--webp.");
+        }
+
+        if (imageOutput && (headerOnly || estimateCompressed || allChunks || unknownChunks
+                || topN != 20 || nonInteractive || optimize || stripLightmap
+                || shadowBrightnessFloor is not null || thumbnailMode != "keep" || embedStored
+                || actions.Count > 0 || noActions.Count > 0 || dryRun || attribute || experimental
+                || verbose || quiet))
+        {
+            return (null, "Non-diff analysis, optimization, verbosity, and text-report flags cannot be used with image output.");
+        }
+
+        if (diff && !imageOutput && outputPath is not null)
+        {
+            return (null, "-o/--output can only be used with diff --png/--webp.");
+        }
+
+        if (diff && !imageOutput && force)
+        {
+            return (null, "--force can only be used with diff --png/--webp.");
+        }
+
+        if (imageOutput && force && outputPath is null)
+        {
+            return (null, "--force requires -o/--output for image output.");
+        }
+
         if ((styledSpecified || notStyledSpecified) && (!diff || !html))
         {
             return (null, "--styled/--not-styled can only be used with diff --html.");
         }
-
-        var format = html ? CliOutputFormat.Html : markdown ? CliOutputFormat.Markdown : json ? CliOutputFormat.Json : CliOutputFormat.Console;
 
         if (diff && showHelp)
         {
@@ -263,7 +333,10 @@ public static class ArgParser
                 Json = json,
                 Format = format,
                 Styled = styled,
+                OutputPath = outputPath,
+                Force = force,
                 ShowHelp = true,
+                Pause = pause,
             }, null);
         }
 
@@ -275,12 +348,6 @@ public static class ArgParser
         if (json && interactive)
         {
             return (null, "--json cannot be used with -i/--interactive.");
-        }
-
-        var formatCount = (json ? 1 : 0) + (html ? 1 : 0) + (markdown ? 1 : 0);
-        if (formatCount > 1)
-        {
-            return (null, "--json, --html, and --markdown/--md cannot be combined.");
         }
 
         if ((html || markdown) && interactive)
