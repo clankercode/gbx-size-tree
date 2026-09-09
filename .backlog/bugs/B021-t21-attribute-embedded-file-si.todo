@@ -9,10 +9,7 @@ id: B021
 priority: high
 started_at: null
 status: pending
-tags:
-    - chat-astra
-    - T21
-    - source-pending
+tags: []
 title: 'T21: Attribute embedded file size to ACTUAL outer-compressed map size / map file limit contribution, not just ZIP compressed size.'
 updated_at: "2026-09-09T06:13:09Z"
 ---
@@ -30,3 +27,5 @@ Outstanding work; not implemented by this ingestion.
 
 ## Source dependencies
 T20
+
+Decision and sequencing: Comparison lane after initial content/metadata changes. Decision: measure embedded-entry marginal contribution by recompressing the original decompressed body with versus without that ZIP entry, preserving unrelated bytes; disclose non-additivity, compression context, and unavailable estimates rather than label ZIP length as outer contribution.
