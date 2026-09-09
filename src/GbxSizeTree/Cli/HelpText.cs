@@ -15,8 +15,11 @@ public static class HelpText
         powered by GBX.NET.
 
         Usage: gbx-size-tree [options] [file.Map.Gbx]
+        Usage: gbx-size-tree diff [--json] [--all] old.Map.Gbx new.Map.Gbx
 
         Analysis:
+          diff                      Compare two map versions
+          --all                     Include all changed header/body chunks
           --header-only             Read and report only the map header
           --estimate-compressed     Estimate compressed sizes for tree entries
           --all-chunks              List every header and body chunk (no size cutoff)
@@ -66,8 +69,33 @@ public static class HelpText
         -n/--non-interactive use report mode. Double-click launches open a file picker.
         """;
 
-    /// <summary>
-    /// Returns the short product and licensing description.
+    /// <summary>Returns focused help for comparing two map versions.</summary>
+    public static string Diff(string version) => $"""
+        gbx-size-tree {version} — compare two map versions
+
+        Usage:
+          gbx-size-tree diff [OPTIONS] OLD_MAP NEW_MAP
+
+        File order:
+          OLD_MAP                  The earlier or baseline map (left side)
+          NEW_MAP                  The later or candidate map (right side)
+
+        The diff reports added, removed, and changed blocks, baked blocks, anchored items,
+        embedded files, map metadata, and file size. Use --all to include every detected
+        header and body chunk, including lightmaps, genealogies, password chunks, and
+        other chunks without a dedicated semantic comparison.
+
+        Options:
+          --all                    Include all header/body chunk changes
+          --json                   Write machine-readable JSON to stdout
+          --help                   Show this help
+
+        Examples:
+          gbx-size-tree diff OLD_MAP.Map.Gbx NEW_MAP.Map.Gbx
+          gbx-size-tree diff --all OLD_MAP.Map.Gbx NEW_MAP.Map.Gbx
+          gbx-size-tree diff --json OLD_MAP.Map.Gbx NEW_MAP.Map.Gbx
+        """;
+
     /// </summary>
     public static string About(string version) =>
         $"gbx-size-tree {version} - Colorful size breakdown + optimizer for TM2020 .Map.Gbx "

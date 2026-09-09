@@ -48,7 +48,7 @@ try
     }
     else if (options.ShowHelp)
     {
-        Console.Write(HelpText.Full(version));
+        Console.Write(options.Diff ? HelpText.Diff(version) : HelpText.Full(version));
     }
     else if (options.ShowVersion)
     {
@@ -56,6 +56,12 @@ try
     }
     else
     {
+        if (options.Diff)
+        {
+            exitCode = DiffMode.Run(options.InputPaths, options.Json, options.CompareAll, options.Color);
+        }
+        else
+        {
         var input = options.InputPath;
         if (input is null && launchKind == LaunchKind.GuiOwnConsole)
         {
@@ -99,6 +105,7 @@ try
                 exitCode = ReportMode.Run(input, options, registry);
             }
         }
+    }
     }
 }
 catch (Exception ex)

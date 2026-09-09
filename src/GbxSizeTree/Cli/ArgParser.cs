@@ -15,6 +15,9 @@ public static class ArgParser
         ArgumentNullException.ThrowIfNull(args);
 
         string? inputPath = null;
+        var inputPaths = new List<string>();
+        var diff = false;
+        var compareAll = false;
         var headerOnly = false;
         var estimateCompressed = false;
         var allChunks = false;
@@ -49,7 +52,7 @@ public static class ArgParser
             {
                 for (i++; i < args.Length; i++)
                 {
-                    if (!TrySetInput(args[i], ref inputPath, out var inputError))
+                    if (!TryAddInput(args[i], inputPaths, ref inputPath, diff, out var inputError))
                     {
                         return (null, inputError);
                     }
@@ -60,6 +63,12 @@ public static class ArgParser
 
             switch (arg)
             {
+                case "diff":
+                    diff = true;
+                    break;
+                case "--all":
+                    compareAll = true;
+                    break;
                 case "--header-only":
                     headerOnly = true;
                     break;
@@ -204,13 +213,29 @@ public static class ArgParser
                         return (null, $"Unknown option '{arg}'.");
                     }
 
-                    if (!TrySetInput(arg, ref inputPath, out var inputError))
+                    if (!TryAddInput(arg, inputPaths, ref inputPath, diff, out var inputError))
                     {
                         return (null, inputError);
                     }
 
                     break;
             }
+        }
+
+        if (diff && showHelp)
+        {
+            return (new CliOptions
+            {
+                Diff = true,
+                CompareAll = compareAll,
+                Json = json,
+                ShowHelp = true,
+            }, null);
+        }
+
+        if (diff && inputPaths.Count != 2)
+        {
+            return (null, "diff requires exactly two input map paths.");
         }
 
         if (json && interactive)
@@ -239,6 +264,9 @@ public static class ArgParser
         return (new CliOptions
         {
             InputPath = inputPath,
+            InputPaths = inputPaths.ToArray(),
+            Diff = diff,
+            CompareAll = compareAll,
             HeaderOnly = headerOnly,
             EstimateCompressed = estimateCompressed,
             AllChunks = allChunks,
@@ -283,6 +311,24 @@ public static class ArgParser
         }
 
         value = args[++index];
+        error = null;
+        return true;
+    }
+
+    private static bool TryAddInput(string value, List<string> inputPaths, ref string? inputPath, bool diff, out string? error)
+    {
+        if (!diff && inputPath is not null)
+        {
+            error = $"Unexpected argument '{value}': only one input path is allowed.";
+            return false;
+        }
+        if (diff && inputPaths.Count >= 2)
+        {
+            error = "diff requires exactly two input map paths.";
+            return false;
+        }
+        inputPaths.Add(value);
+        inputPath ??= value;
         error = null;
         return true;
     }

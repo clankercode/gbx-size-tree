@@ -6,6 +6,9 @@ namespace GbxSizeTree.Cli;
 public sealed record CliOptions
 {
     public string? InputPath { get; init; }
+    public IReadOnlyList<string> InputPaths { get; init; } = Array.Empty<string>();
+    public bool Diff { get; init; }
+    public bool CompareAll { get; init; }
     public bool HeaderOnly { get; init; }
     public bool EstimateCompressed { get; init; }
     public bool AllChunks { get; init; }

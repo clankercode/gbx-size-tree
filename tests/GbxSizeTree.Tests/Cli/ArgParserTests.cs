@@ -9,6 +9,8 @@ public class ArgParserTests
     [InlineData("--estimate-compressed", nameof(CliOptions.EstimateCompressed), "True")]
     [InlineData("--top 50", nameof(CliOptions.TopN), "50")]
     [InlineData("--json", nameof(CliOptions.Json), "True")]
+    [InlineData("diff a.Map.Gbx b.Map.Gbx", nameof(CliOptions.Diff), "True")]
+    [InlineData("--all", nameof(CliOptions.CompareAll), "True")]
     [InlineData("--color", nameof(CliOptions.Color), "True")]
     [InlineData("--no-color", nameof(CliOptions.Color), "False")]
     [InlineData("--interactive", nameof(CliOptions.Interactive), "True")]
@@ -186,6 +188,16 @@ public class ArgParserTests
 
         Assert.Null(options);
         Assert.Contains("-o", error);
+    }
+
+    [Fact]
+    public void Parse_DiffHelpDoesNotRequireMapPaths()
+    {
+        var (options, error) = ArgParser.Parse(["diff", "--help"]);
+        Assert.Null(error);
+        Assert.NotNull(options);
+        Assert.True(options.Diff);
+        Assert.True(options.ShowHelp);
     }
 
     [Fact]
