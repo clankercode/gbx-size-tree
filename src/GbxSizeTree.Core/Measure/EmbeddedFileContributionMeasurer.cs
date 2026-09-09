@@ -66,6 +66,7 @@ public sealed class EmbeddedFileContributionMeasurer
     {
         ArgumentNullException.ThrowIfNull(originalFile);
         ArgumentNullException.ThrowIfNull(requestedPaths);
+        progress = BestEffort(progress);
         options ??= new();
         ArgumentOutOfRangeException.ThrowIfNegative(options.MaxTrials);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(options.MaxBodyBytes);
@@ -151,6 +152,19 @@ public sealed class EmbeddedFileContributionMeasurer
             results.Add(new(path, entry.ZipCompressedBytes, entry.ZipRawBytes, marginal, reason));
         }
         return new(baseline, results, baselineFailure);
+    }
+
+    private static Action<EmbeddedFileContributionProgress>? BestEffort(
+        Action<EmbeddedFileContributionProgress>? progress)
+    {
+        if (progress is null) return null;
+        var failed = false;
+        return value =>
+        {
+            if (failed) return;
+            try { progress(value); }
+            catch { failed = true; }
+        };
     }
 
     private long Compress(byte[] body)

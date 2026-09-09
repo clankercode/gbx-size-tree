@@ -72,6 +72,7 @@ public static class DiffMode
         EmbeddedFileContributionOptions? contributionOptions = null,
         Action<DiffProgress>? progress = null)
     {
+        progress = BestEffort(progress);
         progress?.Invoke(new(DiffProgressStage.ReadingOld, Path.GetFileName(left)));
         var leftBytes = File.ReadAllBytes(left);
         progress?.Invoke(new(DiffProgressStage.ReadingNew, Path.GetFileName(right)));
@@ -101,6 +102,18 @@ public static class DiffMode
             return ContentOnlyReport(leftBytes.Length, rightBytes.Length, leftContent, rightContent);
         }
         return WithContributions(report, leftBytes, rightBytes, contributionOptions, progress);
+    }
+
+    private static Action<DiffProgress>? BestEffort(Action<DiffProgress>? progress)
+    {
+        if (progress is null) return null;
+        var failed = false;
+        return value =>
+        {
+            if (failed) return;
+            try { progress(value); }
+            catch { failed = true; }
+        };
     }
 
     private static Snapshot ReadBytes(byte[] bytes, IReadOnlyDictionary<string, string> content)

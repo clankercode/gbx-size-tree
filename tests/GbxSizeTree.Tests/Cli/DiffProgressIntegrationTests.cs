@@ -85,12 +85,12 @@ public sealed class DiffProgressIntegrationTests
         Assert.True(process.ExitCode == 0, stderr + transcript);
 
         var output = transcript.ToString();
-        Assert.Contains("reading OLD", output);
-        Assert.Contains("parsing OLD", output);
-        Assert.Contains("parsing NEW", output);
-        Assert.Contains("comparing metadata and content", output);
-        Assert.Contains("deep embedded comparison", output);
-        Assert.Contains("embedded trials", output);
+        Assert.Contains("read OLD", output);
+        Assert.Contains("parse OLD", output);
+        Assert.Contains("parse NEW", output);
+        Assert.Contains("compare", output);
+        Assert.Contains("deep embeds", output);
+        Assert.Contains("measure", output);
         Assert.Contains("ETA ", output);
         var heading = output.IndexOf("Map diff", StringComparison.Ordinal);
         Assert.True(heading > 0, output);

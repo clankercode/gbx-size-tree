@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using GbxSizeTree.Cli.Modes;
+using Spectre.Console;
 
 namespace GbxSizeTree.Cli;
 
@@ -97,19 +98,42 @@ internal sealed class TerminalProgress : IDisposable
     private void Render(TimeSpan now, bool stageChanged)
     {
         var progress = current!;
-        var text = new StringBuilder("Processing: ").Append(StageName(progress.Stage));
+        var availableWidth = Math.Max(1, width() - 1);
+        var stage = "Processing: " + CompactStageName(progress.Stage);
+        var statistics = new StringBuilder();
         if (progress.Completed is int completed && progress.Total is int total)
-            text.Append(" — ").Append(completed).Append('/').Append(total);
-        text.Append(" — elapsed ").Append(FormatDuration(now - startedAt));
+            statistics.Append(" — ").Append(completed).Append('/').Append(total);
+        statistics.Append(" — elapsed ").Append(FormatDuration(now - startedAt));
         var eta = EstimateEta(progress, now, stageChanged);
-        text.Append(" — ETA ").Append(eta is null ? "unknown" : FormatDuration(eta.Value));
-        if (!string.IsNullOrWhiteSpace(progress.WorkItem))
-            text.Append(" — ").Append(Sanitize(progress.WorkItem));
+        statistics.Append(" — ETA ").Append(eta is null ? "unknown" : FormatDuration(eta.Value));
 
-        var line = Clip(text.ToString(), Math.Max(1, width() - 1));
-        var padding = Math.Max(0, renderedLength - line.Length);
+        var suffix = statistics.ToString();
+        var stageWidth = stage.GetCellWidth();
+        var suffixWidth = suffix.GetCellWidth();
+        var workItem = string.IsNullOrWhiteSpace(progress.WorkItem) ? null : Sanitize(progress.WorkItem);
+        string line;
+        if (suffixWidth >= availableWidth)
+        {
+            line = Clip(suffix, availableWidth);
+        }
+        else if (stageWidth + suffixWidth >= availableWidth)
+        {
+            line = Clip(stage, availableWidth - suffixWidth) + suffix;
+        }
+        else if (workItem is null)
+        {
+            line = stage + suffix;
+        }
+        else
+        {
+            var workItemWidth = availableWidth - stageWidth - suffixWidth - " — ".GetCellWidth();
+            line = stage + " — " + Clip(workItem, workItemWidth) + suffix;
+        }
+
+        var lineWidth = line.GetCellWidth();
+        var padding = Math.Max(0, renderedLength - lineWidth);
         if (!TryWrite($"\r{line}{new string(' ', padding)}")) return;
-        renderedLength = line.Length;
+        renderedLength = lineWidth;
         lastRenderedAt = now;
     }
 
@@ -141,29 +165,43 @@ internal sealed class TerminalProgress : IDisposable
         }
     }
 
-    private static string StageName(DiffProgressStage stage) => stage switch
+    private static string CompactStageName(DiffProgressStage stage) => stage switch
     {
-        DiffProgressStage.ReadingOld => "reading OLD",
-        DiffProgressStage.ReadingNew => "reading NEW",
-        DiffProgressStage.ParsingOld => "parsing OLD",
-        DiffProgressStage.ParsingNew => "parsing NEW",
-        DiffProgressStage.Comparing => "comparing metadata and content",
-        DiffProgressStage.EmbeddedDeepComparison => "deep embedded comparison",
-        DiffProgressStage.MeasuringOldEmbeds => "measuring OLD embedded trials",
-        DiffProgressStage.MeasuringNewEmbeds => "measuring NEW embedded trials",
+        DiffProgressStage.ReadingOld => "read OLD",
+        DiffProgressStage.ReadingNew => "read NEW",
+        DiffProgressStage.ParsingOld => "parse OLD",
+        DiffProgressStage.ParsingNew => "parse NEW",
+        DiffProgressStage.Comparing => "compare",
+        DiffProgressStage.EmbeddedDeepComparison => "deep embeds",
+        DiffProgressStage.MeasuringOldEmbeds => "measure OLD embeds",
+        DiffProgressStage.MeasuringNewEmbeds => "measure NEW embeds",
         _ => throw new ArgumentOutOfRangeException(nameof(stage)),
     };
 
     private static string Sanitize(string value)
     {
         var result = new StringBuilder(value.Length);
-        foreach (var character in value)
-            result.Append(char.IsControl(character) ? ' ' : character);
+        foreach (var rune in value.EnumerateRunes())
+            result.Append(Rune.IsControl(rune) ? ' ' : rune.ToString());
         return result.ToString();
     }
 
-    private static string Clip(string value, int width) =>
-        value.Length <= width ? value : width == 1 ? "…" : value[..(width - 1)] + "…";
+    private static string Clip(string value, int width)
+    {
+        if (width <= 0) return "";
+        if (value.GetCellWidth() <= width) return value;
+        if (width == 1) return "…";
+        var result = new StringBuilder(value.Length);
+        var remaining = width - "…".GetCellWidth();
+        foreach (var rune in value.EnumerateRunes())
+        {
+            var runeWidth = Math.Max(0, rune.ToString().GetCellWidth());
+            if (runeWidth > remaining) break;
+            result.Append(rune.ToString());
+            remaining -= runeWidth;
+        }
+        return result.Append('…').ToString();
+    }
 
     private static string FormatDuration(TimeSpan duration)
     {

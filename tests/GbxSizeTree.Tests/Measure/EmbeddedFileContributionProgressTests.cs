@@ -26,18 +26,20 @@ public sealed class EmbeddedFileContributionProgressTests
     }
 
     [Fact]
-    public void Measure_ObserverFailurePropagatesBeforeTrial()
+    public void Measure_ObserverFailureIsIgnoredAndMeasurementContinues()
     {
         var file = BuildFile(BuildZip(("asset", new byte[16])));
         var calls = 0;
+        var observerCalls = 0;
         var measurer = new EmbeddedFileContributionMeasurer(body => { calls++; return body.LongLength; });
 
-        var error = Assert.Throws<InvalidOperationException>(() => measurer.Measure(
+        var result = measurer.Measure(
             file, ["asset"], cancellationToken: TestContext.Current.CancellationToken,
-            progress: _ => throw new InvalidOperationException("observer failed")));
+            progress: _ => { observerCalls++; throw new InvalidOperationException("observer failed"); });
 
-        Assert.Equal("observer failed", error.Message);
-        Assert.Equal(0, calls);
+        Assert.Equal(1, observerCalls);
+        Assert.Equal(2, calls);
+        Assert.NotNull(Assert.Single(result.Entries).MarginalCompressedBodyBytes);
     }
 
     private static byte[] BuildZip(params (string Path, byte[] Bytes)[] entries)
