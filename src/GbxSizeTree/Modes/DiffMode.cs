@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using GBX.NET;
 using GBX.NET.Engines.Game;
-using GbxSizeTree.Analysis;
+using GbxSizeTree.Cli;
 using GbxSizeTree.Container;
 using GbxSizeTree.Semantics;
 
@@ -12,14 +12,20 @@ namespace GbxSizeTree.Cli.Modes;
 public static class DiffMode
 {
     [UnconditionalSuppressMessage("Trimming", "IL2026")]
-    public static int Run(IReadOnlyList<string> paths, bool json, bool all, bool? colorOption)
+    public static int Run(IReadOnlyList<string> paths, CliOutputFormat format, bool all, bool? colorOption)
     {
         if (paths.Count != 2) throw new ArgumentException("diff requires exactly two map paths.");
         var left = Read(paths[0]);
         var right = Read(paths[1]);
         var result = Compare(left, right, all);
-        if (json) Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(result, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
-        else DiffRenderer.Render(DiffRenderer.BuildConsole(colorOption), ToReport(result), paths[0], paths[1]);
+        if (format == CliOutputFormat.Json)
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(result, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+        else if (format == CliOutputFormat.Html)
+            Console.WriteLine(DiffRenderer.RenderHtml(ToReport(result), paths[0], paths[1]));
+        else if (format == CliOutputFormat.Markdown)
+            Console.WriteLine(DiffRenderer.RenderMarkdown(ToReport(result), paths[0], paths[1]));
+        else
+            DiffRenderer.Render(DiffRenderer.BuildConsole(colorOption), ToReport(result), paths[0], paths[1]);
         return ExitCodes.Ok;
     }
 

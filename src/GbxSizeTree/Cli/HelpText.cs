@@ -87,8 +87,13 @@ public static class HelpText
         header and body chunk, including lightmaps, genealogies, password chunks, and
         other chunks without a dedicated semantic comparison.
 
+        The human-readable report shows embedded files first, then placed items, followed by
+        blocks and metadata. Use --html or --markdown/--md for portable reports.
+
         Options:
           --all                    Include all header/body chunk changes
+          --html                   Write an HTML report
+          --markdown, --md         Write a Markdown report
           --json                   Write machine-readable JSON to stdout
           --help                   Show this help
 
