@@ -4,3 +4,4 @@ bugs:
     - file: B003-t3-detect-embedded-additions-r.todo
     - file: B004-t4-json-for-automation-and-dis.todo
     - file: B005-t5-all-compares-all-changeable.todo
+    - file: B006-t6-baked-block-comparison-in-a.todo
