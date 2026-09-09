@@ -21,3 +21,4 @@ bugs:
     - file: B020-t20-embedded-columns-actual-fi.todo
     - file: B021-t21-attribute-embedded-file-si.todo
     - file: B022-t22-brainstorm-select-readable.todo
+    - file: B023-t23-html-diff-output-styled-an.todo
