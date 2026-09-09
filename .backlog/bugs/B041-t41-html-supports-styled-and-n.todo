@@ -9,10 +9,7 @@ id: B041
 priority: high
 started_at: null
 status: pending
-tags:
-    - chat-astra
-    - T41
-    - source-pending
+tags: []
 title: 'T41: --html supports --styled and --not-styled; default styled.'
 updated_at: "2026-09-09T06:13:11Z"
 ---
@@ -30,3 +27,5 @@ Outstanding work; not implemented by this ingestion.
 
 ## Source dependencies
 T23
+
+Decision and sequencing: Presentation/CLI lane after initial renderer and content slices, serial because RenderHtml and DiffMode dispatch overlap. Decision: default styled; --styled/--not-styled valid for HTML diff only; deterministic conflicting-flag errors and parity of content across styles.
