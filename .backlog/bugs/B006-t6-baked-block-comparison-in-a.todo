@@ -10,7 +10,10 @@ id: B006
 priority: high
 started_at: null
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T6
+    - source-done
 title: 'T6: Baked-block comparison in --all; omit baked blocks by default.'
 updated_at: "2026-09-09T06:13:48Z"
 ---
