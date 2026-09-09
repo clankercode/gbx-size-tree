@@ -6,6 +6,8 @@ public enum CliOutputFormat
     Json,
     Html,
     Markdown,
+    Png,
+    Webp,
 }
 
 /// <summary>

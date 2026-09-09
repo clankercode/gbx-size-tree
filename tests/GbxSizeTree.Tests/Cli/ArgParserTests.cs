@@ -196,6 +196,161 @@ public class ArgParserTests
         Assert.Contains("-o", error);
     }
 
+    [Theory]
+    [InlineData("--png", CliOutputFormat.Png)]
+    [InlineData("--webp", CliOutputFormat.Webp)]
+    public void Parse_DiffImageFormatsAreAccepted(string flag, CliOutputFormat expected)
+    {
+        var (options, error) = ArgParser.Parse(["diff", "old.Map.Gbx", "new.Map.Gbx", flag]);
+
+        Assert.Null(error);
+        Assert.NotNull(options);
+        Assert.Equal(expected, options.Format);
+    }
+
+    [Theory]
+    [InlineData("--png", "--webp")]
+    [InlineData("--png", "--json")]
+    [InlineData("--png", "--html")]
+    [InlineData("--png", "--markdown")]
+    [InlineData("--webp", "--md")]
+    public void Parse_DiffImageFormatsAreExclusiveWithEveryOtherFormat(string image, string other)
+    {
+        var (options, error) = ArgParser.Parse(["diff", "old.Map.Gbx", "new.Map.Gbx", image, other]);
+
+        Assert.Null(options);
+        Assert.Contains("cannot be combined", error);
+    }
+
+    [Theory]
+    [InlineData("--png")]
+    [InlineData("--webp")]
+    public void Parse_ImageFormatsAreDiffOnly(string format)
+    {
+        var (options, error) = ArgParser.Parse(["map.Map.Gbx", format]);
+
+        Assert.Null(options);
+        Assert.Contains("only be used with diff", error);
+    }
+
+    [Theory]
+    [InlineData("-i")]
+    [InlineData("--interactive")]
+    [InlineData("--pause")]
+    [InlineData("--styled")]
+    [InlineData("--not-styled")]
+    [InlineData("--color")]
+    [InlineData("--no-color")]
+    public void Parse_ImageOutputRejectsTerminalAndTextPresentationFlags(string flag)
+    {
+        var (options, error) = ArgParser.Parse([
+            "diff", "old.Map.Gbx", "new.Map.Gbx", "--png", flag,
+        ]);
+
+        Assert.Null(options);
+        Assert.NotNull(error);
+    }
+
+    [Theory]
+    [InlineData("--header-only")]
+    [InlineData("--estimate-compressed")]
+    [InlineData("--all-chunks")]
+    [InlineData("--unknown-chunks")]
+    [InlineData("--top", "5")]
+    [InlineData("-O")]
+    [InlineData("--optimize")]
+    [InlineData("--strip-lightmap")]
+    [InlineData("--lighten-shadows", "10")]
+    [InlineData("--thumbnail", "strip")]
+    [InlineData("--embed-stored")]
+    [InlineData("--action", "resave")]
+    [InlineData("--no-action", "resave")]
+    [InlineData("--dry-run")]
+    [InlineData("--attribute")]
+    [InlineData("--experimental")]
+    [InlineData("-v")]
+    [InlineData("--verbose")]
+    [InlineData("-q")]
+    [InlineData("--quiet")]
+    public void Parse_ImageOutputRejectsNonDiffFlags(params string[] flags)
+    {
+        var (options, error) = ArgParser.Parse([
+            "diff", "old.Map.Gbx", "new.Map.Gbx", "--png", .. flags,
+        ]);
+
+        Assert.Null(options);
+        Assert.Contains("cannot be used with image output", error);
+    }
+
+    [Theory]
+    [InlineData("--all")]
+    [InlineData("--no-pause")]
+    [InlineData("-n")]
+    [InlineData("--non-interactive")]
+    public void Parse_ImageOutputAllowsNonPresentationDiffFlags(string flag)
+    {
+        var (options, error) = ArgParser.Parse([
+            "diff", "old.Map.Gbx", "new.Map.Gbx", "--webp", flag,
+        ]);
+
+        Assert.Null(error);
+        Assert.NotNull(options);
+        Assert.Equal(CliOutputFormat.Webp, options.Format);
+    }
+
+    [Theory]
+    [InlineData("--png")]
+    [InlineData("--webp")]
+    public void Parse_ImageHelpDoesNotRequireMapPaths(string format)
+    {
+        var (options, error) = ArgParser.Parse(["diff", format, "--help"]);
+
+        Assert.Null(error);
+        Assert.NotNull(options);
+        Assert.True(options.ShowHelp);
+        Assert.Empty(options.InputPaths);
+    }
+
+    [Theory]
+    [InlineData("-o")]
+    [InlineData("--output")]
+    [InlineData("--force")]
+    public void Parse_TextDiffRejectsImageFileOptions(string flag)
+    {
+        var args = new List<string> { "diff", "old.Map.Gbx", "new.Map.Gbx", flag };
+        if (flag != "--force") args.Add("report.txt");
+
+        var (options, error) = ArgParser.Parse(args.ToArray());
+
+        Assert.Null(options);
+        Assert.NotNull(error);
+    }
+
+    [Fact]
+    public void Parse_ImageForceRequiresExplicitOutput()
+    {
+        var (options, error) = ArgParser.Parse([
+            "diff", "old.Map.Gbx", "new.Map.Gbx", "--png", "--force",
+        ]);
+
+        Assert.Null(options);
+        Assert.Contains("requires -o/--output", error);
+    }
+
+    [Fact]
+    public void Parse_OptimizeOutputFlagsRemainAccepted()
+    {
+        var (options, error) = ArgParser.Parse([
+            "map.Map.Gbx", "--optimize", "-o", "optimized.Map.Gbx", "--force",
+        ]);
+
+        Assert.Null(error);
+        Assert.NotNull(options);
+        Assert.True(options.Optimize);
+        Assert.Equal("optimized.Map.Gbx", options.OutputPath);
+        Assert.True(options.Force);
+    }
+
     [Fact]
     public void Parse_DiffHelpDoesNotRequireMapPaths()
     {

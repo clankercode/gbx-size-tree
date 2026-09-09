@@ -79,6 +79,18 @@ public class LaunchModeDetectorTests
                 Probe(), explicitlyRequested, disabled, json, reportOnly, wantsOptimization));
     }
 
+    [Theory]
+    [InlineData(true, "diff", "left", "right", "--png", "--bad")]
+    [InlineData(true, "diff", "left", "right", "--webp", "--bad")]
+    [InlineData(false, "diff", "left", "right", "-o", "--png", "--bad")]
+    [InlineData(false, "diff", "left", "right", "--output", "--webp", "--bad")]
+    [InlineData(false, "diff", "left", "right", "--thumbnail", "--png", "--bad")]
+    [InlineData(false, "diff", "left", "right", "--", "--png")]
+    public void RawImageOutputRequested_SkipsOutputValuesAndStopsAtDelimiter(
+        bool expected,
+        params string[] arguments) =>
+        Assert.Equal(expected, LaunchModeDetector.RawImageOutputRequested(arguments));
+
     [Fact]
     public void ConsoleOwnership_OnNonWindows_ReturnsNull()
     {
