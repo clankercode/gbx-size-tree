@@ -8,7 +8,10 @@ id: B026
 priority: high
 started_at: null
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T26
+    - source-done
 title: 'T26: Before new work, commit pre-existing repo changes logically'
 updated_at: "2026-09-09T06:13:52Z"
 ---
