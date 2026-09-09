@@ -9,10 +9,7 @@ id: B032
 priority: high
 started_at: null
 status: pending
-tags:
-    - chat-astra
-    - T32
-    - source-pending
+tags: []
 title: 'T32: --webp output encoding of purpose-built diff infographic.'
 updated_at: "2026-09-09T06:13:10Z"
 ---
@@ -30,3 +27,5 @@ Outstanding work; not implemented by this ingestion.
 
 ## Source dependencies
 T33
+
+Decision and sequencing: Image/CLI lane after B033 closes; serialize with B031. Decision: same purpose-built infographic encoded as WebP with verified decoder compatibility and no external browser dependency in normal CLI usage.
