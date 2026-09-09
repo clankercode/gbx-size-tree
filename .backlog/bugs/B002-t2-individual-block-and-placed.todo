@@ -9,7 +9,10 @@ id: B002
 priority: high
 started_at: null
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T2
+    - source-done
 title: 'T2: Individual block and placed-item additions/removals, preserving counts of duplicate placements.'
 updated_at: "2026-09-09T06:13:47Z"
 ---
