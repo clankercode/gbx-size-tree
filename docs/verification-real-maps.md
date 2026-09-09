@@ -72,9 +72,9 @@ Chromium 151.0.7922.173 and Playwright 1.58.1 rendered default/`--all`, styled/p
 
 Overview screenshots are `/tmp/gbx-final-real-{default,all}-{styled,plain}-{desktop,mobile}.png`. Targeted full-section screenshots add `-deep.png` or `-metadata.png`. Visual inspection found readable styled hierarchy, wrapping paths and mobile-contained tables. Plain HTML retained native semantic table rendering and expected horizontal overflow without presentation markup.
 
-## Safe-error limitation
+## Safe-error regression
 
-A missing NEW map produced valid escaped JSON and safely quoted stderr, but exposed a code mismatch:
+The initial missing-NEW-map check exposed a JSON/process status mismatch. Fix `c816790` was then verified against the same quoted missing path:
 
 ```sh
 set +e
@@ -86,7 +86,7 @@ dotnet src/GbxSizeTree/bin/Debug/net10.0/gbx-size-tree.dll diff --json -- \
 printf 'exit=%s\n' "$?"
 ```
 
-The process exits `4` (`IoError`), while the JSON envelope reports code `5` (`Internal`). This validation lane does not own shared runtime code, so it records the bug without changing it. The artifacts are `/tmp/gbx-final-real-error.json` and `/tmp/gbx-final-real-error.stderr`.
+The corrected process exits `4` (`IoError`) and the JSON envelope also reports code `4`. The message remains valid escaped JSON and stderr preserves the quoted path. The post-fix artifacts are `/tmp/gbx-final-real-error-fixed.json` and `/tmp/gbx-final-real-error-fixed.stderr`; the original failing capture remains available without the `-fixed` suffix.
 
 ## Test gate
 
