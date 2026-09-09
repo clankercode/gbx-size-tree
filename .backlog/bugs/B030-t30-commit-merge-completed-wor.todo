@@ -12,7 +12,10 @@ id: B030
 priority: high
 started_at: null
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T30
+    - source-done
 title: 'T30: Commit/merge completed work logically and run just install'
 updated_at: "2026-09-09T06:13:53Z"
 ---
