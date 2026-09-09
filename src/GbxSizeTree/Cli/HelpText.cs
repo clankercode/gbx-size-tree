@@ -92,17 +92,31 @@ public static class HelpText
           Placement and metadata rows compare fields understood by GBX.NET; this is not a
           claim that every item property has deep semantic support. With --all, header/body
           chunk candidates plus complete container-prefix, stored-body (when present), and
-          decompressed-body fingerprints can detect opaque changes. These fingerprints identify changed bytes,
-          not their meaning. Warnings call out opaque or otherwise unavailable metadata.
-          Marginal bytes recompress each original body after removing one changed embed;
-          they are context-dependent, do not add up to map size, use a bounded trial budget,
-          and may be unavailable.
+          decompressed-body fingerprints can detect opaque changes. These fingerprints
+          identify changed bytes, not their meaning. Warnings call out opaque or otherwise
+          unavailable metadata. Marginal bytes recompress each original body after removing
+          one changed embed; they are context-dependent, do not add up to map size, use a
+          bounded trial budget (currently 256 trials per map), and may be unavailable.
 
         Output:
           Console color is automatic: disabled for redirects, NO_COLOR, and TERM=dumb.
           --color and --no-color override that policy. HTML is styled by default; use
-          --not-styled for markup without CSS or inline styles. Markdown and JSON are also
-          written to stdout. Redirect reports to a local file; nothing is published.
+          --not-styled for markup without CSS or inline styles. HTML, Markdown, JSON, PNG,
+          and WebP are mutually exclusive formats. PNG and lossless WebP are purpose-built
+          diff infographics, not screenshots of HTML; --all controls their coverage too.
+          Text reports go to stdout. Image bytes go to stdout only when it is redirected;
+          at a terminal, use -o/--output. Image files use a same-directory temporary file
+          and atomic rename. Output refuses either input and existing files unless --force,
+          and does not create parent directories. Its extension never selects or changes the
+          format. Successful image file output leaves stdout empty; errors use stderr.
+          Terminal progress shows actual stages and elapsed time; ETA stays unknown until
+          measurable trials. It is cleared before final output and omitted when stderr is
+          redirected. Nothing is published or uploaded.
+
+        Image restrictions:
+          Image output cannot be combined with --pause/--no-pause, -i/--interactive,
+          -n/--non-interactive, --color/--no-color, or --styled/--not-styled.
+          diff --help needs no map paths.
 
         Options:
           --all                    Add baked blocks and serialized content fingerprints
@@ -113,15 +127,20 @@ public static class HelpText
           --not-styled             Omit CSS and inline styles (with --html)
           --markdown, --md         Write a Markdown report
           --json                   Write machine-readable JSON
+          --png                    Write a purpose-built PNG diff infographic
+          --webp                   Write a purpose-built lossless WebP diff infographic
+          -o, --output PATH        Atomically write image output to PATH
+          --force                  Replace an existing image output file
           -h, --help               Show this help
 
         Examples:
-          gbx-size-tree diff OLD_MAP.Map.Gbx NEW_MAP.Map.Gbx
-          gbx-size-tree diff --all OLD_MAP.Map.Gbx NEW_MAP.Map.Gbx
-          gbx-size-tree diff --no-color OLD_MAP.Map.Gbx NEW_MAP.Map.Gbx > diff.txt
-          gbx-size-tree diff --html --not-styled OLD_MAP.Map.Gbx NEW_MAP.Map.Gbx > diff.html
-          gbx-size-tree diff --md OLD_MAP.Map.Gbx NEW_MAP.Map.Gbx > diff.md
-          gbx-size-tree diff --json OLD_MAP.Map.Gbx NEW_MAP.Map.Gbx > diff.json
+          gbx-size-tree diff 'Sweet 2 burger v205.Map.Gbx' 'Sweet 2 burger v206.Map.Gbx'
+          gbx-size-tree diff --all 'Sweet 2 burger v205.Map.Gbx' 'Sweet 2 burger v206.Map.Gbx'
+          gbx-size-tree diff --html --not-styled Before.Map.Gbx After.Map.Gbx > diff.html
+          gbx-size-tree diff --md Before.Map.Gbx After.Map.Gbx > diff.md
+          gbx-size-tree diff --json Before.Map.Gbx After.Map.Gbx > diff.json
+          gbx-size-tree diff --png --all -o diff.png Before.Map.Gbx After.Map.Gbx
+          gbx-size-tree diff --webp Before.Map.Gbx After.Map.Gbx > diff.webp
         """;
 
     /// </summary>

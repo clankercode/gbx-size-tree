@@ -1,7 +1,8 @@
 # Local map comparison and Discord sharing
 
 Use `diff` when reviewing a saved map against an earlier version. The command is read-only: it
-compares two files and writes a report to stdout.
+compares two input files and writes a selected report or purpose-built infographic. It never
+publishes or uploads the result.
 
 ## Create a report safely
 
@@ -38,7 +39,49 @@ capture "$REPORT" gbx-size-tree diff --markdown -- "$OLD" "$NEW" || {
 
 The temporary file is on the same filesystem as the destination, so the successful rename is
 atomic. On failure, the helper returns the CLI's status, removes the temporary file, and leaves
-an existing report untouched. stderr remains visible for diagnostics.
+an existing report untouched. stderr remains visible for diagnostics. This wrapper is needed
+because shell `>` redirection opens and truncates the destination before `gbx-size-tree` runs;
+shell redirection by itself is not atomic.
+
+## Capture image output
+
+PNG and WebP are mutually exclusive with each other and with HTML, Markdown, and JSON. They
+are purpose-built diff infographics, not browser screenshots of HTML. `--all` applies to image
+coverage in the same way as the text reports. WebP is lossless.
+
+Prefer the image-specific `-o`/`--output` path for automation because the CLI itself performs
+temporary-file output followed by atomic rename:
+
+```sh
+PNG='./reports/v205-to-v206.png'
+
+gbx-size-tree diff --png --all --output "$PNG" -- "$OLD" "$NEW" || {
+    status=$?
+    printf 'gbx-size-tree failed with status %s; image was not replaced\n' "$status" >&2
+    exit "$status"
+}
+```
+
+The destination directory must already exist. The CLI refuses either input map as the output
+path, refuses an existing destination unless `--force` is present, and does not create parent
+directories. The explicit `--png` or `--webp` flag selects the encoding; a filename extension
+never infers or changes it. Successful image file output leaves stdout empty, while errors go
+to stderr.
+
+Binary image output can instead use stdout only when stdout is redirected:
+
+```sh
+capture './reports/v205-to-v206.webp' \
+    gbx-size-tree diff --webp -- "$OLD" "$NEW"
+```
+
+Do not omit `-o` at a terminal: the CLI refuses to emit binary bytes to an attached terminal.
+Image output also rejects pause, interactive/non-interactive, color, and HTML style flags.
+
+Terminal progress uses stderr only when stderr is an actual terminal. It shows actual stages
+and elapsed time; ETA stays unknown until measurable trials provide enough information. The
+display is cleared before final output and is disabled for redirected stderr, so the capture
+helper receives neither terminal control sequences nor progress lines.
 
 Open and review the Markdown report locally. To share it on Discord, attach the `.md` file
 manually to the intended message or thread. `gbx-size-tree` does not publish, upload, contact a

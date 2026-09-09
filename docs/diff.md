@@ -39,9 +39,9 @@ For changed embedded entries, the command may also report an outer-map marginal 
 - negative results are valid; and
 - a result can be unavailable because of the trial budget, container/body limits, an uncompressed body, ZIP constraints, or a measurement failure.
 
-The default trial budget is an implementation setting and may change; consult the report note rather than relying on a fixed number.
+The default trial budget is currently 256 removal trials per map. The report repeats the effective limit; entries beyond it are unavailable. The limit remains an implementation setting, so automation should consume the report note rather than assume every changed entry was measured.
 
-## Output and color
+## Output formats, color, and progress
 
 The default format is the human-readable console report. Console color is automatic: it is disabled when stdout is redirected, when `NO_COLOR` is non-empty, or when `TERM=dumb`. `--color` and `--no-color` explicitly override automatic console detection, including those environment checks.
 
@@ -52,43 +52,65 @@ Available output formats are:
 - `--html` — a complete HTML document, styled by default;
 - `--html --styled` — explicitly include the default stylesheet;
 - `--html --not-styled` — omit CSS and inline styles while retaining semantic HTML classes;
-- `--markdown` or `--md` — Markdown; and
-- `--json` — the machine-readable JSON report.
+- `--markdown` or `--md` — Markdown;
+- `--json` — the machine-readable JSON report;
+- `--png` — a purpose-built PNG diff infographic; and
+- `--webp` — the same purpose-built infographic encoded as lossless WebP.
 
-The format flags are mutually exclusive. `--styled` and `--not-styled` apply only to `diff --html` and cannot be combined. Reports are written to stdout. The command does not publish or upload them automatically.
+HTML, Markdown, JSON, PNG, and WebP are mutually exclusive output formats. PNG and WebP are rendered directly from the diff data; they are not screenshots of the HTML report. `--all` has the same meaning for every format, including both image formats. `--styled` and `--not-styled` apply only to `diff --html` and cannot be combined.
+
+Text reports are written to stdout. Binary image bytes are written to stdout only when stdout is redirected. If stdout is a terminal, image output requires `-o PATH` or `--output PATH`; this avoids writing binary data to a terminal. Image output also rejects `--pause`, `--no-pause`, `-i`/`--interactive`, `-n`/`--non-interactive`, `--color`, `--no-color`, `--styled`, and `--not-styled`. `gbx-size-tree diff --help` remains pathless and does not require `OLD_MAP` or `NEW_MAP`.
+
+For an image file destination, the selected `--png` or `--webp` flag determines the encoding; the filename extension never infers or changes it. The CLI writes a temporary file in the destination directory and atomically renames it into place after success. It refuses to write over either input map, refuses an existing destination unless `--force` is present, and does not create a missing parent directory. Successful file output leaves stdout empty. Errors go to stderr.
+
+While a diff runs in a terminal, transient progress is written only to terminal stderr. It reports actual stages and elapsed time. ETA remains unknown until measurable trials provide enough information. The progress display is cleared before the final report or image result and is omitted when stderr is redirected, so pipes and captured stdout/stderr are not polluted.
+
+The command does not publish or upload reports or images automatically.
 
 ## Local examples
 
-Compare two maps in the terminal:
+Compare two real map versions in the terminal. Keep the earlier map first:
 
 ```text
-gbx-size-tree diff OLD_MAP.Map.Gbx NEW_MAP.Map.Gbx
+gbx-size-tree diff 'Sweet 2 burger v205.Map.Gbx' 'Sweet 2 burger v206.Map.Gbx'
 ```
 
 Include baked blocks and serialized fingerprints:
 
 ```text
-gbx-size-tree diff --all OLD_MAP.Map.Gbx NEW_MAP.Map.Gbx
+gbx-size-tree diff --all 'Sweet 2 burger v205.Map.Gbx' 'Sweet 2 burger v206.Map.Gbx'
 ```
 
-Save plain console output safely to a local file:
+Save plain console output locally:
 
 ```text
-gbx-size-tree diff --no-color OLD_MAP.Map.Gbx NEW_MAP.Map.Gbx > diff.txt
+gbx-size-tree diff --no-color Before.Map.Gbx After.Map.Gbx > diff.txt
 ```
 
 Save styled or unstyled HTML locally:
 
 ```text
-gbx-size-tree diff --html OLD_MAP.Map.Gbx NEW_MAP.Map.Gbx > diff.html
-gbx-size-tree diff --html --not-styled OLD_MAP.Map.Gbx NEW_MAP.Map.Gbx > diff-plain.html
+gbx-size-tree diff --html Before.Map.Gbx After.Map.Gbx > diff.html
+gbx-size-tree diff --html --not-styled Before.Map.Gbx After.Map.Gbx > diff-plain.html
 ```
 
 Save Markdown or JSON locally:
 
 ```text
-gbx-size-tree diff --md OLD_MAP.Map.Gbx NEW_MAP.Map.Gbx > diff.md
-gbx-size-tree diff --json OLD_MAP.Map.Gbx NEW_MAP.Map.Gbx > diff.json
+gbx-size-tree diff --md Before.Map.Gbx After.Map.Gbx > diff.md
+gbx-size-tree diff --json Before.Map.Gbx After.Map.Gbx > diff.json
 ```
 
-These examples use shell redirection and may replace an existing destination file. Choose a new local filename when existing reports must be preserved.
+Atomically create a PNG infographic, including `--all` coverage:
+
+```text
+gbx-size-tree diff --png --all -o diff.png Before.Map.Gbx After.Map.Gbx
+```
+
+Write lossless WebP bytes to redirected stdout:
+
+```text
+gbx-size-tree diff --webp Before.Map.Gbx After.Map.Gbx > diff.webp
+```
+
+The `-o` image example uses the CLI's temporary-file-and-rename path. The shell-redirection examples do not: the shell opens and truncates the destination before the CLI succeeds. Use the capture helper in `docs/automation.md` when an existing redirected report must survive a failed command. All destinations are local; no example uploads anything.
