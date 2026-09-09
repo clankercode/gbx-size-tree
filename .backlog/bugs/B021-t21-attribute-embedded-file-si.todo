@@ -12,7 +12,10 @@ id: B021
 priority: high
 started_at: "2026-09-09T06:26:10Z"
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T21
+    - source-pending
 title: 'T21: Attribute embedded file size to ACTUAL outer-compressed map size / map file limit contribution, not just ZIP compressed size.'
 updated_at: "2026-09-09T07:39:00Z"
 ---
