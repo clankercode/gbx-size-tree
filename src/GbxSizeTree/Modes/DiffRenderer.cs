@@ -11,7 +11,7 @@ public static class DiffRenderer
 {
     private static readonly EmbeddedSizePresentation EmbeddedSizes = new();
 
-    private const string HtmlStyles = "body{font:14px system-ui;margin:24px;color:#18212b;background:#fafbfc}h2{overflow-wrap:anywhere}.summary,.metadata{padding:12px 16px;border:1px solid #d5dce3;border-radius:10px;background:#fff}.warning{color:#7a2e0b}section{overflow-x:auto}table{border-collapse:collapse;margin:12px 0 28px;font-variant-numeric:tabular-nums}th,td{padding:8px 12px;text-align:left;white-space:nowrap}th{background:#e9eef3;border-bottom:1px solid #d5dce3}tbody+tbody tr:first-child td{border-top:1px solid #aab8c5;padding-top:16px}tbody tr:nth-child(even){background:#f0f4f7}td:first-child{font-weight:bold}.added td:first-child{color:#137333}.removed td:first-child{color:#b3261e}.changed td:first-child{color:#946000}td:nth-child(2){white-space:normal;min-width:240px;overflow-wrap:anywhere}.color-chip{display:inline-block;min-width:3.5em;padding:.18em .65em;border-radius:999px;text-align:center;line-height:1.25;font-weight:600;box-sizing:border-box}@media(max-width:600px){body{margin:12px}.summary,.metadata{padding:10px 12px}}";
+    private const string HtmlStyles = "body{font:14px system-ui;margin:24px;color:#18212b;background:#fafbfc}h2{overflow-wrap:anywhere}.summary,.metadata{padding:12px 16px;border:1px solid #d5dce3;border-radius:10px;background:#fff}.warning{color:#7a2e0b}.table-scroll{overflow-x:auto}table{border-collapse:collapse;margin:12px 0 28px;font-variant-numeric:tabular-nums}th,td{padding:8px 12px;text-align:left;white-space:nowrap}th{background:#e9eef3;border-bottom:1px solid #d5dce3}tbody+tbody tr:first-child td{border-top:1px solid #aab8c5;padding-top:16px}tbody tr:nth-child(even){background:#f0f4f7}td:first-child{font-weight:bold}.added td:first-child{color:#137333}.removed td:first-child{color:#b3261e}.changed td:first-child{color:#946000}td:nth-child(2){white-space:normal;min-width:240px;overflow-wrap:anywhere}.color-chip{display:inline-block;min-width:3.5em;padding:.18em .65em;border-radius:999px;text-align:center;line-height:1.25;font-weight:600;box-sizing:border-box}@media(max-width:600px){body{margin:12px}.summary,.metadata{padding:10px 12px}}";
 
     public static bool ShouldUseColor(bool? requested, bool redirected, string? terminal, bool noColor) =>
         requested ?? (!redirected && !noColor && !string.Equals(terminal, "dumb", StringComparison.OrdinalIgnoreCase));
@@ -147,47 +147,123 @@ public static class DiffRenderer
         var color = styled && (colorOption ?? string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NO_COLOR")));
         var b = new StringBuilder("<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Map diff</title>");
         if (styled) b.Append($"<style>{HtmlStyles}</style>");
-        b.Append("</head><body>");
-        b.Append($"<div class=\"summary\"><h2>Diff: <code>{Html(oldPath)}</code> → <code>{Html(newPath)}</code></h2><p>Size: {report.LeftBytes:N0} → {report.RightBytes:N0} bytes</p></div>");
-        foreach (var warning in report.Warnings)
-            b.Append($"<p class=\"warning\"><strong>Warning:</strong> {Html(warning)}</p>");
-        foreach (var table in Tables(report).Where(t => t.Rows.Count > 0))
+        b.Append("</head><body><main id=\"map-diff\" class=\"diff-report\">");
+        b.Append($"<header id=\"diff-summary\" class=\"summary diff-summary\"><h2 id=\"diff-title\" class=\"diff-title\">Diff: <code class=\"old-path\">{Html(oldPath)}</code> → <code class=\"new-path\">{Html(newPath)}</code></h2><p id=\"diff-size\" class=\"diff-size\">Size: {report.LeftBytes:N0} → {report.RightBytes:N0} bytes</p></header>");
+        if (report.Warnings.Count > 0)
         {
-            b.Append($"<h3>{Html(table.Title)} ({Html(Summary(table.Rows))})</h3>");
-            if (table.Note is not null) b.Append($"<p>{Html(table.Note)}</p>");
-            b.Append("<section><table><thead><tr>");
-            foreach (var column in table.Columns) b.Append($"<th>{Html(column)}</th>");
-            b.Append("</tr></thead><tbody>");
-            string? previousGroup = null;
-            foreach (var row in table.Rows)
-            {
-                if (previousGroup is not null && previousGroup != row.Group) b.Append("</tbody><tbody>");
-                previousGroup = row.Group;
-                var rowClass = row.Cells[0] == "+" ? "added" : row.Cells[0] == "-" ? "removed" : "changed";
-                b.Append($"<tr class=\"{rowClass}\">");
-                for (var i = 0; i < row.Cells.Length; i++)
-                {
-                    var cell = table.Columns[i] == "Color" && row.Color is { } change
-                        ? ColorTransition(change, html: true, color)
-                        : Html(row.Cells[i]);
-                    b.Append($"<td>{cell}</td>");
-                }
-                b.Append("</tr>");
-            }
-            b.Append("</tbody></table></section>");
+            b.Append("<aside id=\"diff-warnings\" class=\"warnings diff-warnings\" aria-label=\"Warnings\">");
+            for (var i = 0; i < report.Warnings.Count; i++)
+                b.Append($"<p id=\"warning-{i}\" class=\"warning\"><strong>Warning:</strong> {Html(report.Warnings[i])}</p>");
+            b.Append("</aside>");
         }
+        foreach (var table in Tables(report).Where(t => t.Rows.Count > 0))
+            AppendHtmlTable(b, table, color);
         var metadata = Metadata(report).ToArray();
         if (metadata.Length > 0)
         {
-            b.Append("<div class=\"metadata\"><h3>Metadata</h3>");
-            foreach (var (label, change) in metadata)
-                b.Append($"<p>~ <strong>{Html(label)}</strong>: {Html(change.Left ?? "removed")} → {Html(change.Right ?? "added")}</p>");
-            b.Append("</div>");
+            b.Append("<section id=\"diff-metadata\" class=\"metadata diff-metadata\" aria-labelledby=\"metadata-heading\"><h3 id=\"metadata-heading\" class=\"metadata-heading\">Metadata</h3>");
+            for (var i = 0; i < metadata.Length; i++)
+            {
+                var (label, change) = metadata[i];
+                b.Append($"<p id=\"metadata-row-{i}\" class=\"metadata-row changed\"><span class=\"change-marker\">~</span> <strong id=\"metadata-row-{i}-label\" class=\"metadata-label\">{Html(label)}</strong>: <span id=\"metadata-row-{i}-value\" class=\"metadata-value\">{Html(change.Left ?? "removed")} → {Html(change.Right ?? "added")}</span></p>");
+            }
+            b.Append("</section>");
         }
-        if (IsEmpty(report)) b.Append("<p>No differences in the compared fields.</p>");
-        b.Append("</body></html>");
+        if (IsEmpty(report)) b.Append("<p id=\"diff-empty-state\" class=\"empty-state\">No differences in the compared fields.</p>");
+        b.Append("</main></body></html>");
         return b.ToString();
     }
+
+    private static void AppendHtmlTable(StringBuilder b, DiffTable table, bool color)
+    {
+        var category = HtmlCategoryIdentifier(table.Title);
+        var categoryId = $"category-{category}";
+        var tableId = $"table-{category}";
+        b.Append($"<section id=\"{categoryId}\" class=\"diff-category category-{category}\" aria-labelledby=\"{categoryId}-heading\">");
+        b.Append($"<h3 id=\"{categoryId}-heading\" class=\"category-heading\">{Html(table.Title)} ({Html(Summary(table.Rows))})</h3>");
+        if (table.Note is not null)
+            b.Append($"<p id=\"{categoryId}-note\" class=\"category-note\">{Html(table.Note)}</p>");
+        b.Append($"<div id=\"{categoryId}-scroll\" class=\"table-scroll\"><table id=\"{tableId}\" class=\"diff-table category-table\" aria-labelledby=\"{categoryId}-heading\"");
+        if (table.Note is not null) b.Append($" aria-describedby=\"{categoryId}-note\"");
+        b.Append($"><thead id=\"{tableId}-head\" class=\"table-header\"><tr id=\"{tableId}-header-row\" class=\"table-header-row\">");
+        for (var i = 0; i < table.Columns.Length; i++)
+        {
+            var column = HtmlColumnIdentifier(table.Columns[i]);
+            b.Append($"<th id=\"{tableId}-header-{i}-{column}\" class=\"table-header-cell column-{column}\" scope=\"col\">{Html(table.Columns[i])}</th>");
+        }
+        b.Append("</tr></thead>");
+        string? previousGroup = null;
+        var groupIndex = -1;
+        for (var rowIndex = 0; rowIndex < table.Rows.Count; rowIndex++)
+        {
+            var row = table.Rows[rowIndex];
+            if (rowIndex == 0 || previousGroup != row.Group)
+            {
+                if (rowIndex > 0) b.Append("</tbody>");
+                groupIndex++;
+                b.Append($"<tbody id=\"{tableId}-group-{groupIndex}\" class=\"row-group\">");
+            }
+            previousGroup = row.Group;
+            var rowClass = row.Cells[0] == "+" ? "added" : row.Cells[0] == "-" ? "removed" : "changed";
+            b.Append($"<tr id=\"{tableId}-row-{rowIndex}\" class=\"diff-row {rowClass}\">");
+            for (var i = 0; i < row.Cells.Length; i++)
+            {
+                var column = HtmlColumnIdentifier(table.Columns[i]);
+                var cell = table.Columns[i] == "Color" && row.Color is { } change
+                    ? ColorTransition(change, html: true, color)
+                    : Html(row.Cells[i]);
+                var markerClass = i == 0 ? " marker-cell" : "";
+                b.Append($"<td id=\"{tableId}-row-{rowIndex}-cell-{i}\" class=\"diff-cell{markerClass} column-{column}\" headers=\"{tableId}-header-{i}-{column}\">{cell}</td>");
+            }
+            b.Append("</tr>");
+        }
+        b.Append("</tbody></table></div></section>");
+    }
+
+    private static string HtmlCategoryIdentifier(string title) => title switch
+    {
+        "Embedded files — added/removed" => "embedded-added-removed",
+        "Embedded files — modified" => "embedded-modified",
+        "Embedded outer-map contribution — non-additive LZO marginal bytes" => "embedded-contributions",
+        "Placed items" => "placed-items",
+        "Blocks" => "blocks",
+        "Baked blocks" => "baked-blocks",
+        "Map metadata" => "map-metadata",
+        "Chunks" => "chunks",
+        _ => throw new ArgumentOutOfRangeException(nameof(title), title, "Unknown HTML diff category."),
+    };
+
+    private static string HtmlColumnIdentifier(string column) => column switch
+    {
+        "Mark" => "mark",
+        "Name / path" => "name-path",
+        "Name" => "name",
+        "Field" => "field",
+        "Left" => "left",
+        "Right" => "right",
+        "Size" => "size",
+        "Position" => "position",
+        "Pos" => "position",
+        "Coord" => "coordinate",
+        "Rotation" => "rotation",
+        "Direction" => "direction",
+        "Variant" => "variant",
+        "Subvariant" => "subvariant",
+        "Mode" => "mode",
+        "Ground" => "ground",
+        "Color" => "color",
+        "Pivot" => "pivot",
+        "Animation" => "animation",
+        "Lightmap" => "lightmap",
+        "Flags" => "flags",
+        "What changed" => "change-details",
+        "Left marginal bytes" => "left-marginal-bytes",
+        "Right marginal bytes" => "right-marginal-bytes",
+        "ZIP bytes" => "zip-bytes",
+        "Raw bytes" => "raw-bytes",
+        "ZIP / raw" => "zip-raw-ratio",
+        _ => throw new ArgumentOutOfRangeException(nameof(column), column, "Unknown HTML diff column."),
+    };
 
     private static IEnumerable<DiffTable> Tables(DiffReport report)
     {
