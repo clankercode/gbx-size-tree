@@ -9,10 +9,10 @@ estimate_hours: 1
 id: B022
 priority: high
 started_at: null
-status: pending
+status: in_progress
 tags: []
 title: 'T22: Brainstorm/select readable embedded-size presentation conveying change and compression quality, with a seam for trying alternatives'
-updated_at: "2026-09-09T06:13:09Z"
+updated_at: "2026-09-09T06:13:51Z"
 ---
 ## Source
 Chat task: T22
