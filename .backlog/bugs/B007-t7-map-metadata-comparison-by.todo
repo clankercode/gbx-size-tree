@@ -8,10 +8,10 @@ estimate_hours: 1
 id: B007
 priority: high
 started_at: null
-status: pending
+status: in_progress
 tags: []
 title: 'T7: Map metadata comparison by default'
-updated_at: "2026-09-09T06:13:07Z"
+updated_at: "2026-09-09T06:13:48Z"
 ---
 ## Source
 Chat task: T7
