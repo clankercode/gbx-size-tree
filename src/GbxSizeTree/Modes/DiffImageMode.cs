@@ -23,10 +23,13 @@ public static class DiffImageMode
 
     internal static int RunValidated(CliOptions options)
     {
-        var report = DiffMode.CompareFiles(
-            options.InputPaths[0],
-            options.InputPaths[1],
-            options.CompareAll);
+        DiffReport report;
+        using (var progress = TerminalProgress.Create())
+            report = DiffMode.CompareFiles(
+                options.InputPaths[0],
+                options.InputPaths[1],
+                options.CompareAll,
+                progress: progress is null ? null : progress.Report);
         using var image = DiffInfographic.Render(
             report,
             options.InputPaths[0],
