@@ -11,3 +11,4 @@ bugs:
     - file: B010-t10-embedded-files-first-place.todo
     - file: B011-t11-attractive-diff-markers-se.todo
     - file: B012-t12-terminal-aware-color-plain.todo
+    - file: B013-t13-compact-placed-item-paths.todo
