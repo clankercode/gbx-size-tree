@@ -35,6 +35,12 @@ public sealed record EmbeddedFileContributionMeasurement(
     IReadOnlyList<EmbeddedFileContribution> Entries,
     string? UnavailableReason);
 
+/// <summary>Reports bounded removal-trial work synchronously without depending on a UI.</summary>
+public sealed record EmbeddedFileContributionProgress(
+    string Path,
+    int CompletedTrials,
+    int TotalTrials);
+
 /// <summary>Measures context-dependent embedded-file removal savings without modifying the source map.</summary>
 public sealed class EmbeddedFileContributionMeasurer
 {
@@ -55,10 +61,12 @@ public sealed class EmbeddedFileContributionMeasurer
         byte[] originalFile,
         IReadOnlyCollection<string> requestedPaths,
         EmbeddedFileContributionOptions? options = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Action<EmbeddedFileContributionProgress>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(originalFile);
         ArgumentNullException.ThrowIfNull(requestedPaths);
+        progress = BestEffort(progress);
         options ??= new();
         ArgumentOutOfRangeException.ThrowIfNegative(options.MaxTrials);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(options.MaxBodyBytes);
@@ -85,6 +93,9 @@ public sealed class EmbeddedFileContributionMeasurer
         long? baseline = null;
         string? baselineFailure = null;
         var trials = 0;
+        var completedTrials = 0;
+        var totalTrials = Math.Min(options.MaxTrials, paths.Count(path =>
+            plan.Entries.Any(entry => string.Equals(entry.Path, path, StringComparison.Ordinal))));
         foreach (var path in paths)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -107,6 +118,7 @@ public sealed class EmbeddedFileContributionMeasurer
             }
             else
             {
+                progress?.Invoke(new(path, completedTrials, totalTrials));
                 try
                 {
                     trials++;
@@ -131,10 +143,28 @@ public sealed class EmbeddedFileContributionMeasurer
                 {
                     reason = ex.Message;
                 }
+                finally
+                {
+                    completedTrials++;
+                    progress?.Invoke(new(path, completedTrials, totalTrials));
+                }
             }
             results.Add(new(path, entry.ZipCompressedBytes, entry.ZipRawBytes, marginal, reason));
         }
         return new(baseline, results, baselineFailure);
+    }
+
+    private static Action<EmbeddedFileContributionProgress>? BestEffort(
+        Action<EmbeddedFileContributionProgress>? progress)
+    {
+        if (progress is null) return null;
+        var failed = false;
+        return value =>
+        {
+            if (failed) return;
+            try { progress(value); }
+            catch { failed = true; }
+        };
     }
 
     private long Compress(byte[] body)

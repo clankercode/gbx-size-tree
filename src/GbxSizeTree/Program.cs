@@ -25,6 +25,9 @@ var version = Assembly.GetExecutingAssembly()
     .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "dev";
 
 var (options, parseError) = ArgParser.Parse(args);
+var imageOutputRequested = options is not null
+    ? options.Format is CliOutputFormat.Png or CliOutputFormat.Webp
+    : LaunchModeDetector.RawImageOutputRequested(args);
 var probe = LaunchModeDetector.ProbeCurrent();
 var launchKind = LaunchModeDetector.Detect(probe);
 var exitCode = ExitCodes.Ok;
@@ -58,7 +61,9 @@ try
     {
         if (options.Diff)
         {
-            exitCode = DiffMode.Run(options.InputPaths, options.Format, options.CompareAll, options.Color, options.Styled);
+            exitCode = options.Format is CliOutputFormat.Png or CliOutputFormat.Webp
+                ? DiffImageMode.Run(options)
+                : DiffMode.Run(options.InputPaths, options.Format, options.CompareAll, options.Color, options.Styled);
         }
         else
         {
@@ -111,7 +116,9 @@ try
 }
 catch (Exception ex)
 {
-    exitCode = ExitCodes.FromException(ex);
+    exitCode = ex is GbxSizeTree.Cli.Output.DiffImageOutputException imageOutputException
+        ? imageOutputException.ExitCode
+        : ExitCodes.FromException(ex);
     if (options?.Json == true)
     {
         GbxSizeTree.Cli.Output.JsonReportWriter.WriteError(Console.Out, exitCode, ex.Message);
@@ -124,7 +131,10 @@ catch (Exception ex)
 }
 finally
 {
-    PauseOnExit.PauseIfNeeded(options?.Pause, launchKind);
+    if (!imageOutputRequested)
+    {
+        PauseOnExit.PauseIfNeeded(options?.Pause, launchKind);
+    }
 }
 
 return exitCode;
