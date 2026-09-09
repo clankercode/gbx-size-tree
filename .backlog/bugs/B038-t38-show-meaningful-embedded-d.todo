@@ -13,7 +13,10 @@ id: B038
 priority: high
 started_at: "2026-09-09T07:22:01Z"
 status: in_progress
-tags: []
+tags:
+    - chat-astra
+    - T38
+    - source-inprog
 title: 'T38: Show meaningful embedded deltas and explain what changed (size, compression, content, other known properties)'
 updated_at: "2026-09-09T07:22:01Z"
 ---
