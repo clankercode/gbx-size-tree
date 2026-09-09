@@ -269,7 +269,7 @@ public sealed class DiffModeTests
     }
 
     [Fact]
-    public void CompareFiles_DefaultBudgetMeasuresEightAndKeepsRemainingZipSizes()
+    public void CompareFiles_DefaultBudgetMeasuresTenAndExplicitLowerCapIsPreserved()
     {
         var leftPath = Path.GetTempFileName();
         var rightPath = Path.GetTempFileName();
@@ -280,8 +280,19 @@ public sealed class DiffModeTests
                 .Select(i => ($"asset{i:D2}.bin", $"content{i}")).ToArray()), rightPath);
             var report = DiffMode.CompareFiles(leftPath, rightPath);
             Assert.Equal(10, report.EmbeddedContributions.Count);
-            Assert.All(report.EmbeddedContributions.Take(8), c => Assert.NotNull(c.Right!.MarginalCompressedBodyBytes));
-            Assert.All(report.EmbeddedContributions.Skip(8), c =>
+            Assert.All(report.EmbeddedContributions, c =>
+            {
+                Assert.NotNull(c.Right!.MarginalCompressedBodyBytes);
+                Assert.Null(c.Right.UnavailableReason);
+                Assert.True(c.Right.ZipRawBytes > 0);
+                Assert.True(c.Right.ZipCompressedBytes > 0);
+            });
+            Assert.Contains("Default: at most 256 removal trials per map", DiffRenderer.RenderHtml(report, leftPath, rightPath));
+
+            var capped = DiffMode.CompareFiles(leftPath, rightPath,
+                contributionOptions: new() { MaxTrials = 8 });
+            Assert.All(capped.EmbeddedContributions.Take(8), c => Assert.NotNull(c.Right!.MarginalCompressedBodyBytes));
+            Assert.All(capped.EmbeddedContributions.Skip(8), c =>
             {
                 Assert.Null(c.Right!.MarginalCompressedBodyBytes);
                 Assert.Contains("budget", c.Right.UnavailableReason!);

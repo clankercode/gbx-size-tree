@@ -208,7 +208,7 @@ public static class DiffRenderer
                         Group: Marker(c.Left, c.Right) + DirectoryContext((c.Right ?? c.Left)!.Path));
                 }).ToArray(),
             EmbeddedSizes.FormatOuterNote(report.LeftContributionBaselineBytes, report.RightContributionBaselineBytes) +
-            " Default: at most 8 removal trials per map; remaining entries are unavailable.");
+            $" Default: at most {new EmbeddedFileContributionOptions().MaxTrials} removal trials per map; remaining entries are unavailable.");
         yield return ItemTable(report.Items);
         yield return BlockTable("Blocks", report.Blocks);
         yield return BlockTable("Baked blocks", report.BakedBlocks, showGridPosition: true);
