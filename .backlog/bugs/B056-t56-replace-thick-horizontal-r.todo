@@ -12,10 +12,7 @@ id: B056
 priority: high
 started_at: null
 status: pending
-tags:
-    - chat-astra
-    - T56
-    - source-pending
+tags: []
 title: 'T56: Replace thick horizontal rules between every CLI entry with rules between contextually appropriate row groups'
 updated_at: "2026-09-09T06:13:12Z"
 ---
@@ -33,3 +30,5 @@ Outstanding work; not implemented by this ingestion.
 
 ## Source dependencies
 T14, T17, T18, T37
+
+Decision and sequencing: Presentation lane after B037 closes. Decision: group embedded rows by change kind and path context; spatial rows by deterministic physical proximity while keeping coordinate ties together; separators only at group boundaries, not each entry. Cover distant/near/identical coordinate cases.
