@@ -9,7 +9,10 @@ id: B012
 priority: high
 started_at: null
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T12
+    - source-done
 title: 'T12: Terminal-aware color, plain redirected/dumb/NO_COLOR output and explicit --color/--no-color overrides.'
 updated_at: "2026-09-09T06:13:49Z"
 ---
