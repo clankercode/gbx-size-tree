@@ -13,7 +13,10 @@ id: B035
 priority: high
 started_at: "2026-09-09T07:22:01Z"
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T35
+    - source-pending
 title: 'T35: Stop printing item scale and remove scale from Key(...)'
 updated_at: "2026-09-09T08:22:46Z"
 ---
