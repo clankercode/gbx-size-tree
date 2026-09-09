@@ -1,0 +1,29 @@
+---
+complexity: medium
+created_at: "2026-09-09T06:13:07Z"
+depends_on: []
+estimate_hours: 1
+id: B008
+priority: high
+status: pending
+tags:
+    - chat-astra
+    - T8
+    - source-done
+title: 'T8: diff --help works without paths.'
+updated_at: "2026-09-09T06:13:07Z"
+---
+## Source
+Chat task: T8
+Source status: done
+Inventory: /tmp/gbx-size-tree-astra-chat-tasks.md
+Session: 01a08304-d48f-7631-913b-60e05abe13f3
+
+## Scope and acceptance criteria
+diff --help works without paths.
+
+## State at ingestion
+Historical implementation verified before ingestion.
+
+## Source dependencies
+T1
