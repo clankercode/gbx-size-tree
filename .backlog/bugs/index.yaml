@@ -26,3 +26,4 @@ bugs:
     - file: B025-t25-adapt-pirfl-and-bl-fix-man.todo
     - file: B026-t26-before-new-work-commit-pre.todo
     - file: B027-t27-worktree-based-delegation.todo
+    - file: B028-t28-review-fix-loops-and-regre.todo
