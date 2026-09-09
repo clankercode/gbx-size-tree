@@ -10,3 +10,4 @@ bugs:
     - file: B009-t9-help-explicitly-explains-ol.todo
     - file: B010-t10-embedded-files-first-place.todo
     - file: B011-t11-attractive-diff-markers-se.todo
+    - file: B012-t12-terminal-aware-color-plain.todo
