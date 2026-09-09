@@ -39,3 +39,4 @@ bugs:
     - file: B038-t38-show-meaningful-embedded-d.todo
     - file: B039-t39-deep-diff-embedded-items-r.todo
     - file: B040-t40-diff-embedded-map-metadata.todo
+    - file: B041-t41-html-supports-styled-and-n.todo
