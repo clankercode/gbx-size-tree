@@ -11,4 +11,10 @@ public static class ExitCodes
     public const int ValidationFailed = 3;
     public const int IoError = 4;
     public const int Internal = 5;
+
+    public static int FromException(Exception exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        return exception is IOException ? IoError : Internal;
+    }
 }
