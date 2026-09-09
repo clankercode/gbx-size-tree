@@ -11,7 +11,10 @@ id: B040
 priority: high
 started_at: "2026-09-09T07:39:27Z"
 status: in_progress
-tags: []
+tags:
+    - chat-astra
+    - T40
+    - source-pending
 title: 'T40: Diff embedded map metadata by default, beyond existing top-level UID/name/author fields.'
 updated_at: "2026-09-09T07:39:27Z"
 ---
