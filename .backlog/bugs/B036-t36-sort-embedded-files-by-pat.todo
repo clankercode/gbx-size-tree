@@ -9,7 +9,10 @@ id: B036
 priority: high
 started_at: null
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T36
+    - source-done
 title: 'T36: Sort embedded files by path name'
 updated_at: "2026-09-09T06:13:54Z"
 ---
