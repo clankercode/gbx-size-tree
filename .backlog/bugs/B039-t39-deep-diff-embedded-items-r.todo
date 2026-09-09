@@ -1,15 +1,16 @@
 ---
+completed_at: null
 complexity: medium
 created_at: "2026-09-09T06:13:10Z"
-depends_on: []
+depends_on:
+    - B003
+    - B038
 estimate_hours: 1
 id: B039
 priority: high
+started_at: null
 status: pending
-tags:
-    - chat-astra
-    - T39
-    - source-pending
+tags: []
 title: 'T39: Deep diff embedded items: readable nested property paths e.g'
 updated_at: "2026-09-09T06:13:10Z"
 ---
