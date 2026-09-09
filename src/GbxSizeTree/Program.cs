@@ -111,16 +111,16 @@ try
 }
 catch (Exception ex)
 {
+    exitCode = ExitCodes.FromException(ex);
     if (options?.Json == true)
     {
-        GbxSizeTree.Cli.Output.JsonReportWriter.WriteError(Console.Out, ExitCodes.Internal, ex.Message);
+        GbxSizeTree.Cli.Output.JsonReportWriter.WriteError(Console.Out, exitCode, ex.Message);
     }
     Console.Error.WriteLine($"error: {ex.Message}");
     if (options?.Verbose == true)
     {
         Console.Error.WriteLine(ex.ToString());
     }
-    exitCode = ex is FileNotFoundException or IOException ? ExitCodes.IoError : ExitCodes.Internal;
 }
 finally
 {

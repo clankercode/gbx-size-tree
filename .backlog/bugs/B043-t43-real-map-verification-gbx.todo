@@ -37,3 +37,5 @@ Outstanding work; not implemented by this ingestion.
 T37, T38, T39, T40
 
 Decision and sequencing: Verification lane after B037 B038 B039 B040 close. Both exact user-supplied v205.Map.gbx and v206.Map.Gbx exist under ~/tm-docs/Maps/SB2. Exercise these exact maps, self-diff, reversed diff and all formats; keep fixture paths optional for CI.
+
+Parent review checkpoint: real evidence and560-test gate passed. Follow-up strengthens exact fixture SHA256 authentication, --all reverse regression and precise reproduction docs before merge. B063 JSON/process code mismatch fixed, reviewed,560 tests passed and merged/closed.
