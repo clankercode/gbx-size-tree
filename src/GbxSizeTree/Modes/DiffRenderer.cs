@@ -107,18 +107,22 @@ public static class DiffRenderer
 
     private static IEnumerable<DiffTable> Tables(DiffReport report)
     {
-        yield return new("Embedded files", ["Mark", "Name / path", "Compressed", "Uncompressed", "Ratio"],
-            report.Embedded.OrderBy(c => (c.Right ?? c.Left)?.Path, StringComparer.Ordinal).Select(c => new Row(
-                [Marker(c.Left, c.Right), Transition(c, x => DisplayPath(x.Path), onlyDifferent: true),
-                    Transition(c, x => x.Compressed.ToString(CultureInfo.InvariantCulture)),
-                    Transition(c, x => x.Uncompressed.ToString(CultureInfo.InvariantCulture)),
-                    Transition(c, x => x.Uncompressed == 0 ? "--" : x.Ratio.ToString("P2", CultureInfo.InvariantCulture))])).ToArray());
+        yield return EmbeddedTable("Embedded files — added/removed", report.Embedded.Where(c => c.Left is null || c.Right is null));
+        yield return EmbeddedTable("Embedded files — modified", report.Embedded.Where(c => c.Left is not null && c.Right is not null));
         yield return ItemTable(report.Items);
         yield return BlockTable("Blocks", report.Blocks);
         yield return BlockTable("Baked blocks", report.BakedBlocks);
         yield return new("Chunks", ["Mark", "Name", "Size"], report.Chunks.OrderBy(c => c.Key, StringComparer.Ordinal)
             .Select(c => new Row([Marker(c.Left, c.Right), c.Key ?? "chunk", c.Left is not null && c.Right is not null ? $"{c.Left} → {c.Right}" : c.Left ?? c.Right ?? "--"])).ToArray());
     }
+
+    private static DiffTable EmbeddedTable(string title, IEnumerable<ValueChange<EmbeddedSnapshot>> changes) => new(
+        title, ["Mark", "Name / path", "Compressed", "Uncompressed", "Ratio"],
+        changes.OrderBy(c => (c.Right ?? c.Left)?.Path, StringComparer.Ordinal).Select(c => new Row(
+            [Marker(c.Left, c.Right), Transition(c, x => DisplayPath(x.Path), onlyDifferent: true),
+                Transition(c, x => x.Compressed.ToString(CultureInfo.InvariantCulture)),
+                Transition(c, x => x.Uncompressed.ToString(CultureInfo.InvariantCulture)),
+                Transition(c, x => x.Uncompressed == 0 ? "--" : x.Ratio.ToString("P2", CultureInfo.InvariantCulture))])).ToArray());
 
     private static DiffTable ItemTable(IReadOnlyList<ValueChange<ItemSnapshot>> changes)
     {

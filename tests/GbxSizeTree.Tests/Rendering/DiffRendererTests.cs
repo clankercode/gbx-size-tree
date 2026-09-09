@@ -279,6 +279,39 @@ public sealed class DiffRendererTests
         }
     }
 
+    [Fact]
+    public void Embedded_GroupsAddedRemovedBeforeModifiedAndSortsEachByOrdinalPath()
+    {
+        var report = Empty() with
+        {
+            Embedded = [
+                new(new("bModified", "old", 1, 2), new("bModified", "new", 2, 3)),
+                new(null, new("zAdded", "hash", 1, 2)),
+                new(new("aModified", "old", 1, 2), new("aModified", "new", 2, 3)),
+                new(new("BRemoved", "hash", 1, 2), null),
+            ],
+            Items = [new(null, ItemSnapshot.From(new CGameCtnAnchoredObject()))],
+        };
+        foreach (var output in Outputs(report))
+        {
+            var names = new[] { "Embedded files — added/removed", "BRemoved", "zAdded", "Embedded files — modified", "aModified", "bModified", "Placed items" };
+            var offset = 0;
+            foreach (var name in names)
+            {
+                var index = output.IndexOf(name, offset, StringComparison.Ordinal);
+                Assert.True(index >= offset, $"Missing or out-of-order group/row: {name}");
+                offset = index + name.Length;
+            }
+        }
+        Assert.Equal(DiffRenderer.RenderHtml(report, "left", "right"),
+            DiffRenderer.RenderHtml(report with { Embedded = report.Embedded.Reverse().ToArray() }, "left", "right"));
+        foreach (var output in Outputs(report with { Embedded = [report.Embedded[0]] }))
+        {
+            Assert.Contains("Embedded files — modified", output);
+            Assert.DoesNotContain("Embedded files — added/removed", output);
+        }
+    }
+
     private static IEnumerable<string> Outputs(DiffReport report)
     {
         var console = new TestConsole().Width(500);
