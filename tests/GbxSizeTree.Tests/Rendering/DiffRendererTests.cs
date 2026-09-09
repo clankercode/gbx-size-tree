@@ -478,6 +478,7 @@ public sealed class DiffRendererTests
         var blocks = labels.Select((label, i) => new ValueChange<BlockSnapshot>(null, grid with
         {
             Name = $"grid{i}<img src=x onerror=alert(1)>", Color = label, IsGhost = i == 1,
+            PhysicalPosition = i < 4 ? new(i, 0, 0) : new(1000 + i, 0, 0),
         })).Append(new(null, grid with
         {
             Name = "freeBlock", IsFree = true, PhysicalPosition = new(1.234567, 2, 3), Rotation = new(.123456, 0, 0),
@@ -490,13 +491,18 @@ public sealed class DiffRendererTests
             Items = labels.Select((label, i) => new ValueChange<ItemSnapshot>(null, item with
             {
                 Path = $"item{i}[red]<script>.Item.Gbx", Color = label, AnimationPhase = i.ToString(),
+                PhysicalPosition = i < 4 ? new(i, 0, 0) : new(1000 + i, 0, 0),
             })).Append(new(item with { Path = "transition", Color = "Blue" }, item with { Path = "transition", Color = "Red" })).ToArray(),
             Blocks = blocks, BakedBlocks = blocks,
-            Chunks = [new("10 bytes", "20 bytes", "chunk<script>" )],
+            Chunks = [new("10 bytes", "20 bytes", "body:a"), new("20 bytes", "30 bytes", "body:b"), new("10 bytes", "20 bytes", "header:c<script>")],
+            MetadataChanges = [new("display.comments", new(Text: "old"), new(Text: "new")),
+                new("display.style", null, new(Text: "Race")), new("validation.validated", new(Boolean: false), new(Boolean: true))],
+            EmbeddedContributions = [new(null, new("dir/a", 10, 20, 5, null)), new(null, new("dir/b", 10, 20, -2, null)),
+                new(new("else/c", 20, 30, null, "not measured"), new("else/c", 21, 31, 2, null))],
             MapName = new("old", "<script>alert(1)</script>"),
         };
         var html = DiffRenderer.RenderHtml(report, "old<script>.Map.Gbx", "new[red].Map.Gbx", colorOption: true);
-        Assert.Equal(6, html.Split("<table>", StringSplitOptions.None).Length - 1);
+        Assert.Equal(8, html.Split("<table>", StringSplitOptions.None).Length - 1);
         Assert.Equal(17, html.Split("<span", StringSplitOptions.None).Length - 1);
         Assert.DoesNotContain("<script>", html);
         if (Environment.GetEnvironmentVariable("GBX_RENDER_ARTIFACT_DIR") is { Length: > 0 } directory)
@@ -508,13 +514,14 @@ public sealed class DiffRendererTests
             File.WriteAllText(Path.Combine(directory, "diff.md"), DiffRenderer.RenderMarkdown(report, "old", "new"));
             File.WriteAllText(Path.Combine(directory, "diff.json"), DiffMode.RenderJson(report));
             foreach (var enabled in new[] { false, true })
+            foreach (var width in new[] { 80, 120, 240 })
             {
-                var console = new TestConsole().Width(240);
+                var console = new TestConsole().Width(width);
                 console.Profile.Capabilities.Ansi = enabled;
                 console.Profile.Capabilities.ColorSystem = enabled ? Spectre.Console.ColorSystem.TrueColor : Spectre.Console.ColorSystem.NoColors;
                 console.EmitAnsiSequences = enabled;
                 DiffRenderer.Render(console, report, "old", "new");
-                File.WriteAllText(Path.Combine(directory, enabled ? "diff-tty.txt" : "diff-plain.txt"), console.Output);
+                File.WriteAllText(Path.Combine(directory, enabled ? $"diff-tty-{width}.txt" : $"diff-plain-{width}.txt"), console.Output);
             }
         }
     }
@@ -641,6 +648,109 @@ public sealed class DiffRendererTests
         }
         Assert.Contains("&quot;&quot;", DiffRenderer.RenderHtml(report, "old", "new"));
     }
+
+    [Fact]
+    public void SpatialGroups_ConnectNearbyRegionsAcrossMortonDiscontinuitiesAndKeepTies()
+    {
+        var item = ItemSnapshot.From(new CGameCtnAnchoredObject());
+        var changes = new ValueChange<ItemSnapshot>[]
+        {
+            new(null, item with { Path = "nearA", PhysicalPosition = new(-1, 0, 0) }),
+            new(item with { Path = "nearTie", PhysicalPosition = new(-1, 0, 0) }, null),
+            new(null, item with { Path = "nearB", PhysicalPosition = new(1, 0, 0) }),
+            new(null, item with { Path = "distant", PhysicalPosition = new(-.5, 0, 1000) }),
+            new(null, item with { Path = "chain", PhysicalPosition = new(64, 0, 0) }),
+        };
+        var report = Empty() with { Items = changes };
+        var html = DiffRenderer.RenderHtml(report, "a", "b");
+        var groups = HtmlGroups(html);
+        Assert.Equal(2, groups.Length);
+        Assert.Contains("nearA", groups[0]);
+        Assert.Contains("nearTie", groups[0]);
+        Assert.Contains("nearB", groups[0]);
+        Assert.Contains("chain", groups[0]);
+        Assert.DoesNotContain("distant", groups[0]);
+        Assert.Contains("distant", groups[1]);
+        Assert.Equal(html, DiffRenderer.RenderHtml(report with { Items = changes.Reverse().ToArray() }, "a", "b"));
+    }
+
+    [Theory]
+    [InlineData(80)]
+    [InlineData(120)]
+    public void SpatialGroups_OnlySeparateRegionsInPlainTerminalAndMarkdown(int width)
+    {
+        var item = ItemSnapshot.From(new CGameCtnAnchoredObject());
+        var report = Empty() with { Items = [new(null, item with { Path = "nearA" }),
+            new(null, item with { Path = "nearB", PhysicalPosition = new(1, 0, 0) }),
+            new(null, item with { Path = "farAway", PhysicalPosition = new(1000, 0, 0) })] };
+        var console = new TestConsole().Width(width);
+        DiffRenderer.Render(console, report, "a", "b");
+        var lines = console.Output.Split('\n');
+        var a = Array.FindIndex(lines, l => l.Contains("nearA"));
+        var b = Array.FindIndex(lines, l => l.Contains("nearB"));
+        var far = Array.FindIndex(lines, l => l.Contains("farAway"));
+        Assert.True(a >= 0 && b > a && far > b);
+        Assert.DoesNotContain(lines[(a + 1)..b], l => string.IsNullOrWhiteSpace(l) || l.Contains('─'));
+        Assert.Single(lines[(b + 1)..far], string.IsNullOrWhiteSpace);
+        Assert.DoesNotContain(lines[(b + 1)..far], l => l.Contains('─'));
+        Assert.DoesNotContain("\u001b", console.Output);
+        var markdown = DiffRenderer.RenderMarkdown(report, "a", "b");
+        Assert.Single(markdown.Split('\n'), l => l == "|  |  |  |  |  |");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SpatialGroups_BlocksUsePhysicalPositionsAndHandleMissingAndNonFinite(bool baked)
+    {
+        var block = BlockSnapshot.From(new CGameCtnBlock { IsFree = true });
+        var changes = new ValueChange<BlockSnapshot>[]
+        {
+            new(null, block with { Name = "nearA", X = 1000, PhysicalPosition = new(-1, 0, 0) }),
+            new(null, block with { Name = "nearB", X = -1000, PhysicalPosition = new(1, 0, 0) }),
+            new(null, block with { Name = "farAway", PhysicalPosition = new(1000, 0, 0) }),
+            new(null, block with { Name = "missingA", PhysicalPosition = null }),
+            new(null, block with { Name = "missingB", PhysicalPosition = null }),
+            new(null, block with { Name = "infinite", PhysicalPosition = new(double.PositiveInfinity, 0, 0) }),
+            new(null, block with { Name = "notANumber", PhysicalPosition = new(double.NaN, 0, 0) }),
+        };
+        var report = baked ? Empty() with { BakedBlocks = changes } : Empty() with { Blocks = changes };
+        var html = DiffRenderer.RenderHtml(report, "a", "b");
+        var groups = HtmlGroups(html);
+        Assert.Equal(5, groups.Length);
+        Assert.Single(groups, g => g.Contains("nearA") && g.Contains("nearB"));
+        Assert.Single(groups, g => g.Contains("missingA") && g.Contains("missingB"));
+        var reversed = baked ? report with { BakedBlocks = changes.Reverse().ToArray() } : report with { Blocks = changes.Reverse().ToArray() };
+        Assert.Equal(html, DiffRenderer.RenderHtml(reversed, "a", "b"));
+    }
+
+    [Fact]
+    public void ContextGroups_UseDirectoriesChangeKindsMetadataDomainsAndChunkSections()
+    {
+        var report = Empty() with
+        {
+            Embedded = [new(null, new("dir/a", "h", 1, 2)), new(null, new("dir/b", "h", 1, 2)),
+                new(null, new("other/c", "h", 1, 2)), new(new("dir/gone", "h", 1, 2), null)],
+            EmbeddedContributions = [new(null, new("dir/a", 1, 2, 1, null)), new(null, new("dir/b", 1, 2, 1, null)),
+                new(null, new("other/c", 1, 2, 1, null))],
+            MetadataChanges = [new("display.a", null, new(Text: "a")), new("display.b", null, new(Text: "b")),
+                new("validation.a", null, new(Boolean: true))],
+            Chunks = [new("1", "2", "body:a"), new("1", "2", "body:b"), new("1", "2", "header:a")],
+        };
+        var groups = HtmlGroups(DiffRenderer.RenderHtml(report, "a", "b"));
+        Assert.Equal(9, groups.Length);
+        Assert.Contains("gone", groups[0]);
+        Assert.Contains("dir/a", groups[1]);
+        Assert.Contains("dir/b", groups[1]);
+        Assert.Contains("other/c", groups[2]);
+        Assert.Contains("display.a", groups[5]);
+        Assert.Contains("display.b", groups[5]);
+        Assert.Contains("body:a", groups[7]);
+        Assert.Contains("body:b", groups[7]);
+    }
+
+    private static string[] HtmlGroups(string html) => System.Text.RegularExpressions.Regex.Matches(html, "<tbody>(.*?)</tbody>")
+        .Select(m => m.Groups[1].Value).ToArray();
 
     private static IEnumerable<string> Outputs(DiffReport report)
     {
