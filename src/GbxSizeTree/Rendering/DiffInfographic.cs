@@ -16,10 +16,10 @@ public static class DiffInfographic
     public const int MaximumHeight = 2200;
     private const int MaxSpatialChanges = 400;
     private const int MaxSpatialContext = 900;
-    private const int MaxHighlights = 5;
-    private const int MaxProperties = 5;
-    private const int MaxMetadata = 4;
-    private const int MaxChunks = 5;
+    private const int MaxHighlightLines = 5;
+    private const int MaxPropertyLines = 5;
+    private const int MaxMetadataLines = 5;
+    private const int MaxChunkLines = 4;
 
     public static Image<Rgba32> Render(DiffReport report, string oldPath, string newPath)
     {
@@ -54,16 +54,16 @@ public static class DiffInfographic
             finiteContext.Length - sampledContext.Length, invalidContext);
 
         var sectionContent = new List<(string Id, string Title, IReadOnlyList<string> Lines)>();
-        var highlights = Highlights(report).ToArray();
-        if (highlights.Length > 0) sectionContent.Add(("embedded-highlights", "Embedded highlights", highlights));
-        var properties = Properties(report).ToArray();
-        if (properties.Length > 0) sectionContent.Add(("deep-properties", $"Deep properties · {detailCounts.DeepProperties:N0}", properties));
-        var metadata = Metadata(report).ToArray();
-        if (metadata.Length > 0) sectionContent.Add(("metadata", $"Metadata · {detailCounts.Metadata:N0}", metadata));
-        var chunks = Chunks(report).ToArray();
-        if (chunks.Length > 0) sectionContent.Add(("chunks", $"Chunk observations · {detailCounts.Chunks:N0}", chunks));
+        var highlights = Highlights(report);
+        if (highlights.Count > 0) sectionContent.Add(("embedded-highlights", "Embedded highlights", highlights));
+        var properties = Properties(report);
+        if (properties.Count > 0) sectionContent.Add(("deep-properties", $"Deep properties · {detailCounts.DeepProperties:N0}", properties));
         var warnings = Warnings(report, spatial).ToArray();
         if (warnings.Length > 0) sectionContent.Add(("coverage", "Coverage notes", warnings));
+        var metadata = Metadata(report);
+        if (metadata.Count > 0) sectionContent.Add(("metadata", $"Metadata · {detailCounts.Metadata:N0}", metadata));
+        var chunks = Chunks(report);
+        if (chunks.Count > 0) sectionContent.Add(("chunks", $"Chunk observations · {detailCounts.Chunks:N0}", chunks));
 
         var sections = new List<DiffInfographicSection>
         {
@@ -72,17 +72,15 @@ public static class DiffInfographic
             new("spatial-context", "XZ spatial context", [], 70, 570, 1330, 1010),
         };
         var columnTops = new[] { 1040, 1040 };
-        for (var i = 0; i < sectionContent.Count; i++)
+        foreach (var content in sectionContent)
         {
-            var content = sectionContent[i];
             var column = columnTops[0] <= columnTops[1] ? 0 : 1;
             var left = column == 0 ? 70 : 710;
-            var requestedBottom = columnTops[column] + 88 + Math.Max(1, content.Lines.Count) * 55;
+            var requestedBottom = columnTops[column] + 88 + Math.Max(1, content.Lines.Count) * 57;
             sections.Add(new(content.Id, content.Title, content.Lines, left, columnTops[column], left + 620, requestedBottom));
             columnTops[column] = requestedBottom + 22;
         }
         var height = Math.Clamp(Math.Max(columnTops[0], columnTops[1]) + 24, MinimumHeight, MaximumHeight);
-        sections = sections.Select(x => x with { Bottom = Math.Min(x.Bottom, height - 36) }).Where(x => x.Top < height - 36).ToList();
 
         return new DiffInfographicScene(Width, height,
             DiffInfographicText.FileName(oldPath), DiffInfographicText.FileName(newPath),
@@ -197,8 +195,9 @@ public static class DiffInfographic
         }
     }
 
-    private static IEnumerable<string> Highlights(DiffReport report)
+    private static IReadOnlyList<string> Highlights(DiffReport report)
     {
+        var lines = new List<string>();
         var ranked = report.Embedded.Select(c =>
         {
             var value = c.Right ?? c.Left!;
@@ -209,8 +208,7 @@ public static class DiffInfographic
                 : $"ZIP {DiffInfographicText.Bytes(value.Compressed)}";
             return (Rank: Math.Abs((double)delta), Text: $"{kind} {value.Path}  ·  {detail}");
         }).OrderByDescending(x => x.Rank).ThenBy(x => x.Text, StringComparer.Ordinal).ToArray();
-        foreach (var value in ranked.Take(MaxHighlights)) yield return value.Text;
-        if (ranked.Length > MaxHighlights) yield return $"+ {ranked.Length - MaxHighlights:N0} more embedded changes omitted";
+        lines.AddRange(ranked.Select(x => x.Text));
 
         var highlightedPaths = new HashSet<string>(report.Embedded.Select(x => (x.Right ?? x.Left)!.Path), StringComparer.Ordinal);
         foreach (var contribution in report.EmbeddedContributions)
@@ -221,23 +219,30 @@ public static class DiffInfographic
             var detail = unavailable is null
                 ? "Outer-map marginal available (non-additive; not summed)"
                 : $"Outer-map marginal unavailable: {unavailable}";
-            yield return $"~ {value.Path}  ·  {detail}";
+            lines.Add($"~ {value.Path}  ·  {detail}");
         }
-        var contributions = report.EmbeddedContributions.Where(x => (x.Right ?? x.Left)?.UnavailableReason is not null).ToArray();
-        if (contributions.Length > 0)
-            yield return $"Marginal measurements are non-additive; {contributions.Length:N0} unavailable: {contributions[0].Right?.UnavailableReason ?? contributions[0].Left!.UnavailableReason}";
+        var unavailableContributions = report.EmbeddedContributions.Count(x => (x.Right ?? x.Left)?.UnavailableReason is not null);
+        if (unavailableContributions > 0)
+        {
+            var reason = report.EmbeddedContributions
+                .Select(x => (x.Right ?? x.Left)?.UnavailableReason)
+                .First(x => x is not null);
+            lines.Add($"Marginal measurements are non-additive; {unavailableContributions:N0} unavailable: {reason}");
+        }
         else if (report.EmbeddedContributions.Count > 0)
-            yield return "Outer-map marginal measurements are non-additive and are never summed.";
+        {
+            lines.Add("Outer-map marginal measurements are non-additive and are never summed.");
+        }
+        return LimitLines(lines, MaxHighlightLines, "embedded highlight");
     }
 
-    private static IEnumerable<string> Properties(DiffReport report)
+    private static IReadOnlyList<string> Properties(DiffReport report)
     {
         var rows = report.EmbeddedPropertyChanges.SelectMany(entry => entry.Properties.Changes.Select(change =>
-            $"{entry.Path} › {change.Path}: {Property(change.Left)} to {Property(change.Right)}")).ToArray();
-        foreach (var row in rows.Take(MaxProperties)) yield return row;
-        if (rows.Length > MaxProperties) yield return $"+ {rows.Length - MaxProperties:N0} more property changes omitted";
+            $"{entry.Path} › {change.Path}: {Property(change.Left)} to {Property(change.Right)}")).ToList();
         var issues = report.EmbeddedPropertyChanges.Sum(x => x.Properties.LeftIssues.Count + x.Properties.RightIssues.Count);
-        if (issues > 0) yield return $"WARNING · {issues:N0} opaque or partial-coverage diagnostic{(issues == 1 ? "" : "s")}; content hashes still prove the entries changed.";
+        if (issues > 0) rows.Add($"WARNING · {issues:N0} opaque or partial-coverage diagnostic{(issues == 1 ? "" : "s")}; content hashes still prove the entries changed.");
+        return LimitLines(rows, MaxPropertyLines, "deep-property detail");
     }
 
     private sealed record MetadataEntry(string Label, string? Left, string? Right);
@@ -257,27 +262,34 @@ public static class DiffInfographic
         }
     }
 
-    private static IEnumerable<string> Metadata(DiffReport report)
+    private static IReadOnlyList<string> Metadata(DiffReport report)
     {
-        var changes = MetadataEntries(report);
-        foreach (var row in changes.Take(MaxMetadata))
+        var rows = MetadataEntries(report).Select(row =>
         {
             var marker = row.Left is null ? "+" : row.Right is null ? "−" : "~";
             var value = row.Left is null ? row.Right! : row.Right is null ? row.Left : $"{row.Left} to {row.Right}";
-            yield return $"{marker} {row.Label}: {value}";
-        }
-        if (changes.Count > MaxMetadata) yield return $"+ {changes.Count - MaxMetadata:N0} more metadata changes omitted";
+            return $"{marker} {row.Label}: {value}";
+        }).ToArray();
+        return LimitLines(rows, MaxMetadataLines, "metadata change");
     }
 
-    private static IEnumerable<string> Chunks(DiffReport report)
+    private static IReadOnlyList<string> Chunks(DiffReport report)
     {
-        foreach (var chunk in report.Chunks.Take(MaxChunks))
+        var rows = report.Chunks.Select(chunk =>
         {
             var marker = chunk.Left is null ? "+" : chunk.Right is null ? "−" : "~";
             var value = chunk.Left is null ? chunk.Right! : chunk.Right is null ? chunk.Left : $"{chunk.Left} to {chunk.Right}";
-            yield return $"{marker} {chunk.Key ?? "chunk"}: {value}";
-        }
-        if (report.Chunks.Count > MaxChunks) yield return $"+ {report.Chunks.Count - MaxChunks:N0} more chunk observations omitted";
+            return $"{marker} {chunk.Key ?? "chunk"}: {value}";
+        }).ToArray();
+        return LimitLines(rows, MaxChunkLines, "chunk observation");
+    }
+
+    private static IReadOnlyList<string> LimitLines(IReadOnlyList<string> lines, int limit, string description)
+    {
+        if (lines.Count <= limit) return lines;
+        var visible = lines.Take(limit - 1).ToList();
+        visible.Add($"+ {lines.Count - visible.Count:N0} more {description}{(lines.Count - visible.Count == 1 ? "" : "s")} omitted");
+        return visible;
     }
 
     private static IEnumerable<string> Warnings(DiffReport report, DiffInfographicSpatialScene spatial)

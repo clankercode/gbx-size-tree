@@ -18,6 +18,9 @@ internal static class DiffInfographicPainter
     private static readonly Color Removed = Color.ParseHex("FF647C");
     private static readonly Color Changed = Color.ParseHex("FFC857");
     private static readonly Color Cyan = Color.ParseHex("4FD8E8");
+    private const float HeroDeltaMaxWidth = 598;
+    private const float HeroDeltaMaxFontSize = 82;
+    private const float HeroDeltaMinFontSize = 24;
 
     public static Image<Rgba32> Paint(DiffInfographicScene scene)
     {
@@ -43,13 +46,32 @@ internal static class DiffInfographicPainter
         c.Fill(Color.FromRgba(255, 100, 124, 8), new EllipsePolygon(80, 680, 350));
     }
 
+    internal static Font FitHeroDeltaFont(string text) => FitFont(text, HeroDeltaMaxFontSize, HeroDeltaMinFontSize, HeroDeltaMaxWidth);
+
+    internal static string SpatialFooterLabel(DiffInfographicScene scene) =>
+        scene.Warnings.Count == 0 ? "Coverage notes: none" : $"Coverage notes: {scene.Warnings.Count:N0} below";
+
+    private static Font FitFont(string text, float maxSize, float minSize, float maxWidth)
+    {
+        var maxFont = DiffInfographicFonts.Bold(maxSize);
+        var measuredBounds = TextMeasurer.MeasureBounds(text, new TextOptions(maxFont));
+        var measuredWidth = measuredBounds.X + measuredBounds.Width;
+        if (measuredWidth <= maxWidth) return maxFont;
+        var fittedSize = Math.Max(minSize, maxSize * maxWidth / measuredWidth);
+        var fittedFont = DiffInfographicFonts.Bold(fittedSize);
+        var fittedBounds = TextMeasurer.MeasureBounds(text, new TextOptions(fittedFont));
+        if (fittedBounds.X + fittedBounds.Width <= maxWidth) return fittedFont;
+        return DiffInfographicFonts.Bold(Math.Max(minSize, fittedSize * maxWidth / (fittedBounds.X + fittedBounds.Width)));
+    }
+
     private static void DrawHero(IImageProcessingContext c, DiffInfographicScene scene)
     {
         c.DrawText("MAP DIFF", DiffInfographicFonts.Bold(24), Cyan, new PointF(70, 52));
         c.DrawText("A visual change brief", DiffInfographicFonts.Regular(20), Muted, new PointF(225, 57));
         var deltaColor = scene.DeltaBytes > 0 ? Removed : scene.DeltaBytes < 0 ? Added : Muted;
         var delta = scene.DeltaBytes == 0 ? "NO SIZE CHANGE" : (scene.DeltaBytes > 0 ? "+" : "−") + DiffInfographicText.Bytes(scene.DeltaBytes == long.MinValue ? long.MaxValue : Math.Abs(scene.DeltaBytes));
-        c.DrawText(delta, DiffInfographicFonts.Bold(82), deltaColor, new PointF(68, 102));
+        var deltaFont = FitHeroDeltaFont(delta);
+        c.DrawText(delta, deltaFont, deltaColor, new PointF(68, 102));
         c.DrawText("FILE SIZE", DiffInfographicFonts.Bold(17), Muted, new PointF(73, 205));
 
         var x = 710f;
@@ -131,7 +153,7 @@ internal static class DiffInfographicPainter
     {
         var rangeFont = DiffInfographicFonts.Regular(15);
         var coverageFont = DiffInfographicFonts.Bold(15);
-        var coverage = DiffInfographicText.Fit(scene.Spatial.CoverageLabel, coverageFont, 440);
+        var coverage = SpatialFooterLabel(scene);
         var coverageWidth = TextMeasurer.MeasureAdvance(coverage, new TextOptions(coverageFont)).Width;
         var maxRangeWidth = Math.Max(80, width - coverageWidth - 32);
         var range = DiffInfographicText.Fit(scene.Spatial.RangeLabel, rangeFont, maxRangeWidth);

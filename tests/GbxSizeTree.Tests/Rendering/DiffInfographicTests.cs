@@ -52,6 +52,74 @@ public sealed class DiffInfographicTests
         });
     }
 
+    [Theory]
+    [InlineData("NO SIZE CHANGE")]
+    [InlineData("+9223372036.85 GB")]
+    public void HeroDelta_FitsMeasuredLeftColumnWithoutTruncatingNumber(string text)
+    {
+        var font = DiffInfographicPainter.FitHeroDeltaFont(text);
+        var bounds = SixLabors.Fonts.TextMeasurer.MeasureBounds(text, new SixLabors.Fonts.TextOptions(font));
+
+        Assert.True(68 + bounds.X + bounds.Width <= 668.5f);
+        Assert.True(font.Size < 82);
+    }
+
+    [Fact]
+    public void BuildScene_BoundsContributionHighlightsAndReservesExactOmissionCount()
+    {
+        var contributions = Enumerable.Range(0, 22).Select(i => new ValueChange<GbxSizeTree.Measure.EmbeddedFileContribution>(null,
+            new($"contribution-{i}", 1, 1, null, $"unavailable-{i}"))).ToArray();
+        var scene = DiffInfographic.BuildScene(Empty() with { EmbeddedContributions = contributions }, "a", "b");
+        var highlights = Assert.Single(scene.Sections, x => x.Id == "embedded-highlights");
+
+        Assert.Equal(5, highlights.Lines.Count);
+        Assert.Equal("+ 19 more embedded highlights omitted", highlights.Lines[^1]);
+    }
+
+    [Fact]
+    public void BuildScene_GlobalHeightCapKeepsAllSectionLinesRenderableAndCoverageVisible()
+    {
+        var notices = Enumerable.Range(0, 405).Select(i => new ValueChange<ItemSnapshot>(null, Item($"notice-{i}", i, i))).ToList();
+        notices.Add(new(null, Item("invalid", double.NaN, double.PositiveInfinity)));
+        var context = Enumerable.Range(0, 905).Select(i => Item($"context-{i}", i, i)).Append(Item("invalid-context", double.NegativeInfinity, 0)).ToArray();
+        var report = Empty() with
+        {
+            Items = notices,
+            Blocks = [new(null, Block("unpositioned", 0, 0) with { PhysicalPosition = null })],
+            LeftItemSnapshots = context,
+            Embedded = Enumerable.Range(0, 8).Select(i => new ValueChange<EmbeddedSnapshot>(null, new($"embed-{i}", "hash", i, i))).ToArray(),
+            EmbeddedPropertyChanges = [new("container", "left", "right", new(
+                Enumerable.Range(0, 8).Select(i => new EmbeddedPropertyChange($"property-{i}", new("old"), new("new"))).ToArray(), true,
+                [new("opaque", "left", "partial")], [new("opaque", "right", "partial")]))],
+            MetadataChanges = Enumerable.Range(0, 8).Select(i => new MapMetadataChange($"metadata-{i}", new("old"), new("new"))).ToArray(),
+            Chunks = Enumerable.Range(0, 8).Select(i => new Change("old", "new", $"chunk-{i}")).ToArray(),
+            Warnings = Enumerable.Range(0, 7).Select(i => $"source warning {i}").ToArray(),
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var detailSections = scene.Sections.Where(x => x.Top >= 1000).ToArray();
+        var coverage = Assert.Single(detailSections, x => x.Id == "coverage");
+
+        Assert.InRange(scene.Height, 2100, DiffInfographic.MaximumHeight);
+        Assert.All(detailSections, section => Assert.True(section.Top + 66 + section.Lines.Count * 57 <= section.Bottom));
+        Assert.All(detailSections, section => Assert.True(section.Bottom <= scene.Height - 36));
+        Assert.Contains("+ 4 more embedded highlights omitted", Assert.Single(detailSections, x => x.Id == "embedded-highlights").Lines);
+        Assert.Contains("+ 5 more deep-property details omitted", Assert.Single(detailSections, x => x.Id == "deep-properties").Lines);
+        Assert.Contains("+ 4 more metadata changes omitted", Assert.Single(detailSections, x => x.Id == "metadata").Lines);
+        Assert.Contains("+ 5 more chunk observations omitted", Assert.Single(detailSections, x => x.Id == "chunks").Lines);
+        Assert.Equal(scene.Warnings, coverage.Lines);
+        Assert.Equal("Coverage notes: 11 below", DiffInfographicPainter.SpatialFooterLabel(scene));
+    }
+
+    [Fact]
+    public void BuildScene_NoCoverageNoticesUsesExplicitEmptyFooterLabel()
+    {
+        var scene = DiffInfographic.BuildScene(Empty(), "a", "b");
+
+        Assert.Empty(scene.Warnings);
+        Assert.Equal("Coverage notes: none", DiffInfographicPainter.SpatialFooterLabel(scene));
+    }
+
     [Fact]
     public void Render_EncodesPngWithEmbeddedFontsAndSafeExtremeText()
     {
