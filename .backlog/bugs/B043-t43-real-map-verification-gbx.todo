@@ -12,10 +12,7 @@ id: B043
 priority: high
 started_at: null
 status: pending
-tags:
-    - chat-astra
-    - T43
-    - source-pending
+tags: []
 title: 'T43: Real-map verification: gbx-size-tree diff ~/tm-docs/Maps/SB2/Sweet\ 2\ burger\ v205.Map.gbx ~/tm-docs/Maps/SB2/Sweet\ 2\ burger\ v206.M'
 updated_at: "2026-09-09T06:13:11Z"
 ---
@@ -33,3 +30,5 @@ Outstanding work; not implemented by this ingestion.
 
 ## Source dependencies
 T37, T38, T39, T40
+
+Decision and sequencing: Verification lane after B037 B038 B039 B040 close. Both exact user-supplied v205.Map.gbx and v206.Map.Gbx exist under ~/tm-docs/Maps/SB2. Exercise these exact maps, self-diff, reversed diff and all formats; keep fixture paths optional for CI.
