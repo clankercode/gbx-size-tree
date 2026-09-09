@@ -55,3 +55,4 @@ bugs:
     - file: B054-t54-commit-all-current-changes.todo
     - file: B055-t55-ingest-all-task-rows-as-bl.todo
     - file: B056-t56-replace-thick-horizontal-r.todo
+    - file: B057-t57-color-columns-default-labe.todo
