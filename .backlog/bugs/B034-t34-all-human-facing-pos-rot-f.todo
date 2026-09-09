@@ -10,10 +10,7 @@ id: B034
 priority: high
 started_at: null
 status: pending
-tags:
-    - chat-astra
-    - T34
-    - source-pending
+tags: []
 title: 'T34: ALL human-facing pos/rot float formatting 1-3 decimal places; JSON/machine retains full precision'
 updated_at: "2026-09-09T06:13:10Z"
 ---
@@ -31,3 +28,5 @@ Outstanding work; not implemented by this ingestion.
 
 ## Source dependencies
 T15, T16
+
+Decision and lane plan: renderer lane, serial with B037/B057/B059 because all touch DiffRenderer.cs and renderer tests. Use invariant 0.0## for every displayed transform, preserving source/JSON precision. Keep image work dependent on this shared convention.
