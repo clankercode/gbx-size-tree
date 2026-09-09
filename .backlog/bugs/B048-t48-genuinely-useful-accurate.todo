@@ -1,7 +1,7 @@
 ---
 claimed_at: "2026-09-09T09:21:33Z"
 claimed_by: astra
-completed_at: null
+completed_at: "2026-09-09T16:02:34Z"
 complexity: medium
 created_at: "2026-09-09T06:13:11Z"
 depends_on:
@@ -11,17 +11,15 @@ depends_on:
     - B012
     - B023
     - B024
+duration_minutes: 401.0211878448667
 estimate_hours: 1
 id: B048
 priority: high
 started_at: "2026-09-09T09:21:33Z"
-status: in_progress
-tags:
-    - chat-astra
-    - T48
-    - source-inprog
+status: done
+tags: []
 title: 'T48: Genuinely useful accurate diff help: explain baked gating, color flags, coverage limitations and new output/style flags when implemente'
-updated_at: "2026-09-09T09:21:33Z"
+updated_at: "2026-09-09T16:02:34Z"
 ---
 ## Source
 Chat task: T48
