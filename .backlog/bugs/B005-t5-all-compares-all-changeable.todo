@@ -1,0 +1,29 @@
+---
+complexity: medium
+created_at: "2026-09-09T06:13:07Z"
+depends_on: []
+estimate_hours: 1
+id: B005
+priority: high
+status: pending
+tags:
+    - chat-astra
+    - T5
+    - source-inprog
+title: 'T5: --all compares ALL changeable map parts: lightmaps, genealogies, MediaTracker, other chunks and chunk removal, including equal-length c'
+updated_at: "2026-09-09T06:13:07Z"
+---
+## Source
+Chat task: T5
+Source status: inprog
+Inventory: /tmp/gbx-size-tree-astra-chat-tasks.md
+Session: 01a08304-d48f-7631-913b-60e05abe13f3
+
+## Scope and acceptance criteria
+--all compares ALL changeable map parts: lightmaps, genealogies, MediaTracker, other chunks and chunk removal, including equal-length content changes. Existing implementation compares detected chunk IDs and lengths only; exhaustive coverage incomplete.
+
+## State at ingestion
+Partial implementation; remaining scope must be completed. No active agent claim is implied.
+
+## Source dependencies
+T1
