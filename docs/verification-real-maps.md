@@ -43,7 +43,7 @@ All 14 captures exited zero with empty stderr. Forward full-format runs took 87â
 | diagnostic chunk changes | 0 | 23 |
 | warnings | 0 | 0 |
 
-Default output therefore keeps baked blocks and diagnostic chunks hidden. `--all` exposes both, including complete container, stored-body, and decompressed-body SHA-256 records; body candidates explicitly say that identification is not exhaustive.
+Default output therefore keeps baked blocks and diagnostic chunks hidden. `--all` exposes both, including container-prefix, stored-body, and decompressed-body SHA-256 records; body candidates explicitly say that identification is not exhaustive.
 
 The 17 modified embedded entries produce 89 rendered deep-property rows. Their bounded diagnostics contain 34 `partial-coverage` and 38 `unsupported` side issues. This is explicit opaque-content diagnostic coverage, not a claim that opaque properties are semantically equal. Metadata includes 23 changed `script.*` paths, including the added `_EKV_` data. There was no report-level metadata warning for this pair because capture remained available; the deep-property coverage warnings are present in every output format.
 
