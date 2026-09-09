@@ -10,10 +10,10 @@ estimate_hours: 1
 id: B038
 priority: high
 started_at: null
-status: pending
+status: in_progress
 tags: []
 title: 'T38: Show meaningful embedded deltas and explain what changed (size, compression, content, other known properties)'
-updated_at: "2026-09-09T06:13:10Z"
+updated_at: "2026-09-09T06:13:54Z"
 ---
 ## Source
 Chat task: T38
