@@ -7,13 +7,34 @@ using GbxSizeTree.Measure;
 
 namespace GbxSizeTree.Cli.Modes;
 
+public enum DiffProgressStage
+{
+    ReadingOld,
+    ReadingNew,
+    ParsingOld,
+    ParsingNew,
+    Comparing,
+    EmbeddedDeepComparison,
+    MeasuringOldEmbeds,
+    MeasuringNewEmbeds,
+}
+
+public sealed record DiffProgress(
+    DiffProgressStage Stage,
+    string? WorkItem = null,
+    int? Completed = null,
+    int? Total = null);
+
 public static class DiffMode
 {
     public static int Run(IReadOnlyList<string> paths, CliOutputFormat format, bool all,
         bool? colorOption, bool styled = true)
     {
         if (paths.Count != 2) throw new ArgumentException("diff requires exactly two map paths.");
-        var report = CompareFiles(paths[0], paths[1], all);
+        DiffReport report;
+        using (var progress = TerminalProgress.Create())
+            report = CompareFiles(paths[0], paths[1], all,
+                progress: progress is null ? null : progress.Report);
         if (format == CliOutputFormat.Json)
             Console.WriteLine(RenderJson(report));
         else if (format == CliOutputFormat.Html)
@@ -48,22 +69,38 @@ public static class DiffMode
 
     /// <summary>Compares map metadata and placements, with bounded outer-body trials for changed embeds.</summary>
     public static DiffReport CompareFiles(string left, string right, bool all = false,
-        EmbeddedFileContributionOptions? contributionOptions = null)
+        EmbeddedFileContributionOptions? contributionOptions = null,
+        Action<DiffProgress>? progress = null)
     {
+        progress?.Invoke(new(DiffProgressStage.ReadingOld, Path.GetFileName(left)));
         var leftBytes = File.ReadAllBytes(left);
+        progress?.Invoke(new(DiffProgressStage.ReadingNew, Path.GetFileName(right)));
         var rightBytes = File.ReadAllBytes(right);
-        var leftContent = all ? MapContentComparison.Capture(leftBytes) : new Dictionary<string, string>();
-        var rightContent = all ? MapContentComparison.Capture(rightBytes) : new Dictionary<string, string>();
+        IReadOnlyDictionary<string, string> leftContent = new Dictionary<string, string>();
+        IReadOnlyDictionary<string, string> rightContent = new Dictionary<string, string>();
+        if (all)
+        {
+            progress?.Invoke(new(DiffProgressStage.ParsingOld, Path.GetFileName(left)));
+            leftContent = MapContentComparison.Capture(leftBytes);
+            progress?.Invoke(new(DiffProgressStage.ParsingNew, Path.GetFileName(right)));
+            rightContent = MapContentComparison.Capture(rightBytes);
+        }
         DiffReport report;
         try
         {
-            report = Compare(ReadBytes(leftBytes, leftContent), ReadBytes(rightBytes, rightContent), all);
+            progress?.Invoke(new(DiffProgressStage.ParsingOld, Path.GetFileName(left)));
+            var leftSnapshot = ReadBytes(leftBytes, leftContent);
+            progress?.Invoke(new(DiffProgressStage.ParsingNew, Path.GetFileName(right)));
+            var rightSnapshot = ReadBytes(rightBytes, rightContent);
+            progress?.Invoke(new(DiffProgressStage.Comparing));
+            report = Compare(leftSnapshot, rightSnapshot, all, progress);
         }
         catch (Exception ex) when (all && ex is not OperationCanceledException and not OutOfMemoryException)
         {
+            progress?.Invoke(new(DiffProgressStage.Comparing));
             return ContentOnlyReport(leftBytes.Length, rightBytes.Length, leftContent, rightContent);
         }
-        return WithContributions(report, leftBytes, rightBytes, contributionOptions);
+        return WithContributions(report, leftBytes, rightBytes, contributionOptions, progress);
     }
 
     private static Snapshot ReadBytes(byte[] bytes, IReadOnlyDictionary<string, string> content)
@@ -86,11 +123,13 @@ public static class DiffMode
     }
 
     private static DiffReport WithContributions(DiffReport report, byte[]? leftBytes, byte[]? rightBytes,
-        EmbeddedFileContributionOptions? options = null)
+        EmbeddedFileContributionOptions? options = null, Action<DiffProgress>? progress = null)
     {
         if (report.Embedded.Count == 0) return report;
-        var left = Measure(leftBytes, report.Embedded.Select(c => c.Left).OfType<EmbeddedSnapshot>().ToArray());
-        var right = Measure(rightBytes, report.Embedded.Select(c => c.Right).OfType<EmbeddedSnapshot>().ToArray());
+        var left = Measure(leftBytes, report.Embedded.Select(c => c.Left).OfType<EmbeddedSnapshot>().ToArray(),
+            DiffProgressStage.MeasuringOldEmbeds);
+        var right = Measure(rightBytes, report.Embedded.Select(c => c.Right).OfType<EmbeddedSnapshot>().ToArray(),
+            DiffProgressStage.MeasuringNewEmbeds);
         var leftEntries = left.Entries.ToDictionary(e => e.Path, StringComparer.Ordinal);
         var rightEntries = right.Entries.ToDictionary(e => e.Path, StringComparer.Ordinal);
         return report with
@@ -102,7 +141,8 @@ public static class DiffMode
                 c.Right is null ? null : rightEntries[c.Right.Path])).ToArray(),
         };
 
-        EmbeddedFileContributionMeasurement Measure(byte[]? bytes, EmbeddedSnapshot[] entries)
+        EmbeddedFileContributionMeasurement Measure(byte[]? bytes, EmbeddedSnapshot[] entries,
+            DiffProgressStage stage)
         {
             if (entries.Length == 0) return new(null, [], null);
             string? unavailable = null;
@@ -118,7 +158,8 @@ public static class DiffMode
             if (unavailable is not null)
                 return new(null, entries.Select(e => new EmbeddedFileContribution(e.Path, e.Compressed, e.Uncompressed,
                     null, unavailable)).ToArray(), unavailable);
-            var measured = new EmbeddedFileContributionMeasurer().Measure(bytes!, entries.Select(e => e.Path).ToArray(), options);
+            var measured = new EmbeddedFileContributionMeasurer().Measure(bytes!, entries.Select(e => e.Path).ToArray(), options,
+                progress: value => progress?.Invoke(new(stage, value.Path, value.CompletedTrials, value.TotalTrials)));
             var snapshots = entries.ToDictionary(e => e.Path, StringComparer.Ordinal);
             return measured with
             {
@@ -156,10 +197,10 @@ public static class DiffMode
         map.AnchoredObjects?.Select(ItemSnapshot.From).OrderBy(x => x.PhysicalPosition).ThenBy(x => x.Key, StringComparer.Ordinal).ToArray() ?? [],
         ReadEmbeds(map), map.EmbeddedZipData, MapMetadataSnapshot.Capture(map), map.MapUid ?? "", map.MapName ?? "", map.AuthorLogin ?? "", map.AuthorNickname ?? "", map.Password is not null);
 
-    private static DiffReport Compare(Snapshot a, Snapshot b, bool all)
+    private static DiffReport Compare(Snapshot a, Snapshot b, bool all, Action<DiffProgress>? progress = null)
     {
         var embedded = EmbeddedDiff(a.Embedded, b.Embedded);
-        return new(
+        var report = new DiffReport(
             a.FileBytes, b.FileBytes, InstanceDiff(a.Blocks, b.Blocks, x => x.PhysicalPosition, x => x.Key),
             all ? InstanceDiff(a.BakedBlocks, b.BakedBlocks, x => x.PhysicalPosition, x => x.Key) : [],
             InstanceDiff(a.Items, b.Items, x => x.PhysicalPosition, x => x.Key), embedded,
@@ -177,6 +218,10 @@ public static class DiffMode
             LeftItemSnapshots = a.Items, RightItemSnapshots = b.Items,
             LeftEmbeddedSnapshots = a.Embedded.Values.OrderBy(x => x.Path, StringComparer.Ordinal).ToArray(),
             RightEmbeddedSnapshots = b.Embedded.Values.OrderBy(x => x.Path, StringComparer.Ordinal).ToArray(),
+        };
+        progress?.Invoke(new(DiffProgressStage.EmbeddedDeepComparison));
+        return report with
+        {
             EmbeddedPropertyChanges = EmbeddedPropertyReport.Capture(a.EmbeddedZipData, b.EmbeddedZipData, embedded),
         };
     }
