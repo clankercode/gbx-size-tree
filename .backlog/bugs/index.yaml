@@ -43,3 +43,4 @@ bugs:
     - file: B042-t42-unstyled-html-plain-simple.todo
     - file: B043-t43-real-map-verification-gbx.todo
     - file: B044-t44-validate-new-requests-with.todo
+    - file: B045-t45-final-logical-commits-merg.todo
