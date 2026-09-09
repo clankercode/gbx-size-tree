@@ -1,6 +1,7 @@
 using System.Globalization;
 using GBX.NET;
 using GBX.NET.Engines.Game;
+using GbxSizeTree.Measure;
 
 namespace GbxSizeTree.Cli.Modes;
 
@@ -86,6 +87,10 @@ public sealed record DiffReport(
     IReadOnlyList<ValueChange<EmbeddedSnapshot>> Embedded, IReadOnlyList<Change> Chunks,
     Change? MapUid, Change? MapName, Change? AuthorLogin, Change? AuthorNickname, Change? Password)
 {
+    public IReadOnlyList<MapMetadataChange> MetadataChanges { get; init; } = [];
+    public IReadOnlyList<ValueChange<EmbeddedFileContribution>> EmbeddedContributions { get; init; } = [];
+    public long? LeftContributionBaselineBytes { get; init; }
+    public long? RightContributionBaselineBytes { get; init; }
     public IReadOnlyList<BlockSnapshot> LeftBakedSnapshots { get; init; } = [];
     public IReadOnlyList<BlockSnapshot> RightBakedSnapshots { get; init; } = [];
     public IReadOnlyList<BlockSnapshot> LeftBlockSnapshots { get; init; } = [];

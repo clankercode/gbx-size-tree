@@ -176,6 +176,37 @@ public sealed class DiffContentTests
     }
 
     [Fact]
+    public void CompareMaps_ReportsTypedMapMetadataByDefaultAndPreservesLegacyFields()
+    {
+        var left = new CGameCtnChallenge { MapName = "old", AuthorLogin = "author" };
+        var right = new CGameCtnChallenge { MapName = "new", AuthorLogin = "author" };
+        var report = DiffMode.CompareMaps(left, right);
+
+        Assert.Contains(report.MetadataChanges, c => c.Path == "map.name" && c.Left!.Text == "old" && c.Right!.Text == "new");
+        Assert.Null(report.MapUid);
+        using var json = JsonDocument.Parse(DiffMode.RenderJson(report));
+        Assert.Equal(JsonValueKind.Array, json.RootElement.GetProperty("MetadataChanges").ValueKind);
+        Assert.Equal("new", json.RootElement.GetProperty("MapName").GetProperty("Right").GetString());
+    }
+
+    [Fact]
+    public void Renderers_IncludeTypedMetadataChanges()
+    {
+        var report = DiffMode.CompareMaps(new CGameCtnChallenge { Comments = "old" }, new CGameCtnChallenge { Comments = "new" });
+        Assert.Contains("display.comments", DiffRenderer.RenderHtml(report, "old", "new"));
+        Assert.Contains("display.comments", DiffRenderer.RenderMarkdown(report, "old", "new"));
+    }
+
+    [Fact]
+    public void DiffReport_ExposesOptionalEmbeddedContributionMeasurements()
+    {
+        var report = DiffMode.CompareMaps(new(), new());
+        Assert.Empty(report.EmbeddedContributions);
+        using var json = JsonDocument.Parse(DiffMode.RenderJson(report));
+        Assert.Equal(JsonValueKind.Array, json.RootElement.GetProperty("EmbeddedContributions").ValueKind);
+    }
+
+    [Fact]
     public void CompareMaps_AllWithoutChunksIsExplicitlySerializedContentOnly()
     {
         var left = new CGameCtnChallenge { DecoBaseHeightOffset = 1 };

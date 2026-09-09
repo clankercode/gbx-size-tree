@@ -446,6 +446,61 @@ public sealed class DiffRendererTests
         }
     }
 
+    [Fact]
+    public void MetadataAndContributions_RenderTypedAbsenceAndSafeNonAdditiveMeasurements()
+    {
+        var report = Empty() with
+        {
+            MetadataChanges = [new("display.comments", null, new(Text: "")),
+                new("validation.forScriptModes", null, new(Boolean: false)),
+                new("medals.authorMs", null, new(Integer: 0)),
+                new("custom[red]<script>\u001b", new(Text: "old"), new(Text: "<script>\u001b"))],
+            LeftContributionBaselineBytes = 123,
+            RightContributionBaselineBytes = 456,
+            EmbeddedContributions = [new(new("asset", 10, 20, -5, null), new("asset", 11, 21, null, "budget<script>\u001b"))],
+        };
+        foreach (var output in Outputs(report))
+        {
+            Assert.Contains("display.comments", output);
+            Assert.Contains("absent", output);
+            Assert.Contains("false", output);
+            Assert.Contains("non-additive", output);
+            Assert.Contains("LZO", output);
+            Assert.Contains("123", output);
+            Assert.Contains("456", output);
+            Assert.Contains("unavailable", output);
+            Assert.DoesNotContain("No differences", output);
+            Assert.DoesNotContain("\u001b", output);
+        }
+        var html = DiffRenderer.RenderHtml(report, "a", "b");
+        Assert.DoesNotContain("<script>", html);
+        Assert.Contains("-5", html);
+        Assert.Contains("&quot;&quot;", html);
+        if (Environment.GetEnvironmentVariable("GBX_RENDER_ARTIFACT_DIR") is { Length: > 0 } directory)
+        {
+            Directory.CreateDirectory(directory);
+            File.WriteAllText(Path.Combine(directory, "diff-integration.html"), html);
+        }
+    }
+
+    [Theory]
+    [InlineData(80)]
+    [InlineData(120)]
+    public void MetadataAndContributions_FitOrdinaryTerminalWidths(int width)
+    {
+        var report = Empty() with
+        {
+            MetadataChanges = [new("display.comments", null, new(Text: ""))],
+            EmbeddedContributions = [new(new("asset.bin", 10, 20, -5, null),
+                new("asset.bin", 11, 21, null, "Removal trial budget exhausted."))],
+        };
+        var console = new TestConsole().Width(width);
+        DiffRenderer.Render(console, report, "a", "b");
+        Assert.Contains("asset.bin", console.Output);
+        Assert.Contains("display.comments", console.Output);
+        Assert.DoesNotContain("\u001b", console.Output);
+    }
+
     private static IEnumerable<string> Outputs(DiffReport report)
     {
         var console = new TestConsole().Width(500);

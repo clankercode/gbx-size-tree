@@ -2,6 +2,8 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using GBX.NET;
 using GBX.NET.Engines.Game;
+using GbxSizeTree.Container;
+using GbxSizeTree.Measure;
 
 namespace GbxSizeTree.Cli.Modes;
 
@@ -14,7 +16,7 @@ public static class DiffMode
         if (format == CliOutputFormat.Json)
             Console.WriteLine(RenderJson(report));
         else if (format == CliOutputFormat.Html)
-            Console.WriteLine(DiffRenderer.RenderHtml(report, paths[0], paths[1]));
+            Console.WriteLine(DiffRenderer.RenderHtml(report, paths[0], paths[1], colorOption));
         else if (format == CliOutputFormat.Markdown)
             Console.WriteLine(DiffRenderer.RenderMarkdown(report, paths[0], paths[1]));
         else
@@ -35,39 +37,41 @@ public static class DiffMode
         report.LeftBlockSnapshots, report.RightBlockSnapshots,
         report.LeftItemSnapshots, report.RightItemSnapshots,
         report.LeftEmbeddedSnapshots, report.RightEmbeddedSnapshots,
-        report.MapUid, report.MapName, report.AuthorLogin, report.AuthorNickname, report.Password
+        report.MapUid, report.MapName, report.AuthorLogin, report.AuthorNickname, report.Password,
+        report.MetadataChanges, report.EmbeddedContributions,
+        report.LeftContributionBaselineBytes, report.RightContributionBaselineBytes
     ), DiffJsonContext.Default.DiffJsonReport);
 
     private static IEnumerable<Change> Legacy<T>(IEnumerable<ValueChange<T>> changes, Func<T, string> format) where T : class =>
         changes.Select(c => new Change(c.Left is null ? null : format(c.Left), c.Right is null ? null : format(c.Right)));
 
-    /// <summary>Compares parsed map placements and, with all, original serialized content.</summary>
-    public static DiffReport CompareFiles(string left, string right, bool all = false)
+    /// <summary>Compares map metadata and placements, with bounded outer-body trials for changed embeds.</summary>
+    public static DiffReport CompareFiles(string left, string right, bool all = false,
+        EmbeddedFileContributionOptions? contributionOptions = null)
     {
-        if (!all) return Compare(Read(left, false), Read(right, false), false);
         var leftBytes = File.ReadAllBytes(left);
         var rightBytes = File.ReadAllBytes(right);
-        var leftContent = MapContentComparison.Capture(leftBytes);
-        var rightContent = MapContentComparison.Capture(rightBytes);
+        var leftContent = all ? MapContentComparison.Capture(leftBytes) : new Dictionary<string, string>();
+        var rightContent = all ? MapContentComparison.Capture(rightBytes) : new Dictionary<string, string>();
+        DiffReport report;
         try
         {
-            return Compare(ReadBytes(leftBytes), ReadBytes(rightBytes), true);
+            report = Compare(ReadBytes(leftBytes, leftContent), ReadBytes(rightBytes, rightContent), all);
         }
-        catch (Exception) when (IsMapParseFailure())
+        catch (Exception ex) when (all && ex is not OperationCanceledException and not OutOfMemoryException)
         {
             return ContentOnlyReport(leftBytes.Length, rightBytes.Length, leftContent, rightContent);
         }
-
-        bool IsMapParseFailure() => true;
+        return WithContributions(report, leftBytes, rightBytes, contributionOptions);
     }
 
-    private static Snapshot ReadBytes(byte[] bytes)
+    private static Snapshot ReadBytes(byte[] bytes, IReadOnlyDictionary<string, string> content)
     {
         Gbx.LZO = new GBX.NET.LZO.Lzo();
         Gbx.ZLib = new GBX.NET.ZLib.ZLib();
         using var stream = new MemoryStream(bytes, writable: false);
         var map = Gbx.Parse<CGameCtnChallenge>(stream).Node;
-        return Capture(map, bytes.Length, MapContentComparison.Capture(bytes));
+        return Capture(map, bytes.Length, content);
     }
 
     private static DiffReport ContentOnlyReport(long leftBytes, long rightBytes,
@@ -81,15 +85,50 @@ public static class DiffMode
         return new DiffReport(leftBytes, rightBytes, [], [], [], [], chunks, null, null, null, null, null);
     }
 
-    private static Snapshot Read(string path, bool all)
+    private static DiffReport WithContributions(DiffReport report, byte[]? leftBytes, byte[]? rightBytes,
+        EmbeddedFileContributionOptions? options = null)
     {
-        if (!File.Exists(path)) throw new FileNotFoundException("map not found", path);
-        var bytes = File.ReadAllBytes(path);
-        Gbx.LZO = new GBX.NET.LZO.Lzo();
-        Gbx.ZLib = new GBX.NET.ZLib.ZLib();
-        using var stream = new MemoryStream(bytes, writable: false);
-        var map = Gbx.Parse<CGameCtnChallenge>(stream).Node;
-        return Capture(map, bytes.Length, all ? MapContentComparison.Capture(bytes) : new Dictionary<string, string>());
+        if (report.Embedded.Count == 0) return report;
+        var left = Measure(leftBytes, report.Embedded.Select(c => c.Left).OfType<EmbeddedSnapshot>().ToArray());
+        var right = Measure(rightBytes, report.Embedded.Select(c => c.Right).OfType<EmbeddedSnapshot>().ToArray());
+        var leftEntries = left.Entries.ToDictionary(e => e.Path, StringComparer.Ordinal);
+        var rightEntries = right.Entries.ToDictionary(e => e.Path, StringComparer.Ordinal);
+        return report with
+        {
+            LeftContributionBaselineBytes = left.BaselineCompressedBodyBytes,
+            RightContributionBaselineBytes = right.BaselineCompressedBodyBytes,
+            EmbeddedContributions = report.Embedded.Select(c => new ValueChange<EmbeddedFileContribution>(
+                c.Left is null ? null : leftEntries[c.Left.Path],
+                c.Right is null ? null : rightEntries[c.Right.Path])).ToArray(),
+        };
+
+        EmbeddedFileContributionMeasurement Measure(byte[]? bytes, EmbeddedSnapshot[] entries)
+        {
+            if (entries.Length == 0) return new(null, [], null);
+            string? unavailable = null;
+            try
+            {
+                unavailable = bytes is null ? "Measurement requires original container bytes."
+                    : !GbxContainerReader.Read(bytes).BodyCompressed ? "Outer body is uncompressed; no LZO contribution is available." : null;
+            }
+            catch (Exception ex) when (ex is InvalidDataException or NotSupportedException or OverflowException)
+            {
+                unavailable = ex.Message;
+            }
+            if (unavailable is not null)
+                return new(null, entries.Select(e => new EmbeddedFileContribution(e.Path, e.Compressed, e.Uncompressed,
+                    null, unavailable)).ToArray(), unavailable);
+            var measured = new EmbeddedFileContributionMeasurer().Measure(bytes!, entries.Select(e => e.Path).ToArray(), options);
+            var snapshots = entries.ToDictionary(e => e.Path, StringComparer.Ordinal);
+            return measured with
+            {
+                Entries = measured.Entries.Select(e => e with
+                {
+                    ZipCompressedBytes = e.ZipCompressedBytes ?? snapshots[e.Path].Compressed,
+                    ZipRawBytes = e.ZipRawBytes ?? snapshots[e.Path].Uncompressed,
+                }).ToArray(),
+            };
+        }
     }
 
     /// <summary>
@@ -98,7 +137,7 @@ public static class DiffMode
     /// Use MapContentComparison.Compare for original bytes, including data GBX.NET does not preserve.
     /// </summary>
     public static DiffReport CompareMaps(CGameCtnChallenge left, CGameCtnChallenge right, bool all = false) =>
-        Compare(Capture(left, 0, SerializedContent(left, all)), Capture(right, 0, SerializedContent(right, all)), all);
+        WithContributions(Compare(Capture(left, 0, SerializedContent(left, all)), Capture(right, 0, SerializedContent(right, all)), all), null, null);
 
     private static IReadOnlyDictionary<string, string> SerializedContent(CGameCtnChallenge map, bool all)
     {
@@ -115,7 +154,7 @@ public static class DiffMode
         map.Blocks?.Select(BlockSnapshot.From).OrderBy(x => x.PhysicalPosition).ThenBy(x => x.Key, StringComparer.Ordinal).ToArray() ?? [],
         map.BakedBlocks?.Select(BlockSnapshot.From).OrderBy(x => x.PhysicalPosition).ThenBy(x => x.Key, StringComparer.Ordinal).ToArray() ?? [],
         map.AnchoredObjects?.Select(ItemSnapshot.From).OrderBy(x => x.PhysicalPosition).ThenBy(x => x.Key, StringComparer.Ordinal).ToArray() ?? [],
-        ReadEmbeds(map), map.MapUid ?? "", map.MapName ?? "", map.AuthorLogin ?? "", map.AuthorNickname ?? "", map.Password is not null);
+        ReadEmbeds(map), MapMetadataSnapshot.Capture(map), map.MapUid ?? "", map.MapName ?? "", map.AuthorLogin ?? "", map.AuthorNickname ?? "", map.Password is not null);
 
     private static DiffReport Compare(Snapshot a, Snapshot b, bool all) => new(
         a.FileBytes, b.FileBytes, InstanceDiff(a.Blocks, b.Blocks, x => x.PhysicalPosition, x => x.Key),
@@ -125,6 +164,7 @@ public static class DiffMode
         Different(a.AuthorLogin, b.AuthorLogin), Different(a.AuthorNickname, b.AuthorNickname),
         Different(a.Password.ToString(), b.Password.ToString()))
     {
+        MetadataChanges = MapMetadataSnapshot.Compare(a.Metadata, b.Metadata),
         LeftBakedSnapshots = all ? a.BakedBlocks : [], RightBakedSnapshots = all ? b.BakedBlocks : [],
         LeftBlockSnapshots = a.Blocks, RightBlockSnapshots = b.Blocks,
         LeftItemSnapshots = a.Items, RightItemSnapshots = b.Items,
@@ -174,6 +214,6 @@ public static class DiffMode
 
     private sealed record Snapshot(long FileBytes, IReadOnlyDictionary<string, string> Chunks,
         BlockSnapshot[] Blocks, BlockSnapshot[] BakedBlocks, ItemSnapshot[] Items,
-        IReadOnlyDictionary<string, EmbeddedSnapshot> Embedded,
+        IReadOnlyDictionary<string, EmbeddedSnapshot> Embedded, MapMetadataSnapshot Metadata,
         string MapUid, string MapName, string AuthorLogin, string AuthorNickname, bool Password);
 }

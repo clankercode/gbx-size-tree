@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net;
 using System.Text;
+using GbxSizeTree.Measure;
 using Spectre.Console;
 
 namespace GbxSizeTree.Cli.Modes;
@@ -38,7 +39,8 @@ public static class DiffRenderer
                 {
                     "Compressed" => "Comp. B", "Uncompressed" => "Raw B", "Position" => "Pos",
                     "Rotation" => "Rot", "Direction" => "Dir", "Variant" => "Var", "Subvariant" => "Sub",
-                    "Animation" => "Anim", "Lightmap" => "Light", _ => column,
+                    "Animation" => "Anim", "Lightmap" => "Light", "Left marginal bytes" => "Left B",
+                    "Right marginal bytes" => "Right B", "ZIP bytes" => "ZIP B", "Raw bytes" => "Raw B", _ => column,
                 } : column;
                 var cell = new TableColumn(new Markup($"[bold]{Escape(heading)}[/]"));
                 if (column is "Compressed" or "Uncompressed" or "Ratio" or "Scale" or "Variant" or "Subvariant") cell.RightAligned();
@@ -56,6 +58,7 @@ public static class DiffRenderer
                 table.AddRow(cells);
             }
             console.MarkupLine($"[bold]{data.Title}[/] [grey]({Summary(data.Rows)})[/]");
+            if (data.Note is not null) console.MarkupLine(Escape(data.Note));
             console.Write(table);
             console.WriteLine();
         }
@@ -72,6 +75,7 @@ public static class DiffRenderer
         foreach (var table in Tables(report).Where(t => t.Rows.Count > 0))
         {
             b.Append($"\n### {table.Title} ({Summary(table.Rows)})\n\n");
+            if (table.Note is not null) b.AppendLine(MarkdownCell(table.Note) + "\n");
             b.AppendLine("| " + string.Join(" | ", table.Columns) + " |");
             b.AppendLine("| " + string.Join(" | ", table.Columns.Select(_ => "---")) + " |");
             foreach (var row in table.Rows)
@@ -90,7 +94,9 @@ public static class DiffRenderer
         b.Append($"<h2>Diff: <code>{Html(oldPath)}</code> → <code>{Html(newPath)}</code></h2><p>Size: {report.LeftBytes:N0} → {report.RightBytes:N0} bytes</p>");
         foreach (var table in Tables(report).Where(t => t.Rows.Count > 0))
         {
-            b.Append($"<h3>{table.Title} ({Summary(table.Rows)})</h3><section><table><thead><tr>");
+            b.Append($"<h3>{table.Title} ({Summary(table.Rows)})</h3>");
+            if (table.Note is not null) b.Append($"<p>{Html(table.Note)}</p>");
+            b.Append("<section><table><thead><tr>");
             foreach (var column in table.Columns) b.Append($"<th>{Html(column)}</th>");
             b.Append("</tr></thead><tbody>");
             foreach (var row in table.Rows)
@@ -118,12 +124,36 @@ public static class DiffRenderer
     {
         yield return EmbeddedTable("Embedded files — added/removed", report.Embedded.Where(c => c.Left is null || c.Right is null));
         yield return EmbeddedTable("Embedded files — modified", report.Embedded.Where(c => c.Left is not null && c.Right is not null));
+        yield return new("Embedded outer-map contribution — non-additive LZO marginal bytes",
+            ["Mark", "Name / path", "Left marginal bytes", "Right marginal bytes", "ZIP bytes", "Raw bytes"],
+            report.EmbeddedContributions.OrderBy(c => (c.Right ?? c.Left)?.Path, StringComparer.Ordinal)
+                .Select(c => new Row([Marker(c.Left, c.Right), (c.Right ?? c.Left)?.Path ?? "--",
+                    ContributionValue(c.Left), ContributionValue(c.Right),
+                    Transition(c, x => Bytes(x.ZipCompressedBytes)), Transition(c, x => Bytes(x.ZipRawBytes))])).ToArray(),
+            $"Original-body recompressed LZO baseline bytes: left {Bytes(report.LeftContributionBaselineBytes)}, right {Bytes(report.RightContributionBaselineBytes)}. " +
+            "Marginal bytes are signed baseline-minus-removal savings; context-dependent and non-additive, not an allocation of map size. ZIP/raw bytes are independent. Default: at most 8 removal trials per map; remaining entries are unavailable.");
         yield return ItemTable(report.Items);
         yield return BlockTable("Blocks", report.Blocks);
         yield return BlockTable("Baked blocks", report.BakedBlocks, showGridPosition: true);
+        yield return new("Map metadata", ["Mark", "Field", "Left", "Right"],
+            report.MetadataChanges.OrderBy(c => c.Path, StringComparer.Ordinal)
+                .Select(c => new Row([Marker(c.Left, c.Right), c.Path, MetadataValue(c.Left), MetadataValue(c.Right)])).ToArray());
         yield return new("Chunks", ["Mark", "Name", "Size"], report.Chunks.OrderBy(c => c.Key, StringComparer.Ordinal)
             .Select(c => new Row([Marker(c.Left, c.Right), c.Key ?? "chunk", c.Left is not null && c.Right is not null ? $"{c.Left} → {c.Right}" : c.Left ?? c.Right ?? "--"])).ToArray());
     }
+
+    private static string MetadataValue(MapMetadataValue? value) => value switch
+    {
+        { Text: { } text } => $"\"{text}\"",
+        { Integer: { } number } => number.ToString(CultureInfo.InvariantCulture),
+        { Boolean: { } flag } => flag ? "true" : "false",
+        _ => "absent",
+    };
+
+    private static string Bytes(long? value) => value?.ToString(CultureInfo.InvariantCulture) ?? "unavailable";
+    private static string ContributionValue(EmbeddedFileContribution? value) => value is null ? "absent"
+        : value.MarginalCompressedBodyBytes is { } bytes ? Bytes(bytes)
+        : $"unavailable: {value.UnavailableReason ?? "not measured"}";
 
     private static DiffTable EmbeddedTable(string title, IEnumerable<ValueChange<EmbeddedSnapshot>> changes) => new(
         title, ["Mark", "Name / path", "Compressed", "Uncompressed", "Ratio"],
@@ -215,7 +245,8 @@ public static class DiffRenderer
     }
 
     private static bool IsEmpty(DiffReport r) => r.LeftBytes == r.RightBytes && r.Embedded.Count == 0 && r.Items.Count == 0
-        && r.Blocks.Count == 0 && r.BakedBlocks.Count == 0 && r.Chunks.Count == 0 && !Metadata(r).Any();
+        && r.Blocks.Count == 0 && r.BakedBlocks.Count == 0 && r.Chunks.Count == 0
+        && r.MetadataChanges.Count == 0 && r.EmbeddedContributions.Count == 0 && !Metadata(r).Any();
 
     private static string Summary(IReadOnlyList<Row> rows) => string.Join(" ", new[] { ("+", "added"), ("-", "removed"), ("~", "changed") }
         .Select(x => (x.Item1, x.Item2, Count: rows.Count(r => r.Cells[0] == x.Item1)))
@@ -266,5 +297,5 @@ public static class DiffRenderer
 
     private sealed record Column<T>(string Name, Func<T, string> Value);
     private sealed record Row(string[] Cells, ValueChange<string>? Color = null);
-    private sealed record DiffTable(string Title, string[] Columns, IReadOnlyList<Row> Rows);
+    private sealed record DiffTable(string Title, string[] Columns, IReadOnlyList<Row> Rows, string? Note = null);
 }
