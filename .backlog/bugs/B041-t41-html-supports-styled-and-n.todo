@@ -9,10 +9,7 @@ id: B041
 priority: high
 started_at: null
 status: pending
-tags:
-    - chat-astra
-    - T41
-    - source-pending
+tags: []
 title: 'T41: --html supports --styled and --not-styled; default styled.'
 updated_at: "2026-09-09T06:13:11Z"
 ---
@@ -34,3 +31,5 @@ T23
 Decision and sequencing: Presentation/CLI lane after initial renderer and content slices, serial because RenderHtml and DiffMode dispatch overlap. Decision: default styled; --styled/--not-styled valid for HTML diff only; deterministic conflicting-flag errors and parity of content across styles.
 
 Additional user requirement (same chat, after opening styled HTML): improve color chips in styled HTML. Use rounded pill/chip shape, balanced padding and line-height, actual color background and readable contrast. Default stays ordinary. Preserve separate endpoint chips for transitions, safe unknown labels, and no styling in --not-styled output. Include desktop/mobile visual review; do not change terminal styling solely for this request.
+
+Parallel lane refinement: CLI parser/options/help-test seam can be implemented independently now, owning ArgParser.cs/CliOptions.cs and new parser tests only. Renderer/dispatch/style-chip integration must wait for active renderer/metadata branches to merge; helper slice is not full completion.
