@@ -12,7 +12,7 @@ public sealed class EmbeddedSizePresentation
     public const string RightMarginalColumn = "Right marginal bytes";
 
     public string EntryNote =>
-        "ZIP and raw are entry bytes, not total archive or outer-map size. ZIP / raw uses raw bytes as its denominator; " +
+        "ZIP and raw are entry bytes, not total ZIP archive or outer-map size. ZIP / raw uses raw bytes as its denominator; " +
         "lower means fewer ZIP bytes per raw byte. Signed byte and percentage-point deltas are right minus left; " +
         "absent entry bytes count as zero, while unmeasured bytes remain unavailable.";
 
