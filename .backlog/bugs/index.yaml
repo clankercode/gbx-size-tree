@@ -52,3 +52,4 @@ bugs:
     - file: B051-t51-exact-paragraph-initial-ta.todo
     - file: B052-t52-persist-all-tasks-in-tempo.todo
     - file: B053-t53-launch-xgrok46-reviewer-ov.todo
+    - file: B054-t54-commit-all-current-changes.todo
