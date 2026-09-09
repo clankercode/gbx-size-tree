@@ -30,3 +30,5 @@ Partial implementation; remaining scope must be completed. No active agent claim
 T20, T21
 
 Decision and sequencing: Presentation lane only after B021 is closed. Decision: show named ZIP/raw/marginal-map byte deltas with explicit compression context through a shared replaceable formatter, avoiding ambiguous c|u notation.
+
+Parallel lane refinement: develop a small replaceable embedded-size presentation helper and dedicated tests in NEW files only; integration waits active renderer lane. Prefer explicit named ZIP/raw/marginal-map columns, signed deltas and ratio with clear unavailable/baseline labels. No ambiguous c|u shorthand or percentage claims without denominator.
