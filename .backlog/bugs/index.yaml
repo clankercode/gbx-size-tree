@@ -20,3 +20,4 @@ bugs:
     - file: B019-t19-sort-using-physical-positi.todo
     - file: B020-t20-embedded-columns-actual-fi.todo
     - file: B021-t21-attribute-embedded-file-si.todo
+    - file: B022-t22-brainstorm-select-readable.todo
