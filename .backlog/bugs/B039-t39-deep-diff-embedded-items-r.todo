@@ -10,10 +10,7 @@ id: B039
 priority: high
 started_at: null
 status: pending
-tags:
-    - chat-astra
-    - T39
-    - source-pending
+tags: []
 title: 'T39: Deep diff embedded items: readable nested property paths e.g'
 updated_at: "2026-09-09T06:13:10Z"
 ---
@@ -31,3 +28,5 @@ Outstanding work; not implemented by this ingestion.
 
 ## Source dependencies
 T3, T38
+
+Decision and sequencing: Comparison lane after B038 closes, then integrate renderer serially. Decision: bounded deterministic readable nested property changes for parsable embedded GBX items; explicit opaque-content fallback for unsupported/corrupt payloads, no silent missing changes.
