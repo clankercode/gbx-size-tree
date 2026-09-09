@@ -33,9 +33,14 @@ public sealed class DiffInfographicTests
         Assert.Equal(1400, scene.Width);
         Assert.InRange(scene.Height, 900, 2200);
         Assert.Equal(new DiffInfographicCounts(216, 216, 1), scene.Counts);
+        Assert.Equal(new DiffInfographicDetailCounts(1, 0, 0), scene.DetailCounts);
         Assert.Equal(400, scene.Spatial.PlottedChanges);
-        Assert.Equal(30, scene.Spatial.OmittedChanges);
-        Assert.Equal(1, scene.Spatial.IgnoredNonFinitePositions);
+        Assert.Equal(30, scene.Spatial.SampledOutChanges);
+        Assert.Equal(0, scene.Spatial.InvalidChangePositions);
+        Assert.Equal(0, scene.Spatial.UnpositionedChanges);
+        Assert.Equal(430, scene.Spatial.PlottedContext);
+        Assert.Equal(0, scene.Spatial.SampledOutContext);
+        Assert.Equal(1, scene.Spatial.InvalidContextPositions);
         Assert.Contains(scene.Sections, x => x.Id == "spatial-context");
         Assert.Contains(scene.Sections, x => x.Id == "embedded-highlights");
         Assert.All(scene.Sections, x =>
@@ -79,6 +84,137 @@ public sealed class DiffInfographicTests
     }
 
     [Fact]
+    public void BuildScene_HeroCountsEntitiesOnlyAndCountsUnpositionedBlocks()
+    {
+        var report = Empty() with
+        {
+            Blocks = [new(null, Block("missing", 0, 0) with { PhysicalPosition = null })],
+            Embedded = [new(new("asset", "a", 1, 1), new("asset", "b", 2, 2))],
+            EmbeddedPropertyChanges = [new("asset", "a", "b", new(
+                [new("A", new("old"), new("new")), new("B", new("old"), new("new"))], true, [], []))],
+            Chunks = [new("1", "2", "chunk")],
+            MapName = new("Before", "After"),
+            MetadataChanges = [new("map.name", new("Before"), new("After")), new("editor.medal", new(Integer: 100), new(Integer: 90))],
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+
+        Assert.Equal(new DiffInfographicCounts(1, 0, 1), scene.Counts);
+        Assert.Equal(new DiffInfographicDetailCounts(2, 2, 1), scene.DetailCounts);
+        Assert.Equal(1, scene.Spatial.UnpositionedChanges);
+        Assert.Equal(0, scene.Spatial.PlottedChanges);
+        Assert.Equal("PLACEMENTS + EMBEDDED", scene.CountScopeLabel);
+    }
+
+    [Fact]
+    public void BuildScene_MetadataAdditionAndRemovalAreNotCalledModified()
+    {
+        var report = Empty() with
+        {
+            Password = new("False", "True"),
+            MetadataChanges =
+            [
+                new("custom.added", null, new("yes")),
+                new("custom.removed", new("yes"), null),
+            ],
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var metadata = Assert.Single(scene.Sections, x => x.Id == "metadata");
+
+        Assert.Equal(new DiffInfographicCounts(0, 0, 0), scene.Counts);
+        Assert.Equal(3, scene.DetailCounts.Metadata);
+        Assert.Contains(metadata.Lines, x => x == "+ custom.added: yes");
+        Assert.Contains(metadata.Lines, x => x == "− custom.removed: yes");
+        Assert.Contains(metadata.Lines, x => x == "~ Password present: False to True");
+    }
+
+    [Fact]
+    public void BuildScene_SpatialCoverageSeparatesChangesFromContext()
+    {
+        var context = Enumerable.Range(0, 905).Select(i => Item($"context-{i}", i, i)).ToArray();
+        var report = Empty() with
+        {
+            Items =
+            [
+                new(null, Item("valid", 1, 1)),
+                new(null, Item("invalid", double.NaN, 2)),
+            ],
+            Blocks = [new(null, Block("unpositioned", 0, 0) with { PhysicalPosition = null })],
+            LeftItemSnapshots = context.Append(Item("invalid-context", double.PositiveInfinity, 0)).ToArray(),
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+
+        Assert.Equal(1, scene.Spatial.PlottedChanges);
+        Assert.Equal(0, scene.Spatial.SampledOutChanges);
+        Assert.Equal(1, scene.Spatial.InvalidChangePositions);
+        Assert.Equal(1, scene.Spatial.UnpositionedChanges);
+        Assert.Equal(900, scene.Spatial.PlottedContext);
+        Assert.Equal(5, scene.Spatial.SampledOutContext);
+        Assert.Equal(1, scene.Spatial.InvalidContextPositions);
+        Assert.Contains(scene.Warnings, x => x.Contains("5 context points sampled out", StringComparison.Ordinal));
+        Assert.Contains(scene.Warnings, x => x.Contains("1 invalid change position", StringComparison.Ordinal));
+        Assert.Contains(scene.Warnings, x => x.Contains("1 invalid context position", StringComparison.Ordinal));
+        Assert.Contains(scene.Warnings, x => x.Contains("1 unpositioned change", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void BuildScene_NormalizesExtremeAndEqualHugePositionsToFiniteUnitCoordinates()
+    {
+        var report = Empty() with
+        {
+            Items =
+            [
+                new(null, Item("min", -double.MaxValue, -double.MaxValue)),
+                new(null, Item("max", double.MaxValue, double.MaxValue)),
+                new(null, Item("equal", double.MaxValue, double.MaxValue)),
+            ],
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+
+        Assert.Equal(0, scene.Spatial.Changes.Min(x => x.X));
+        Assert.Equal(1, scene.Spatial.Changes.Max(x => x.X));
+        Assert.Equal(0, scene.Spatial.Changes.Min(x => x.Z));
+        Assert.Equal(1, scene.Spatial.Changes.Max(x => x.Z));
+        Assert.All(scene.Spatial.Changes, point =>
+        {
+            Assert.True(float.IsFinite(point.X));
+            Assert.True(float.IsFinite(point.Z));
+            Assert.InRange(point.X, 0, 1);
+            Assert.InRange(point.Z, 0, 1);
+        });
+    }
+
+    [Fact]
+    public void BuildScene_SpatialRangeAndCoverageLabelsStayBoundedWhenMeasured()
+    {
+        var report = Empty() with
+        {
+            Items = [new(null, Item("min", -double.MaxValue, -double.MaxValue)), new(null, Item("max", double.MaxValue, double.MaxValue))],
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var rangeFont = TestFont(15);
+        var coverageFont = TestFont(15, bold: true);
+        var fittedCoverage = DiffInfographicText.Fit(scene.Spatial.CoverageLabel, coverageFont, 440);
+        var coverageWidth = SixLabors.Fonts.TextMeasurer.MeasureAdvance(fittedCoverage, new SixLabors.Fonts.TextOptions(coverageFont)).Width;
+        var fittedRange = DiffInfographicText.Fit(scene.Spatial.RangeLabel, rangeFont, 1200 - coverageWidth - 32);
+        var rangeWidth = SixLabors.Fonts.TextMeasurer.MeasureAdvance(fittedRange, new SixLabors.Fonts.TextOptions(rangeFont)).Width;
+
+        Assert.True(rangeWidth + coverageWidth + 32 <= 1200.5f);
+    }
+
+    private static SixLabors.Fonts.Font TestFont(float size, bool bold = false)
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "GbxSizeTree", "Resources", "Fonts", bold
+            ? "AtkinsonHyperlegibleNext-Bold.ttf" : "AtkinsonHyperlegibleNext-Regular.ttf");
+        var collection = new SixLabors.Fonts.FontCollection();
+        return collection.Add(path).CreateFont(size);
+    }
+
+    [Fact]
     public void BuildScene_DoesNotPairMarginalMeasurementsOrExposeScale()
     {
         var report = Empty() with
@@ -114,6 +250,18 @@ public sealed class DiffInfographicTests
     }
 
     [Fact]
+    public void BuildScene_TypedLegacyMetadataIsKeptWhenLegacyProjectionIsAbsent()
+    {
+        var report = Empty() with { MetadataChanges = [new("map.name", new("Before"), new("After"))] };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var metadata = Assert.Single(scene.Sections, x => x.Id == "metadata");
+
+        Assert.Equal(1, scene.DetailCounts.Metadata);
+        Assert.Equal("~ map.name: Before to After", Assert.Single(metadata.Lines));
+    }
+
+    [Fact]
     public void BuildScene_DoesNotDoubleCountLegacyMetadata()
     {
         var report = Empty() with
@@ -125,9 +273,10 @@ public sealed class DiffInfographicTests
         var scene = DiffInfographic.BuildScene(report, "a", "b");
         var metadata = Assert.Single(scene.Sections, x => x.Id == "metadata");
 
-        Assert.Equal(2, scene.Counts.Changed);
+        Assert.Equal(2, scene.DetailCounts.Metadata);
+        Assert.Equal(new DiffInfographicCounts(0, 0, 0), scene.Counts);
         Assert.Equal(2, metadata.Lines.Count);
-        Assert.Single(metadata.Lines, x => x.StartsWith("Map name:", StringComparison.Ordinal));
+        Assert.Single(metadata.Lines, x => x.StartsWith("~ Map name:", StringComparison.Ordinal));
     }
 
     [Fact]

@@ -69,6 +69,7 @@ internal static class DiffInfographicPainter
 
     private static void DrawCounts(IImageProcessingContext c, DiffInfographicScene scene)
     {
+        c.DrawText(scene.CountScopeLabel, DiffInfographicFonts.Bold(14), Muted, new PointF(70, 378));
         DrawCount(c, 70, 400, "+", scene.Counts.Added, "ADDED", Added);
         DrawCount(c, 510, 400, "−", scene.Counts.Removed, "REMOVED", Removed);
         DrawCount(c, 950, 400, "~", scene.Counts.Changed, "MODIFIED", Changed);
@@ -123,11 +124,19 @@ internal static class DiffInfographicPainter
             }
             else c.Fill(color, new EllipsePolygon(cx, cy, point.Kind == DiffInfographicChangeKind.Added ? 4 : 5));
         }
-            var detail = scene.Spatial.ClippedToPlotEdge > 0 ? $" · {scene.Spatial.ClippedToPlotEdge:N0} edge-pinned" : "";
-            c.DrawText(scene.Spatial.RangeLabel + detail, DiffInfographicFonts.Regular(15), Muted, new PointF(px, py + ph + 17));
-        var plotted = $"{scene.Spatial.PlottedChanges:N0} plotted" + (scene.Spatial.OmittedChanges > 0 ? $" · {scene.Spatial.OmittedChanges:N0} omitted" : "");
-        var plottedFont = DiffInfographicFonts.Bold(15);
-        c.DrawText(plotted, plottedFont, Changed, new PointF(px + pw - 220, py + ph + 17));
+            DrawInlineSpatialFooter(c, scene, px, py + ph + 17, pw);
+    }
+
+    private static void DrawInlineSpatialFooter(IImageProcessingContext c, DiffInfographicScene scene, float x, float y, float width)
+    {
+        var rangeFont = DiffInfographicFonts.Regular(15);
+        var coverageFont = DiffInfographicFonts.Bold(15);
+        var coverage = DiffInfographicText.Fit(scene.Spatial.CoverageLabel, coverageFont, 440);
+        var coverageWidth = TextMeasurer.MeasureAdvance(coverage, new TextOptions(coverageFont)).Width;
+        var maxRangeWidth = Math.Max(80, width - coverageWidth - 32);
+        var range = DiffInfographicText.Fit(scene.Spatial.RangeLabel, rangeFont, maxRangeWidth);
+        c.DrawText(range, rangeFont, Muted, new PointF(x, y));
+        c.DrawText(coverage, coverageFont, Changed, new PointF(x + width - coverageWidth, y));
     }
 
     private static void Legend(IImageProcessingContext c, float x, float y, Color color, string text)
@@ -141,7 +150,7 @@ internal static class DiffInfographicPainter
         var detailSections = scene.Sections.Where(x => x.Top >= 1000).ToArray();
         foreach (var section in detailSections)
         {
-            var accent = section.Id switch { "embedded-highlights" => Cyan, "deep-properties" => Changed, "metadata" => Added, _ => Removed };
+            var accent = section.Id switch { "embedded-highlights" => Cyan, "deep-properties" or "chunks" => Changed, "metadata" => Added, _ => Removed };
             c.Fill(Panel, Rounded(section.Left, section.Top, section.Right - section.Left, section.Bottom - section.Top, 22));
             c.Draw(PanelEdge, 2, Rounded(section.Left, section.Top, section.Right - section.Left, section.Bottom - section.Top, 22));
             c.Fill(accent, Rounded(section.Left, section.Top, 8, section.Bottom - section.Top, 4));
