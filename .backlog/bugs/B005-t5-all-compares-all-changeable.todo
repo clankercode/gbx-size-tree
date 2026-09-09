@@ -9,10 +9,7 @@ id: B005
 priority: high
 started_at: null
 status: in_progress
-tags:
-    - chat-astra
-    - T5
-    - source-inprog
+tags: []
 title: 'T5: --all compares ALL changeable map parts: lightmaps, genealogies, MediaTracker, other chunks and chunk removal, including equal-length c'
 updated_at: "2026-09-09T06:13:47Z"
 ---
@@ -30,3 +27,5 @@ Partial implementation; remaining scope must be completed. No active agent claim
 
 ## Source dependencies
 T1
+
+Decision and lane plan: comparison lane, separate from renderer-only edits. Verify equal-length byte changes and chunk removal. Use complete container/header/decompressed-body content fingerprints as exhaustive fallback alongside identifiable chunks; never call scanner-only coverage exhaustive. Record any parsing limits explicitly. B007/B021/B047 follow serially where DiffMode overlaps.
