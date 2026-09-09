@@ -27,6 +27,8 @@ public static class HelpText
                                     recognize, then exit (works with --json)
           --top N                   Show the top N entries (default: 20)
           --json                    Write the analysis as JSON
+          --html                    Write the analysis as HTML
+          --markdown, --md          Write the analysis as Markdown
           --color                   Always use color
           --no-color                Never use color
           -i, --interactive         Explicitly open the interactive interface

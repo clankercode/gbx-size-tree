@@ -84,7 +84,8 @@ try
             var reportOnly = options.HeaderOnly
                 || options.EstimateCompressed
                 || options.AllChunks
-                || options.UnknownChunks;
+                || options.UnknownChunks
+                || options.Format != CliOutputFormat.Console;
             var startInteractive = LaunchModeDetector.ShouldStartInteractive(
                 probe,
                 explicitlyRequested: options.Interactive,

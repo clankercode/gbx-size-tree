@@ -24,6 +24,8 @@ public static class ArgParser
         var unknownChunks = false;
         var topN = 20;
         var json = false;
+        var html = false;
+        var markdown = false;
         bool? color = null;
         var interactive = false;
         var nonInteractive = false;
@@ -96,6 +98,13 @@ public static class ArgParser
                     break;
                 case "--json":
                     json = true;
+                    break;
+                case "--html":
+                    html = true;
+                    break;
+                case "--markdown":
+                case "--md":
+                    markdown = true;
                     break;
                 case "--color":
                     color = true;
@@ -243,6 +252,19 @@ public static class ArgParser
             return (null, "--json cannot be used with -i/--interactive.");
         }
 
+        var formatCount = (json ? 1 : 0) + (html ? 1 : 0) + (markdown ? 1 : 0);
+        if (formatCount > 1)
+        {
+            return (null, "--json, --html, and --markdown/--md cannot be combined.");
+        }
+
+        if ((html || markdown) && interactive)
+        {
+            return (null, "--html and --markdown/--md cannot be used with -i/--interactive.");
+        }
+
+        var format = html ? CliOutputFormat.Html : markdown ? CliOutputFormat.Markdown : json ? CliOutputFormat.Json : CliOutputFormat.Console;
+
         if (interactive && nonInteractive)
         {
             return (null, "-i/--interactive cannot be used with --non-interactive.");
@@ -273,6 +295,7 @@ public static class ArgParser
             UnknownChunks = unknownChunks,
             TopN = topN,
             Json = json,
+            Format = format,
             Color = color,
             Interactive = interactive,
             NonInteractive = nonInteractive,

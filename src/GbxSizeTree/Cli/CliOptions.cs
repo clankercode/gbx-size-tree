@@ -1,5 +1,13 @@
 namespace GbxSizeTree.Cli;
 
+public enum CliOutputFormat
+{
+    Console,
+    Json,
+    Html,
+    Markdown,
+}
+
 /// <summary>
 /// Represents the command-line choices used to analyse or optimize one TM2020 <c>.Map.Gbx</c> file.
 /// </summary>
@@ -15,6 +23,7 @@ public sealed record CliOptions
     public bool UnknownChunks { get; init; }
     public int TopN { get; init; } = 20;
     public bool Json { get; init; }
+    public CliOutputFormat Format { get; init; } = CliOutputFormat.Console;
     public bool? Color { get; init; }
     public bool Interactive { get; init; }
     public bool NonInteractive { get; init; }
