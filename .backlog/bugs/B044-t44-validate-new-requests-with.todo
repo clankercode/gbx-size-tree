@@ -21,15 +21,13 @@ depends_on:
     - B057
     - B058
     - B059
+    - B064
 estimate_hours: 1
 id: B044
 priority: high
 started_at: null
 status: pending
-tags:
-    - chat-astra
-    - T44
-    - source-pending
+tags: []
 title: 'T44: Validate new requests with regression tests, real maps, visual infographic review, styled/unstyled HTML checks'
 updated_at: "2026-09-09T06:13:11Z"
 ---
