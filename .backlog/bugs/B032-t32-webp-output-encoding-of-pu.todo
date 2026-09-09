@@ -11,7 +11,10 @@ id: B032
 priority: high
 started_at: "2026-09-09T14:32:54Z"
 status: in_progress
-tags: []
+tags:
+    - chat-astra
+    - T32
+    - source-pending
 title: 'T32: --webp output encoding of purpose-built diff infographic.'
 updated_at: "2026-09-09T14:32:54Z"
 ---
