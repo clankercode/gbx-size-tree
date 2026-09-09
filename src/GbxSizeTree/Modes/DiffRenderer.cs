@@ -49,8 +49,10 @@ public static class DiffRenderer
                 var cells = row.Cells.Select(Escape).ToArray();
                 cells[0] = Colorize(cells[0], MarkerColor(cells[0]), color);
                 for (var i = 1; i < cells.Length; i++)
-                    cells[i] = Colorize(cells[i], data.Columns[i] is "Pos" or "Position" or "Coord" ? "cyan"
-                        : data.Columns[i] is "Rotation" or "Direction" ? "yellow" : "default", color);
+                    cells[i] = data.Columns[i] == "Color" && row.Color is { } change
+                        ? Transition(change, label => ColorChip(label, html: false, color), onlyDifferent: true)
+                        : Colorize(cells[i], data.Columns[i] is "Pos" or "Position" or "Coord" ? "cyan"
+                            : data.Columns[i] is "Rotation" or "Direction" ? "yellow" : "default", color);
                 table.AddRow(cells);
             }
             console.MarkupLine($"[bold]{data.Title}[/] [grey]({Summary(data.Rows)})[/]");
@@ -81,8 +83,9 @@ public static class DiffRenderer
         return b.ToString();
     }
 
-    public static string RenderHtml(DiffReport report, string oldPath, string newPath)
+    public static string RenderHtml(DiffReport report, string oldPath, string newPath, bool? colorOption = null)
     {
+        var color = colorOption ?? string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NO_COLOR"));
         var b = new StringBuilder("<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Map diff</title><style>body{font:14px system-ui;margin:24px;color:#18212b;background:#fafbfc}h2{overflow-wrap:anywhere}section{overflow-x:auto}table{border-collapse:collapse;margin:12px 0 28px;font-variant-numeric:tabular-nums}th,td{padding:8px 12px;border-bottom:1px solid #d5dce3;text-align:left;white-space:nowrap}th{background:#e9eef3}tbody tr:nth-child(even){background:#f0f4f7}td:first-child{font-weight:bold}.added td:first-child{color:#137333}.removed td:first-child{color:#b3261e}.changed td:first-child{color:#946000}td:nth-child(2){white-space:normal;min-width:240px;overflow-wrap:anywhere}@media(max-width:600px){body{margin:12px}}</style></head><body>");
         b.Append($"<h2>Diff: <code>{Html(oldPath)}</code> → <code>{Html(newPath)}</code></h2><p>Size: {report.LeftBytes:N0} → {report.RightBytes:N0} bytes</p>");
         foreach (var table in Tables(report).Where(t => t.Rows.Count > 0))
@@ -93,7 +96,13 @@ public static class DiffRenderer
             foreach (var row in table.Rows)
             {
                 b.Append($"<tr class=\"{(row.Cells[0] == "+" ? "added" : row.Cells[0] == "-" ? "removed" : "changed")}\">");
-                foreach (var cell in row.Cells) b.Append($"<td>{Html(cell)}</td>");
+                for (var i = 0; i < row.Cells.Length; i++)
+                {
+                    var cell = table.Columns[i] == "Color" && row.Color is { } change
+                        ? Transition(change, label => ColorChip(label, html: true, color), onlyDifferent: true)
+                        : Html(row.Cells[i]);
+                    b.Append($"<td>{cell}</td>");
+                }
                 b.Append("</tr>");
             }
             b.Append("</tbody></table></section>");
@@ -137,7 +146,7 @@ public static class DiffRenderer
         AddVarying(columns, values, "Animation", x => x.AnimationPhase);
         AddVarying(columns, values, "Lightmap", x => x.LightmapQuality);
         AddVarying(columns, values, "Flags", x => x.Flags.ToString(CultureInfo.InvariantCulture));
-        return SpatialTable("Placed items", changes, columns, x => x.PhysicalPosition, x => x.Key);
+        return SpatialTable("Placed items", changes, columns, x => x.PhysicalPosition, x => x.Key, x => x.Color);
     }
 
     private static DiffTable BlockTable(string title, IReadOnlyList<ValueChange<BlockSnapshot>> changes)
@@ -157,7 +166,7 @@ public static class DiffRenderer
         AddVarying(columns, values, "Color", x => x.Color);
         AddVarying(columns, values, "Lightmap", x => x.LightmapQuality);
         AddVarying(columns, values, "Flags", x => x.Flags.ToString(CultureInfo.InvariantCulture));
-        return SpatialTable(title, changes, columns, x => x.PhysicalPosition, x => x.Key);
+        return SpatialTable(title, changes, columns, x => x.PhysicalPosition, x => x.Key, x => x.Color);
     }
 
     private static void AddVarying<T>(List<Column<T>> columns, T[] values, string name, Func<T, string> value) where T : class
@@ -166,12 +175,13 @@ public static class DiffRenderer
     }
 
     private static DiffTable SpatialTable<T>(string title, IReadOnlyList<ValueChange<T>> changes,
-        List<Column<T>> columns, Func<T, SpatialPosition?> position, Func<T, string> key) where T : class => new(
+        List<Column<T>> columns, Func<T, SpatialPosition?> position, Func<T, string> key, Func<T, string> color) where T : class => new(
         title, new[] { "Mark" }.Concat(columns.Select(c => c.Name)).ToArray(),
         changes.OrderBy(c => position((c.Right ?? c.Left)!))
             .ThenBy(c => key((c.Right ?? c.Left)!), StringComparer.Ordinal)
             .ThenBy(c => c.Left is null ? 1 : 0)
-            .Select(c => new Row(new[] { Marker(c.Left, c.Right) }.Concat(columns.Select(col => Transition(c, col.Value, onlyDifferent: true))).ToArray())).ToArray());
+            .Select(c => new Row(new[] { Marker(c.Left, c.Right) }.Concat(columns.Select(col => Transition(c, col.Value, onlyDifferent: true))).ToArray(),
+                new(c.Left is null ? null : color(c.Left), c.Right is null ? null : color(c.Right)))).ToArray());
 
     private static string Transition<T>(ValueChange<T> change, Func<T, string> value, bool onlyDifferent = false) where T : class
     {
@@ -228,7 +238,25 @@ public static class DiffRenderer
         return b.ToString();
     }
 
+    private static string ColorChip(string label, bool html, bool enabled)
+    {
+        var (background, foreground) = label switch
+        {
+            "White" => ("#ffffff", "#000000"),
+            "Green" => ("#008000", "#ffffff"),
+            "Blue" => ("#0000ff", "#ffffff"),
+            "Red" => ("#ff0000", "#000000"),
+            "Black" => ("#000000", "#ffffff"),
+            _ => ((string?)null, (string?)null),
+        };
+        var text = html ? Html(label) : Escape(label);
+        if (!enabled || background is null) return text;
+        return html
+            ? $"<span style=\"background-color:{background};color:{foreground};white-space:pre\"> {text} </span>"
+            : $"[{foreground} on {background}] {text} [/]";
+    }
+
     private sealed record Column<T>(string Name, Func<T, string> Value);
-    private sealed record Row(string[] Cells);
+    private sealed record Row(string[] Cells, ValueChange<string>? Color = null);
     private sealed record DiffTable(string Title, string[] Columns, IReadOnlyList<Row> Rows);
 }

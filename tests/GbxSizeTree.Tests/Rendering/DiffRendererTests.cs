@@ -312,6 +312,57 @@ public sealed class DiffRendererTests
         }
     }
 
+    [Fact]
+    public void Colors_KnownPaletteHasPaddedChipsInEverySpatialTable()
+    {
+        var names = Enum.GetNames(typeof(CGameCtnBlock).GetProperty("Color")!.PropertyType);
+        Assert.Equal(new[] { "Default", "White", "Green", "Blue", "Red", "Black" }, names);
+        foreach (var name in names.Where(n => n != "Default"))
+        {
+            var report = ColorReport(name);
+            var html = DiffRenderer.RenderHtml(report, "left", "right", colorOption: true);
+            Assert.Equal(3, html.Split($"> {name} </span>", StringSplitOptions.None).Length - 1);
+            Assert.Contains("background-color:", html);
+            var console = new TestConsole().Width(500);
+            console.Profile.Capabilities.Ansi = true;
+            console.Profile.Capabilities.ColorSystem = Spectre.Console.ColorSystem.TrueColor;
+            console.EmitAnsiSequences = true;
+            DiffRenderer.Render(console, report, "left", "right");
+            Assert.Equal(3, console.Output.Split($" {name} \u001b", StringSplitOptions.None).Length - 1);
+        }
+    }
+
+    [Fact]
+    public void Colors_DefaultUnknownAndNoColorRemainOrdinaryAndSafe()
+    {
+        const string unknown = "Blue → Red [red]<script>\u001b";
+        foreach (var name in new[] { "Default", unknown })
+        {
+            var html = DiffRenderer.RenderHtml(ColorReport(name), "left", "right", colorOption: true);
+            Assert.DoesNotContain("<span", html);
+            Assert.DoesNotContain("<script>", html);
+            Assert.DoesNotContain("\u001b", html);
+        }
+        var report = ColorReport("Blue");
+        var console = new TestConsole().Width(500);
+        DiffRenderer.Render(console, report, "left", "right");
+        Assert.DoesNotContain("\u001b", console.Output);
+        Assert.DoesNotContain("<span", DiffRenderer.RenderMarkdown(report, "left", "right"));
+        Assert.DoesNotContain("<span", DiffRenderer.RenderHtml(report, "left", "right", colorOption: false));
+    }
+
+    private static DiffReport ColorReport(string color)
+    {
+        var item = ItemSnapshot.From(new CGameCtnAnchoredObject());
+        var block = BlockSnapshot.From(new CGameCtnBlock());
+        return Empty() with
+        {
+            Items = [new(item with { Color = "Default" }, item with { Color = color })],
+            Blocks = [new(block with { Color = "Default" }, block with { Color = color })],
+            BakedBlocks = [new(block with { Color = "Default" }, block with { Color = color })],
+        };
+    }
+
     private static IEnumerable<string> Outputs(DiffReport report)
     {
         var console = new TestConsole().Width(500);
