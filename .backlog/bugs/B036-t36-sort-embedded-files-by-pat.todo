@@ -1,15 +1,15 @@
 ---
+completed_at: null
 complexity: medium
 created_at: "2026-09-09T06:13:10Z"
-depends_on: []
+depends_on:
+    - B003
 estimate_hours: 1
 id: B036
 priority: high
+started_at: null
 status: pending
-tags:
-    - chat-astra
-    - T36
-    - source-done
+tags: []
 title: 'T36: Sort embedded files by path name'
 updated_at: "2026-09-09T06:13:10Z"
 ---
