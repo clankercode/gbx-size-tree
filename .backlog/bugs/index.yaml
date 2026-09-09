@@ -12,3 +12,4 @@ bugs:
     - file: B011-t11-attractive-diff-markers-se.todo
     - file: B012-t12-terminal-aware-color-plain.todo
     - file: B013-t13-compact-placed-item-paths.todo
+    - file: B014-t14-proper-aligned-tables-with.todo
