@@ -1,4 +1,6 @@
 ---
+claimed_at: "2026-09-09T06:26:44Z"
+claimed_by: astra
 completed_at: null
 complexity: medium
 created_at: "2026-09-09T06:13:07Z"
@@ -7,8 +9,8 @@ depends_on:
 estimate_hours: 1
 id: B007
 priority: high
-started_at: null
-status: pending
+started_at: "2026-09-09T06:26:44Z"
+status: in_progress
 tags: []
 title: 'T7: Map metadata comparison by default'
 updated_at: "2026-09-09T06:26:44Z"
