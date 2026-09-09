@@ -9,10 +9,7 @@ id: B040
 priority: high
 started_at: null
 status: pending
-tags:
-    - chat-astra
-    - T40
-    - source-pending
+tags: []
 title: 'T40: Diff embedded map metadata by default, beyond existing top-level UID/name/author fields.'
 updated_at: "2026-09-09T06:13:11Z"
 ---
@@ -30,3 +27,5 @@ Outstanding work; not implemented by this ingestion.
 
 ## Source dependencies
 T7
+
+Decision and sequencing: Comparison lane after B007 closes. Decision: expose embedded map metadata by default using explicit stable fields/paths and safe text handling; preserve legacy top-level JSON metadata keys.
