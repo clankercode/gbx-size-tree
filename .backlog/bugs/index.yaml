@@ -32,3 +32,4 @@ bugs:
     - file: B031-t31-png-output-encoding-of-pur.todo
     - file: B032-t32-webp-output-encoding-of-pu.todo
     - file: B033-t33-visually-excellent-dedicat.todo
+    - file: B034-t34-all-human-facing-pos-rot-f.todo
