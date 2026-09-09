@@ -22,7 +22,10 @@ id: B049
 priority: high
 started_at: "2026-09-09T09:54:49Z"
 status: in_progress
-tags: []
+tags:
+    - chat-astra
+    - T49
+    - source-inprog
 title: 'T49: Overall local-comparison and Discord automation usability'
 updated_at: "2026-09-09T09:54:49Z"
 ---
