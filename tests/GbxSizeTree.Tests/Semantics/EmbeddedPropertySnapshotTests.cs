@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using GBX.NET;
+using GBX.NET.Components;
 using GBX.NET.Engines.GameData;
 using GBX.NET.Engines.Plug;
 using GbxSizeTree.Semantics;
@@ -109,6 +110,82 @@ public sealed class EmbeddedPropertySnapshotTests
         Assert.Contains(result.Changes, x => x.Path.EndsWith("IsNatural") && x.Left!.Boolean == false && x.Right!.Boolean == true);
         var json = JsonSerializer.Serialize(result, EmbeddedPropertyTestJsonContext.Default.EmbeddedPropertyDiff);
         Assert.Contains("Plastic", json);
+    }
+
+    [Fact]
+    public void ExternalPrefabModel_IsIdentifiedAndNeverResolved()
+    {
+        var reads = 0;
+        var refTable = new GbxRefTable
+        {
+            FileSystemPath = "/outside/capture",
+            ExternalNodes = new Dictionary<string, Func<Gbx>>(StringComparer.OrdinalIgnoreCase)
+        };
+        refTable.ExternalNodes["external.Shape.Gbx"] = () =>
+        {
+            reads++;
+            throw new InvalidOperationException("External model was resolved.");
+        };
+        var prefab = new CPlugPrefab
+        {
+            Ents = [new()
+            {
+                ModelFile = new GbxRefTableFile(refTable, flags: 0, useFile: true, "external.Shape.Gbx")
+            }]
+        };
+
+        var snapshot = EmbeddedPropertySnapshot.CaptureParsed(prefab);
+
+        Assert.Equal(0, reads);
+        Assert.Equal("external.Shape.Gbx", snapshot.Values["Prefab > Ent#1 > ExternalModel > Path"].Text);
+        Assert.Contains(snapshot.Issues, x =>
+            x.Code == "unavailable" && x.Path == "Prefab > Ent#1 > ExternalModel");
+
+        var changed = new CPlugPrefab
+        {
+            Ents = [new()
+            {
+                ModelFile = new GbxRefTableFile(refTable, flags: 0, useFile: true, "changed.Shape.Gbx")
+            }]
+        };
+        Assert.Contains(
+            EmbeddedPropertySnapshot.Compare(snapshot, EmbeddedPropertySnapshot.CaptureParsed(changed)).Changes,
+            x => x.Path.EndsWith("ExternalModel > Path")
+                && x.Left!.Text == "external.Shape.Gbx"
+                && x.Right!.Text == "changed.Shape.Gbx");
+    }
+
+    [Fact]
+    public void MissingPrefabModel_HasExplicitOccurrenceDiagnostic()
+    {
+        var snapshot = EmbeddedPropertySnapshot.CaptureParsed(
+            new CPlugPrefab { Ents = [new()] });
+
+        Assert.Contains(snapshot.Issues, x =>
+            x.Code == "unavailable" && x.Path == "Prefab > Ent#1 > Model");
+    }
+
+    [Theory]
+    [InlineData(float.NaN, "NaN")]
+    [InlineData(float.PositiveInfinity, "Infinity")]
+    [InlineData(float.NegativeInfinity, "-Infinity")]
+    public void NonFiniteMaterialNumber_IsJsonSafeAndPreservesFloatBits(
+        float value,
+        string text)
+    {
+        var snapshot = EmbeddedPropertySnapshot.CaptureParsed(
+            new CPlugMaterialUserInst { TextureSizeInMeters = value });
+        var captured = snapshot.Values["Material > TextureSizeMeters"];
+        var bits = BitConverter.SingleToUInt32Bits(value).ToString("X8");
+
+        Assert.Equal(text, captured.Text);
+        Assert.Equal(bits, captured.NumberBits);
+        Assert.Null(captured.Number);
+        var finite = EmbeddedPropertySnapshot.CaptureParsed(
+            new CPlugMaterialUserInst { TextureSizeInMeters = 1 });
+        var diff = EmbeddedPropertySnapshot.Compare(snapshot, finite);
+        var json = JsonSerializer.Serialize(diff, EmbeddedPropertyTestJsonContext.Default.EmbeddedPropertyDiff);
+        Assert.Contains(bits, json);
     }
 
     [Fact]

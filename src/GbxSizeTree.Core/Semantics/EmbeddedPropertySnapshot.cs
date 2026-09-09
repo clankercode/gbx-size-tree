@@ -14,7 +14,8 @@ public sealed record EmbeddedPropertyValue(
     string Text,
     bool? Boolean = null,
     long? Integer = null,
-    double? Number = null);
+    double? Number = null,
+    string? NumberBits = null);
 
 public sealed record EmbeddedPropertyIssue(string Code, string Path, string Message);
 
@@ -389,12 +390,28 @@ public static class EmbeddedPropertySnapshot
             var ents = prefab.Ents ?? [];
             for (var index = 0; index < ents.Length && !stopped; index++)
             {
+                var occurrencePath = path + Separator + $"Ent#{index + 1}";
+                if (ents[index].ModelFile is { } modelFile)
+                {
+                    var externalPath = occurrencePath + Separator + "ExternalModel";
+                    AddText(externalPath + Separator + "Path", modelFile.FilePath);
+                    Unavailable(
+                        externalPath,
+                        externalPath + Separator + "Content",
+                        "External prefab model was not resolved during bounded capture.");
+                    continue;
+                }
+
                 if (ents[index].Model is { } model)
                 {
-                    VisitNode(
-                        model,
-                        path + Separator + $"Ent#{index + 1}" + Separator + TypeSegment(model),
-                        depth + 1);
+                    VisitNode(model, occurrencePath + Separator + TypeSegment(model), depth + 1);
+                }
+                else
+                {
+                    Unavailable(
+                        occurrencePath + Separator + "Model",
+                        occurrencePath + Separator + "Model",
+                        "Prefab entity has no readable inline model or external reference.");
                 }
             }
         }
@@ -496,8 +513,20 @@ public static class EmbeddedPropertySnapshot
         private void AddInteger(string path, long value) =>
             Add(path, new EmbeddedPropertyValue(value.ToString(System.Globalization.CultureInfo.InvariantCulture), Integer: value));
 
-        private void AddNumber(string path, double value) =>
-            Add(path, new EmbeddedPropertyValue(value.ToString("R", System.Globalization.CultureInfo.InvariantCulture), Number: value));
+        private void AddNumber(string path, float value)
+        {
+            if (float.IsFinite(value))
+            {
+                Add(path, new EmbeddedPropertyValue(
+                    value.ToString("R", System.Globalization.CultureInfo.InvariantCulture),
+                    Number: value));
+                return;
+            }
+
+            Add(path, new EmbeddedPropertyValue(
+                value.ToString("R", System.Globalization.CultureInfo.InvariantCulture),
+                NumberBits: BitConverter.SingleToUInt32Bits(value).ToString("X8", System.Globalization.CultureInfo.InvariantCulture)));
+        }
 
         private void Add(string path, EmbeddedPropertyValue value)
         {
@@ -520,6 +549,12 @@ public static class EmbeddedPropertySnapshot
 
             valueBytes += bytes;
             Values[path] = value;
+        }
+
+        private void Unavailable(string issuePath, string unreadablePath, string message)
+        {
+            Issues.Add(new EmbeddedPropertyIssue("unavailable", issuePath, message));
+            UnreadablePaths.Add(unreadablePath);
         }
 
         private void Unsupported(string path, string typeName)
