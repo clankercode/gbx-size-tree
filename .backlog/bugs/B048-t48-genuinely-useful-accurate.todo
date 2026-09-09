@@ -34,3 +34,5 @@ Partial implementation; remaining scope must be completed. No active agent claim
 T6, T8, T9, T12, T23, T24
 
 Decision and sequencing: Final CLI/docs lane after output flags and data coverage stabilize (despite existing dependencies already done). Decision: help documents actual coverage and opaque fallbacks, baked gating, NO_COLOR behavior, styles, binary outputs and OLD_MAP NEW_MAP examples; never overclaim semantic interpretation.
+
+Parallel lane: HelpText.cs and documentation/tests only, disjoint from active renderer integration, deep helper, and measurement budget. Document current implemented features accurately; image flags must be added in final follow-up after encoders land. Do not claim pending image support exists.
