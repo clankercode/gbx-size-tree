@@ -15,7 +15,10 @@ id: B043
 priority: high
 started_at: "2026-09-09T11:05:31Z"
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T43
+    - source-pending
 title: 'T43: Real-map verification: gbx-size-tree diff ~/tm-docs/Maps/SB2/Sweet\ 2\ burger\ v205.Map.gbx ~/tm-docs/Maps/SB2/Sweet\ 2\ burger\ v206.M'
 updated_at: "2026-09-09T13:45:00Z"
 ---
