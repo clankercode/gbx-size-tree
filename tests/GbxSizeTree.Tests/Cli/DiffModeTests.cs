@@ -214,6 +214,29 @@ public sealed class DiffModeTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void CompareFiles_ThrowingObserverPreservesJsonResult(bool all)
+    {
+        var leftPath = Path.GetTempFileName();
+        var rightPath = Path.GetTempFileName();
+        try
+        {
+            SaveEmbeddedMap(MapWithEmbeds(("asset.bin", "old")), leftPath);
+            SaveEmbeddedMap(MapWithEmbeds(("asset.bin", "new")), rightPath);
+            var expected = DiffMode.RenderJson(DiffMode.CompareFiles(leftPath, rightPath, all));
+            var calls = 0;
+
+            var actual = DiffMode.CompareFiles(leftPath, rightPath, all,
+                progress: _ => { calls++; throw new InvalidOperationException("observer failed"); });
+
+            Assert.Equal(1, calls);
+            Assert.Equal(expected, DiffMode.RenderJson(actual));
+        }
+        finally { File.Delete(leftPath); File.Delete(rightPath); }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void CompareFiles_MeasuresChangedEntriesFromOriginalBytes(bool all)
     {
         var left = MapWithEmbeds(("changed.bin", "aaaa"), ("removed.bin", "old"), ("keep.bin", "keep"));
