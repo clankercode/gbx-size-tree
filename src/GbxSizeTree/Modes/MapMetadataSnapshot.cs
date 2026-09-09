@@ -1,4 +1,5 @@
 using GBX.NET.Engines.Game;
+using GBX.NET.Serialization.Chunking;
 
 namespace GbxSizeTree.Cli.Modes;
 
@@ -17,6 +18,8 @@ public sealed class MapMetadataSnapshot
     public static MapMetadataSnapshot Capture(CGameCtnChallenge map)
     {
         ArgumentNullException.ThrowIfNull(map);
+        var passwordChunk = map.Chunks.FirstOrDefault(c => c.Id == 0x03043029);
+        var opaquePassword = passwordChunk is ISkippableChunk { Data: not null };
         var values = new SortedDictionary<string, MapMetadataValue?>(StringComparer.Ordinal)
         {
             ["author.extraInfo"] = Text(map.AuthorExtraInfo),
@@ -59,11 +62,15 @@ public sealed class MapMetadataSnapshot
             ["medals.goldMs"] = Number(map.GoldTime?.TotalMilliseconds),
             ["medals.silverMs"] = Number(map.SilverTime?.TotalMilliseconds),
             // RemovePassword leaves a zero hash; do not expose either credential's contents.
-            ["security.hashedPasswordPresent"] = Flag(map.HashedPassword is { } hash && hash != GBX.NET.Checksum128.Zero),
+            ["security.hashedPasswordPresent"] = opaquePassword ? null : Flag(map.HashedPassword is { } hash && hash != GBX.NET.Checksum128.Zero),
+            ["security.passwordChunkPresent"] = Flag(passwordChunk is not null),
             ["security.passwordPresent"] = Flag(map.Password is not null),
             ["validation.forScriptModes"] = Flag(map.ChallengeParameters?.IsValidatedForScriptModes),
             ["validation.timeLimitMs"] = Number(map.ChallengeParameters?.TimeLimit.TotalMilliseconds),
         };
+        if (opaquePassword)
+            values["security.hashedPasswordPresent/status"] = new(Text: "unavailable: opaque chunk 03043029");
+        EmbeddedMetadataCapture.Capture(map, values);
         return new(values);
     }
 

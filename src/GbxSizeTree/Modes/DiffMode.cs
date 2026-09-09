@@ -164,6 +164,9 @@ public static class DiffMode
         Different(a.Password.ToString(), b.Password.ToString()))
     {
         MetadataChanges = MapMetadataSnapshot.Compare(a.Metadata, b.Metadata),
+        Warnings = a.Metadata.Values.Concat(b.Metadata.Values)
+            .Where(p => p.Key.EndsWith("/status", StringComparison.Ordinal) && p.Value?.Text?.StartsWith("unavailable:", StringComparison.Ordinal) == true)
+            .Select(p => $"Metadata {p.Key}: {p.Value!.Text}").Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray(),
         LeftBakedSnapshots = all ? a.BakedBlocks : [], RightBakedSnapshots = all ? b.BakedBlocks : [],
         LeftBlockSnapshots = a.Blocks, RightBlockSnapshots = b.Blocks,
         LeftItemSnapshots = a.Items, RightItemSnapshots = b.Items,
