@@ -9,7 +9,10 @@ id: B011
 priority: high
 started_at: null
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T11
+    - source-done
 title: 'T11: Attractive +,-,~ diff markers, section counts, colored columns and size highlighting.'
 updated_at: "2026-09-09T06:13:49Z"
 ---
