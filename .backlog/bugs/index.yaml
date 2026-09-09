@@ -9,3 +9,4 @@ bugs:
     - file: B008-t8-diff-help-works-without-pat.todo
     - file: B009-t9-help-explicitly-explains-ol.todo
     - file: B010-t10-embedded-files-first-place.todo
+    - file: B011-t11-attractive-diff-markers-se.todo
