@@ -41,6 +41,40 @@ public sealed class DiffSpatialGroupsTests(ITestOutputHelper output)
     }
 
     [Theory]
+    [InlineData(8000, false, false)]
+    [InlineData(8000, true, false)]
+    [InlineData(8000, false, true)]
+    [InlineData(8000, true, true)]
+    [InlineData(32000, false, false)]
+    [InlineData(32000, true, false)]
+    [InlineData(32000, false, true)]
+    [InlineData(32000, true, true)]
+    [InlineData(64000, false, false)]
+    [InlineData(64000, true, false)]
+    [InlineData(64000, false, true)]
+    [InlineData(64000, true, true)]
+    public void DenseDisconnectedCells_PruneActualBoundsAndKeepBridges(int count, bool overlappingBounds, bool bridge)
+    {
+        var changes = Enumerable.Range(0, count).Select(i =>
+        {
+            var delta = i / (double)count * .01;
+            var p = i >= count / 2 ? new SpatialPosition(63.9 + delta, 31.9, 31.9)
+                : overlappingBounds ? i % 2 == 0 ? new(0, 31 + delta, 0) : new(0, 0, 31 + delta)
+                : new(delta, 0, 0);
+            return Added(i, p);
+        }).ToArray();
+        if (bridge) changes = [.. changes, Added(count, new(31, 31, 31))];
+        var timer = Stopwatch.StartNew();
+        var result = DiffSpatialGroups.OrderWithDiagnostics(changes, p => p.Position, p => p.Key, out var checks).ToArray();
+        output.WriteLine($"Disconnected cells: {count}, overlapping bounds={overlappingBounds}, bridge={bridge}, "
+            + $"{timer.Elapsed.TotalMilliseconds:F3} ms, {checks} distance checks");
+        Assert.Equal(changes.Length, result.Length);
+        Assert.Equal(bridge ? 1 : 2, result.Select(r => r.Group).Distinct().Count());
+        Assert.True(checks <= count * 8L, $"Expected bounded search work, got {checks} for {count} points.");
+        Assert.Equal(result, Order(changes.Reverse().ToArray()));
+    }
+
+    [Theory]
     [InlineData(0)]
     [InlineData(-128)]
     public void AdjacentCells_KeepNonRepresentativeBridgeEvidence(int offset)
@@ -83,6 +117,31 @@ public sealed class DiffSpatialGroupsTests(ITestOutputHelper output)
         foreach (var end in new[] { new SpatialPosition(64, 0, 0), new(64.0001, 0, 0),
             new(0, 64, 0), new(0, 0, 64), new(40, 40, 40), new(-64, 0, 0) })
             AssertMatchesOracle([Added(0, new(0, 0, 0)), Added(1, end)]);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(.000001)]
+    public void HierarchicalSearch_KeepsExactRadiusBoundary(double beyond)
+    {
+        var changes = Enumerable.Range(0, 80).Select(i => Added(i, i < 40
+            ? new(0, i / 100.0, 0) : new(64 + beyond, 31 + i / 1000.0, 31))).ToArray();
+        changes = [.. changes, Added(80, new(0, 31.08, 31)), Added(81, new(64 + beyond, 31.08, 31))];
+        AssertMatchesOracle(changes);
+        Assert.Equal(beyond == 0 ? 1 : 2, Order(changes).Select(r => r.Group).Distinct().Count());
+    }
+
+    [Fact]
+    public void DenseSeededCells_MatchAllPairsAfterHierarchicalSplits()
+    {
+        var random = new Random(56057);
+        for (var trial = 0; trial < 20; trial++)
+        {
+            var changes = Enumerable.Range(0, 100).Select(i => Added(i, new(
+                (i < 50 ? 0 : 63) + random.NextDouble(),
+                random.NextDouble() * 32, random.NextDouble() * 32))).ToArray();
+            AssertMatchesOracle(changes);
+        }
     }
 
     [Fact]
