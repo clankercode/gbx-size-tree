@@ -56,3 +56,4 @@ bugs:
     - file: B055-t55-ingest-all-task-rows-as-bl.todo
     - file: B056-t56-replace-thick-horizontal-r.todo
     - file: B057-t57-color-columns-default-labe.todo
+    - file: B058-t58-improve-pretty-tty-framing.todo
