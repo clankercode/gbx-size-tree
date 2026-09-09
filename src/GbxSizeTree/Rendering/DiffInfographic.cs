@@ -221,19 +221,21 @@ public static class DiffInfographic
                 : $"Outer-map marginal unavailable: {unavailable}";
             lines.Add($"~ {value.Path}  ·  {detail}");
         }
-        var unavailableContributions = report.EmbeddedContributions.Count(x => (x.Right ?? x.Left)?.UnavailableReason is not null);
-        if (unavailableContributions > 0)
+        var unavailableSides = report.EmbeddedContributions
+            .SelectMany(x => new[] { x.Left, x.Right })
+            .OfType<EmbeddedFileContribution>()
+            .Where(x => x.UnavailableReason is not null)
+            .ToArray();
+        string? note = null;
+        if (unavailableSides.Length > 0)
         {
-            var reason = report.EmbeddedContributions
-                .Select(x => (x.Right ?? x.Left)?.UnavailableReason)
-                .First(x => x is not null);
-            lines.Add($"Marginal measurements are non-additive; {unavailableContributions:N0} unavailable: {reason}");
+            note = $"Marginal measurements are non-additive; {unavailableSides.Length:N0} unavailable contribution side{(unavailableSides.Length == 1 ? "" : "s")}: {unavailableSides[0].UnavailableReason}";
         }
         else if (report.EmbeddedContributions.Count > 0)
         {
-            lines.Add("Outer-map marginal measurements are non-additive and are never summed.");
+            note = "Outer-map marginal measurements are non-additive and are never summed.";
         }
-        return LimitLines(lines, MaxHighlightLines, "embedded highlight");
+        return LimitLines(lines, MaxHighlightLines, "embedded highlight", note);
     }
 
     private static IReadOnlyList<string> Properties(DiffReport report)
@@ -241,8 +243,10 @@ public static class DiffInfographic
         var rows = report.EmbeddedPropertyChanges.SelectMany(entry => entry.Properties.Changes.Select(change =>
             $"{entry.Path} › {change.Path}: {Property(change.Left)} to {Property(change.Right)}")).ToList();
         var issues = report.EmbeddedPropertyChanges.Sum(x => x.Properties.LeftIssues.Count + x.Properties.RightIssues.Count);
-        if (issues > 0) rows.Add($"WARNING · {issues:N0} opaque or partial-coverage diagnostic{(issues == 1 ? "" : "s")}; content hashes still prove the entries changed.");
-        return LimitLines(rows, MaxPropertyLines, "deep-property detail");
+        var note = issues > 0
+            ? $"WARNING · {issues:N0} opaque or partial-coverage diagnostic{(issues == 1 ? "" : "s")}; content hashes still prove the entries changed."
+            : null;
+        return LimitLines(rows, MaxPropertyLines, "deep-property detail", note);
     }
 
     private sealed record MetadataEntry(string Label, string? Left, string? Right);
@@ -284,11 +288,18 @@ public static class DiffInfographic
         return LimitLines(rows, MaxChunkLines, "chunk observation");
     }
 
-    private static IReadOnlyList<string> LimitLines(IReadOnlyList<string> lines, int limit, string description)
+    private static IReadOnlyList<string> LimitLines(IReadOnlyList<string> details, int limit, string description, string? finalNote = null)
     {
-        if (lines.Count <= limit) return lines;
-        var visible = lines.Take(limit - 1).ToList();
-        visible.Add($"+ {lines.Count - visible.Count:N0} more {description}{(lines.Count - visible.Count == 1 ? "" : "s")} omitted");
+        var detailLimit = limit - (finalNote is null ? 0 : 1);
+        var visible = details.Take(detailLimit).ToList();
+        var omitted = details.Count - visible.Count;
+        if (omitted > 0)
+        {
+            visible = details.Take(detailLimit - 1).ToList();
+            omitted = details.Count - visible.Count;
+            visible.Add($"+ {omitted:N0} more {description}{(omitted == 1 ? "" : "s")} omitted");
+        }
+        if (finalNote is not null) visible.Add(finalNote);
         return visible;
     }
 

@@ -73,7 +73,40 @@ public sealed class DiffInfographicTests
         var highlights = Assert.Single(scene.Sections, x => x.Id == "embedded-highlights");
 
         Assert.Equal(5, highlights.Lines.Count);
-        Assert.Equal("+ 19 more embedded highlights omitted", highlights.Lines[^1]);
+        Assert.Equal("+ 19 more embedded highlights omitted", highlights.Lines[^2]);
+        Assert.Equal("Marginal measurements are non-additive; 22 unavailable contribution sides: unavailable-0", highlights.Lines[^1]);
+    }
+
+    [Fact]
+    public void BuildScene_ContributionNoteCountsUnavailableLeftAndRightSides()
+    {
+        var contributions = Enumerable.Range(0, 5).Select(i => new ValueChange<GbxSizeTree.Measure.EmbeddedFileContribution>(
+            new($"contribution-{i}", 1, 1, i == 0 ? null : 1, i == 0 ? "left unavailable" : null),
+            new($"contribution-{i}", 1, 1, i == 1 ? null : 1, i == 1 ? "right unavailable" : null))).ToArray();
+        var scene = DiffInfographic.BuildScene(Empty() with { EmbeddedContributions = contributions }, "a", "b");
+        var highlights = Assert.Single(scene.Sections, x => x.Id == "embedded-highlights");
+
+        Assert.Equal(5, highlights.Lines.Count);
+        Assert.Equal("+ 2 more embedded highlights omitted", highlights.Lines[^2]);
+        Assert.Equal("Marginal measurements are non-additive; 2 unavailable contribution sides: left unavailable", highlights.Lines[^1]);
+    }
+
+    [Fact]
+    public void BuildScene_PropertyWarningRetainsFinalSlotAndOmitsOnlyRealDetails()
+    {
+        var report = Empty() with
+        {
+            EmbeddedPropertyChanges = [new("container", "left", "right", new(
+                Enumerable.Range(0, 6).Select(i => new EmbeddedPropertyChange($"property-{i}", new("old"), new("new"))).ToArray(), true,
+                [new("opaque", "left", "partial")], [new("opaque", "right", "partial")]))],
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var properties = Assert.Single(scene.Sections, x => x.Id == "deep-properties");
+
+        Assert.Equal(5, properties.Lines.Count);
+        Assert.Equal("+ 3 more deep-property details omitted", properties.Lines[^2]);
+        Assert.Equal("WARNING · 2 opaque or partial-coverage diagnostics; content hashes still prove the entries changed.", properties.Lines[^1]);
     }
 
     [Fact]
