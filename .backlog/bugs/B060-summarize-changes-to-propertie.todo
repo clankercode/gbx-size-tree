@@ -1,0 +1,27 @@
+---
+complexity: medium
+created_at: "2026-09-09T07:49:16Z"
+depends_on: []
+estimate_hours: 2
+id: B060
+priority: high
+status: pending
+tags:
+    - chat-astra
+    - property-summary
+title: Summarize changes to properties omitted from detailed diff tables
+updated_at: "2026-09-09T07:49:16Z"
+---
+## User request
+After the other diff tables, show a summary table for changed properties that are not represented in those detailed tables, such as lightmap quality and is flying. List how many changes occurred for each such property; omit the summary when there are none.
+
+## Acceptance criteria
+- Derive counts from actual property changes on blocks/placed items and other applicable compared entities, preserving duplicate instance counts.
+- Include properties omitted from the current detailed table, without double-counting values already explained there.
+- Use readable property labels and deterministic ordering; place the summary after the other tables across applicable human-readable outputs.
+- Define matching/counting semantics explicitly for changed instances versus additions/removals; do not infer a property transition from unrelated nearby additions and removals.
+- Cover numerous lightmap-quality-only changes and mixed property changes, unchanged maps, and empty summary cases with regression tests.
+- Real-map example: ~/tm-docs/Maps/SB2/Sweet 2 burger v206 Validated LMQ.Map.Gbx has many lightmap-quality changes. Compare with the corresponding v206 Validated.Map.Gbx and inspect actual differences.
+
+## Sequencing
+Newly requested backlog addition while the original 26-ticket batch is running. Keep as its own ticket, not silently inserted into the fixed batch. Coordinate with renderer/comparison ownership when implementing; do not overwrite ongoing work.
