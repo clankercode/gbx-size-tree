@@ -42,3 +42,4 @@ bugs:
     - file: B041-t41-html-supports-styled-and-n.todo
     - file: B042-t42-unstyled-html-plain-simple.todo
     - file: B043-t43-real-map-verification-gbx.todo
+    - file: B044-t44-validate-new-requests-with.todo
