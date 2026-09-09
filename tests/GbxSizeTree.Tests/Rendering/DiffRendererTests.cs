@@ -166,7 +166,7 @@ public sealed class DiffRendererTests
             Assert.Contains("Subvariant", output);
             Assert.Contains("Ghost", output);
             Assert.Contains("Free", output);
-            Assert.Contains("48, 20, 112", output);
+            Assert.Contains("48.0, 20.0, 112.0", output);
             Assert.True(output.IndexOf("free", StringComparison.Ordinal) < output.IndexOf("grid", StringComparison.Ordinal));
         }
     }
@@ -236,6 +236,47 @@ public sealed class DiffRendererTests
         Assert.Contains(@"a\~\~removed\~\~.Item.Gbx", output);
         Assert.Contains(@"\~\~new\~\~", output);
         Assert.Contains(@"\~\~left\~\~", output);
+    }
+
+    [Theory]
+    [InlineData(".")]
+    [InlineData(",")]
+    public void Transforms_UseOneToThreeInvariantDecimalsWithoutChangingJson(string separator)
+    {
+        var previous = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            var culture = (System.Globalization.CultureInfo)System.Globalization.CultureInfo.InvariantCulture.Clone();
+            culture.NumberFormat.NumberDecimalSeparator = separator;
+            System.Globalization.CultureInfo.CurrentCulture = culture;
+            var vector = new SpatialPosition(1, 2.123456789, 3.1);
+            var item = ItemSnapshot.From(new CGameCtnAnchoredObject()) with
+            {
+                PhysicalPosition = vector, Rotation = vector, Pivot = vector, Scale = 2.1234567f,
+            };
+            var free = BlockSnapshot.From(new CGameCtnBlock { IsFree = true }) with
+            {
+                PhysicalPosition = vector, Rotation = vector,
+            };
+            var report = Empty() with
+            {
+                Items = [new(null, item)], Blocks = [new(null, free)], BakedBlocks = [new(null, free)],
+            };
+            var json = DiffMode.RenderJson(report);
+            foreach (var output in Outputs(report))
+            {
+                Assert.Equal(7, output.Split("1.0, 2.123, 3.1", StringSplitOptions.None).Length - 1);
+                Assert.DoesNotContain("2.123456", output);
+                Assert.Contains("2.123", output);
+            }
+            Assert.Equal(json, DiffMode.RenderJson(report));
+            Assert.Contains("2.123456789", json);
+            Assert.Contains("2.1234567", json);
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = previous;
+        }
     }
 
     private static IEnumerable<string> Outputs(DiffReport report)

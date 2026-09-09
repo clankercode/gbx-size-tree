@@ -128,8 +128,8 @@ public static class DiffRenderer
             new("Rotation", x => DisplayVector(x.Rotation)), new("Color", x => x.Color),
         };
         var values = changes.SelectMany(c => new[] { c.Left, c.Right }).OfType<ItemSnapshot>().ToArray();
-        if (values.Any(x => x.Scale != 1)) columns.Add(new("Scale", x => x.Scale.ToString("G", CultureInfo.InvariantCulture)));
-        if (values.Any(x => x.Pivot != default)) columns.Add(new("Pivot", x => x.Pivot.ToString()));
+        if (values.Any(x => x.Scale != 1)) columns.Add(new("Scale", x => x.Scale.ToString("0.0##", CultureInfo.InvariantCulture)));
+        if (values.Any(x => x.Pivot != default)) columns.Add(new("Pivot", x => DisplayVector(x.Pivot)));
         AddVarying(columns, values, "Animation", x => x.AnimationPhase);
         AddVarying(columns, values, "Lightmap", x => x.LightmapQuality);
         AddVarying(columns, values, "Flags", x => x.Flags.ToString(CultureInfo.InvariantCulture));
@@ -141,13 +141,13 @@ public static class DiffRenderer
         var columns = new List<Column<BlockSnapshot>>
         {
             new("Name", x => x.Name), new("Coord", x => x.IsFree ? "--" : x.Coord),
-            new("Pos", x => x.PhysicalPosition?.ToString() ?? "--"),
+            new("Pos", x => DisplayVector(x.PhysicalPosition)),
             new("Direction", x => x.IsFree ? "--" : x.Direction),
             new("Variant", x => x.Variant.ToString(CultureInfo.InvariantCulture)),
             new("Subvariant", x => x.SubVariant.ToString(CultureInfo.InvariantCulture)),
         };
         var values = changes.SelectMany(c => new[] { c.Left, c.Right }).OfType<BlockSnapshot>().ToArray();
-        if (values.Any(x => x.IsFree)) columns.Add(new("Rotation", x => x.Rotation?.ToString() ?? "--"));
+        if (values.Any(x => x.IsFree)) columns.Add(new("Rotation", x => DisplayVector(x.Rotation)));
         if (values.Any(x => x.IsFree || x.IsGhost)) columns.Add(new("Mode", x => x.IsFree ? "Free" : x.IsGhost ? "Ghost" : "Normal"));
         AddVarying(columns, values, "Ground", x => x.IsGround.ToString());
         AddVarying(columns, values, "Color", x => x.Color);
@@ -178,7 +178,8 @@ public static class DiffRenderer
         return a == b && onlyDifferent ? a : $"{a} → {b}";
     }
 
-    private static string DisplayVector(SpatialPosition p) => FormattableString.Invariant($"({p.X:0.###}, {p.Y:0.###}, {p.Z:0.###})");
+    private static string DisplayVector(SpatialPosition? position) => position is { } p
+        ? FormattableString.Invariant($"({p.X:0.0##}, {p.Y:0.0##}, {p.Z:0.0##})") : "--";
 
     public static string CompactPath(string path)
     {
