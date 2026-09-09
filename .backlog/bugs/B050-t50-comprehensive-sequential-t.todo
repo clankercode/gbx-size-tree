@@ -1,5 +1,5 @@
 ---
-completed_at: null
+completed_at: "2026-09-09T06:13:56Z"
 complexity: medium
 created_at: "2026-09-09T06:13:12Z"
 depends_on: []
@@ -7,10 +7,10 @@ estimate_hours: 1
 id: B050
 priority: high
 started_at: null
-status: pending
+status: done
 tags: []
 title: 'T50: Comprehensive sequential Tx task tables with pending/inprog/done and dependency references.'
-updated_at: "2026-09-09T06:13:12Z"
+updated_at: "2026-09-09T06:13:56Z"
 ---
 ## Source
 Chat task: T50
