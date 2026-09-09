@@ -11,7 +11,10 @@ id: B007
 priority: high
 started_at: "2026-09-09T06:26:44Z"
 status: in_progress
-tags: []
+tags:
+    - chat-astra
+    - T7
+    - source-inprog
 title: 'T7: Map metadata comparison by default'
 updated_at: "2026-09-09T06:26:44Z"
 ---
