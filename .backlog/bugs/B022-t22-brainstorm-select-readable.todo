@@ -1,23 +1,21 @@
 ---
 claimed_at: "2026-09-09T08:03:27Z"
 claimed_by: astra
-completed_at: null
+completed_at: "2026-09-09T09:24:33Z"
 complexity: medium
 created_at: "2026-09-09T06:13:09Z"
 depends_on:
     - B020
     - B021
+duration_minutes: 81.10852106501666
 estimate_hours: 1
 id: B022
 priority: high
 started_at: "2026-09-09T08:03:27Z"
-status: in_progress
-tags:
-    - chat-astra
-    - T22
-    - source-inprog
+status: done
+tags: []
 title: 'T22: Brainstorm/select readable embedded-size presentation conveying change and compression quality, with a seam for trying alternatives'
-updated_at: "2026-09-09T08:03:27Z"
+updated_at: "2026-09-09T09:24:33Z"
 ---
 ## Source
 Chat task: T22
