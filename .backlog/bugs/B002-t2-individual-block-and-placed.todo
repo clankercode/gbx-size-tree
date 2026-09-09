@@ -1,5 +1,5 @@
 ---
-completed_at: null
+completed_at: "2026-09-09T06:13:47Z"
 complexity: medium
 created_at: "2026-09-09T06:13:07Z"
 depends_on:
@@ -8,10 +8,10 @@ estimate_hours: 1
 id: B002
 priority: high
 started_at: null
-status: pending
+status: done
 tags: []
 title: 'T2: Individual block and placed-item additions/removals, preserving counts of duplicate placements.'
-updated_at: "2026-09-09T06:13:07Z"
+updated_at: "2026-09-09T06:13:47Z"
 ---
 ## Source
 Chat task: T2
