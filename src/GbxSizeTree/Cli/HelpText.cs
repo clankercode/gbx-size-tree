@@ -15,7 +15,7 @@ public static class HelpText
         powered by GBX.NET.
 
         Usage: gbx-size-tree [options] [file.Map.Gbx]
-        Usage: gbx-size-tree diff [--json] [--all] old.Map.Gbx new.Map.Gbx
+        Usage: gbx-size-tree diff [OPTIONS] OLD_MAP NEW_MAP
 
         Analysis:
           diff                      Compare two map versions
@@ -79,30 +79,49 @@ public static class HelpText
           gbx-size-tree diff [OPTIONS] OLD_MAP NEW_MAP
 
         File order:
-          OLD_MAP                  The earlier or baseline map (left side)
-          NEW_MAP                  The later or candidate map (right side)
+          OLD_MAP                  Earlier or baseline map; shown on the left
+          NEW_MAP                  Later or candidate map; shown on the right
 
-        The diff reports added, removed, and changed blocks, baked blocks, anchored items,
-        embedded files, map metadata, and file size. Use --all to include every detected
-        header and body chunk, including lightmaps, genealogies, password chunks, and
-        other chunks without a dedicated semantic comparison.
+        Default comparison:
+          File size; embedded ZIP entries; placed items; ordinary blocks; and map metadata.
+          Embedded content is fingerprinted with SHA-256. ZIP/raw entry sizes and bounded,
+          non-additive outer-body marginal measurements are also shown when available.
+          Baked blocks and serialized content fingerprints are included only with --all.
 
-        The human-readable report shows embedded files first, then placed items, followed by
-        blocks and metadata. Use --html or --markdown/--md for portable reports.
+        Coverage:
+          Placement and metadata rows compare fields understood by GBX.NET; this is not a
+          claim that every item property has deep semantic support. With --all, header/body
+          chunk candidates plus complete container, stored-body, and decompressed-body
+          fingerprints can detect opaque changes, but fingerprints identify changed bytes,
+          not their meaning. Warnings call out opaque or otherwise unavailable metadata.
+          Marginal bytes recompress each original body after removing one changed embed;
+          they are context-dependent, do not add up to map size, use a bounded trial budget,
+          and may be unavailable.
+
+        Output:
+          Console color is automatic: disabled for redirects, NO_COLOR, and TERM=dumb.
+          --color and --no-color override that policy. HTML is styled by default; use
+          --not-styled for markup without CSS or inline styles. Markdown and JSON are also
+          written to stdout. Redirect reports to a local file; nothing is published.
 
         Options:
-          --all                    Include all header/body chunk changes
+          --all                    Add baked blocks and serialized content fingerprints
+          --color                  Always use color
+          --no-color               Never use color
           --html                   Write an HTML report (styled by default)
-          --styled                 Include the default HTML stylesheet
-          --not-styled             Write HTML without CSS or inline styles
+          --styled                 Include the default HTML stylesheet (with --html)
+          --not-styled             Omit CSS and inline styles (with --html)
           --markdown, --md         Write a Markdown report
-          --json                   Write machine-readable JSON to stdout
-          --help                   Show this help
+          --json                   Write machine-readable JSON
+          -h, --help               Show this help
 
         Examples:
           gbx-size-tree diff OLD_MAP.Map.Gbx NEW_MAP.Map.Gbx
           gbx-size-tree diff --all OLD_MAP.Map.Gbx NEW_MAP.Map.Gbx
-          gbx-size-tree diff --json OLD_MAP.Map.Gbx NEW_MAP.Map.Gbx
+          gbx-size-tree diff --no-color OLD_MAP.Map.Gbx NEW_MAP.Map.Gbx > diff.txt
+          gbx-size-tree diff --html --not-styled OLD_MAP.Map.Gbx NEW_MAP.Map.Gbx > diff.html
+          gbx-size-tree diff --md OLD_MAP.Map.Gbx NEW_MAP.Map.Gbx > diff.md
+          gbx-size-tree diff --json OLD_MAP.Map.Gbx NEW_MAP.Map.Gbx > diff.json
         """;
 
     /// </summary>
