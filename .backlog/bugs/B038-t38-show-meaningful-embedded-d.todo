@@ -11,10 +11,7 @@ id: B038
 priority: high
 started_at: null
 status: in_progress
-tags:
-    - chat-astra
-    - T38
-    - source-inprog
+tags: []
 title: 'T38: Show meaningful embedded deltas and explain what changed (size, compression, content, other known properties)'
 updated_at: "2026-09-09T06:13:54Z"
 ---
@@ -32,3 +29,5 @@ Partial implementation; remaining scope must be completed. No active agent claim
 
 ## Source dependencies
 T3, T20, T37
+
+Decision and sequencing: Presentation/data integration lane after B037 closes. Decision: explicit raw and compressed deltas plus content/compression explanations, never conflate equal-size content changes with no change.
