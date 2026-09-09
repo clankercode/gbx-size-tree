@@ -10,10 +10,7 @@ id: B022
 priority: high
 started_at: null
 status: in_progress
-tags:
-    - chat-astra
-    - T22
-    - source-inprog
+tags: []
 title: 'T22: Brainstorm/select readable embedded-size presentation conveying change and compression quality, with a seam for trying alternatives'
 updated_at: "2026-09-09T06:13:51Z"
 ---
@@ -31,3 +28,5 @@ Partial implementation; remaining scope must be completed. No active agent claim
 
 ## Source dependencies
 T20, T21
+
+Decision and sequencing: Presentation lane only after B021 is closed. Decision: show named ZIP/raw/marginal-map byte deltas with explicit compression context through a shared replaceable formatter, avoiding ambiguous c|u notation.
