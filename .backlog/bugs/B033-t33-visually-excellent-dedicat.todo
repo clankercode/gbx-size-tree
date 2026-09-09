@@ -17,10 +17,7 @@ id: B033
 priority: high
 started_at: "2026-09-09T11:05:31Z"
 status: in_progress
-tags:
-    - chat-astra
-    - T33
-    - source-pending
+tags: []
 title: 'T33: Visually excellent dedicated diff infographic: colorful, well composed, readable and understandable; not a trivial screencap of another'
 updated_at: "2026-09-09T11:05:31Z"
 ---
@@ -40,3 +37,5 @@ Outstanding work; not implemented by this ingestion.
 T14, T34, T35, T37, T38, T39, T40
 
 Decision and sequencing: Dedicated infographic lane only after B034 B035 B037 B038 B039 B040 close. Decision: purpose-designed visual summary with hierarchy, change counts, size contribution, spatial context and readable detailed highlights; never screenshot existing HTML/terminal table. Review rendered artifact visually and verify large/empty/error cases.
+
+Parent review checkpoint: a8bed4f data counts and real/synthetic visual review passed, but extra edge-case review found zero/huge hero overlap and silent canvas-cap line loss. Corrective worker owns infographic files exclusively; image encoders remain blocked until these are fixed and rereviewed.
