@@ -171,6 +171,31 @@ public sealed class DiffModeTests
     }
 
     [Fact]
+    public void CompareMaps_ScaleOnlyEditsRemainDistinctRawSnapshotsWithoutScaleInKey()
+    {
+        var left = new CGameCtnChallenge { AnchoredObjects = [new() { Scale = 1 }, new() { Scale = 1 }] };
+        var right = new CGameCtnChallenge { AnchoredObjects = [new() { Scale = 1 }, new() { Scale = 2 }] };
+        var report = DiffMode.CompareMaps(left, right);
+        Assert.Equal(2, report.Items.Count);
+        var removed = Assert.Single(report.Items, c => c.Right is null).Left!;
+        var added = Assert.Single(report.Items, c => c.Left is null).Right!;
+        Assert.Equal(1, removed.Scale);
+        Assert.Equal(2, added.Scale);
+        Assert.NotEqual(removed, added);
+        Assert.Equal(removed.Key, added.Key);
+        Assert.DoesNotContain("|scale=", removed.Key);
+        Assert.Equal(new float[] { 1, 1 }, report.LeftItemSnapshots.Select(x => x.Scale));
+        Assert.Equal(new float[] { 1, 2 }, report.RightItemSnapshots.Select(x => x.Scale).Order());
+        foreach (var output in new[] { DiffRenderer.RenderHtml(report, "a", "b"), DiffRenderer.RenderMarkdown(report, "a", "b") })
+        {
+            Assert.DoesNotContain("Scale", output);
+            Assert.DoesNotContain("No differences", output);
+            Assert.Contains("1 added", output);
+            Assert.Contains("1 removed", output);
+        }
+    }
+
+    [Fact]
     public void JsonAndSpatialOrdering_HandleNonFiniteAndMissingPositions()
     {
         var report = DiffMode.CompareMaps(new(), new()

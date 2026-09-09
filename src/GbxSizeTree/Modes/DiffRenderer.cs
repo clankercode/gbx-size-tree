@@ -45,7 +45,7 @@ public static class DiffRenderer
                     "Right marginal bytes" => "Right B", "ZIP bytes" => "ZIP B", "Raw bytes" => "Raw B", _ => column,
                 } : column;
                 var cell = new TableColumn(new Markup($"[bold]{Escape(heading)}[/]"));
-                if (column is "Compressed" or "Uncompressed" or "Ratio" or "Scale" or "Variant" or "Subvariant") cell.RightAligned();
+                if (column is "Compressed" or "Uncompressed" or "Ratio" or "Variant" or "Subvariant") cell.RightAligned();
                 table.AddColumn(cell);
             }
             foreach (var row in data.Rows)
@@ -177,7 +177,6 @@ public static class DiffRenderer
             new("Rotation", x => DisplayVector(x.Rotation)), new("Color", x => x.Color),
         };
         var values = changes.SelectMany(c => new[] { c.Left, c.Right }).OfType<ItemSnapshot>().ToArray();
-        if (values.Any(x => x.Scale != 1)) columns.Add(new("Scale", x => x.Scale.ToString("0.0##", CultureInfo.InvariantCulture)));
         if (values.Any(x => x.Pivot != default)) columns.Add(new("Pivot", x => DisplayVector(x.Pivot)));
         AddVarying(columns, values, "Animation", x => x.AnimationPhase);
         AddVarying(columns, values, "Lightmap", x => x.LightmapQuality);

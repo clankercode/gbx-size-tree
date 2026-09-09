@@ -121,7 +121,7 @@ public sealed class DiffRendererTests
             Assert.Contains("Position", output);
             Assert.Contains("Rotation", output);
             Assert.Contains("Color", output);
-            Assert.Contains("Scale", output);
+            Assert.DoesNotContain("Scale", output);
             Assert.Contains("Animation", output);
             Assert.Contains("Blue", output);
             Assert.DoesNotContain("position=", output);

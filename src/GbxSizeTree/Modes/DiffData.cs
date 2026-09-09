@@ -65,7 +65,7 @@ public sealed record ItemSnapshot(
     SpatialPosition Pivot, string AnimationPhase, string LightmapQuality, short Flags)
 {
     public string Position => PhysicalPosition.ToString();
-    public string Key => FormattableString.Invariant($"{Path}|position={Position}|rotation={Rotation}|scale={Scale:G}|color={Color}|pivot={Pivot}|animation={AnimationPhase}|lightmap={LightmapQuality}|flags={Flags}");
+    public string Key => FormattableString.Invariant($"{Path}|position={Position}|rotation={Rotation}|color={Color}|pivot={Pivot}|animation={AnimationPhase}|lightmap={LightmapQuality}|flags={Flags}");
 
     public static ItemSnapshot From(CGameCtnAnchoredObject item) => new(
         item.ItemModel?.Id ?? "<unknown>", SpatialPosition.From(item.AbsolutePositionInMap),
