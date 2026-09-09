@@ -13,7 +13,10 @@ id: B059
 priority: high
 started_at: "2026-09-09T06:21:52Z"
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T59
+    - source-pending
 title: 'T59: For normal/ghost (non-free) blocks, the pos column must display `--`, not a computed grid-cell midpoint'
 updated_at: "2026-09-09T07:14:29Z"
 ---
