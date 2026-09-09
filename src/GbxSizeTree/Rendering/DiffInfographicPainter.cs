@@ -1,0 +1,188 @@
+using SixLabors.Fonts;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Drawing;
+using SixLabors.ImageSharp.Drawing.Processing;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
+
+namespace GbxSizeTree.Cli.Rendering;
+
+internal static class DiffInfographicPainter
+{
+    private static readonly Color Background = Color.ParseHex("09131D");
+    private static readonly Color Panel = Color.ParseHex("112230");
+    private static readonly Color PanelEdge = Color.ParseHex("294355");
+    private static readonly Color Text = Color.ParseHex("F5F1E8");
+    private static readonly Color Muted = Color.ParseHex("9DB0BC");
+    private static readonly Color Added = Color.ParseHex("48E5A2");
+    private static readonly Color Removed = Color.ParseHex("FF647C");
+    private static readonly Color Changed = Color.ParseHex("FFC857");
+    private static readonly Color Cyan = Color.ParseHex("4FD8E8");
+
+    public static Image<Rgba32> Paint(DiffInfographicScene scene)
+    {
+        var image = new Image<Rgba32>(scene.Width, scene.Height, Background);
+        image.Mutate(context =>
+        {
+            DrawBackdrop(context, scene);
+            DrawHero(context, scene);
+            DrawCounts(context, scene);
+            DrawSpatial(context, scene);
+            DrawDetails(context, scene);
+            DrawFooter(context, scene);
+        });
+        return image;
+    }
+
+    private static void DrawBackdrop(IImageProcessingContext c, DiffInfographicScene scene)
+    {
+        c.Fill(Color.ParseHex("0D1B27"), new RectangularPolygon(0, 0, scene.Width, 14));
+        for (var x = -300; x < scene.Width + 300; x += 70)
+            c.Draw(Color.FromRgba(79, 216, 232, 12), 1, new PathBuilder().AddLine(x, 0, x + 420, scene.Height).Build());
+        c.Fill(Color.FromRgba(72, 229, 162, 10), new EllipsePolygon(1250, 100, 440));
+        c.Fill(Color.FromRgba(255, 100, 124, 8), new EllipsePolygon(80, 680, 350));
+    }
+
+    private static void DrawHero(IImageProcessingContext c, DiffInfographicScene scene)
+    {
+        c.DrawText("MAP DIFF", DiffInfographicFonts.Bold(24), Cyan, new PointF(70, 52));
+        c.DrawText("A visual change brief", DiffInfographicFonts.Regular(20), Muted, new PointF(225, 57));
+        var deltaColor = scene.DeltaBytes > 0 ? Removed : scene.DeltaBytes < 0 ? Added : Muted;
+        var delta = scene.DeltaBytes == 0 ? "NO SIZE CHANGE" : (scene.DeltaBytes > 0 ? "+" : "−") + DiffInfographicText.Bytes(scene.DeltaBytes == long.MinValue ? long.MaxValue : Math.Abs(scene.DeltaBytes));
+        c.DrawText(delta, DiffInfographicFonts.Bold(82), deltaColor, new PointF(68, 102));
+        c.DrawText("FILE SIZE", DiffInfographicFonts.Bold(17), Muted, new PointF(73, 205));
+
+        var x = 710f;
+        DrawFile(c, "OLD", scene.OldFileName, DiffInfographicText.Bytes(scene.LeftBytes), x, 92, Removed);
+        c.DrawLine(Changed, 4, new PointF(730, 259), new PointF(1300, 259));
+        c.Fill(Changed, new Polygon(new LinearLineSegment(new PointF(1300, 252), new PointF(1314, 259), new PointF(1300, 266))));
+        DrawFile(c, "NEW", scene.NewFileName, DiffInfographicText.Bytes(scene.RightBytes), x, 280, Added);
+    }
+
+    private static void DrawFile(IImageProcessingContext c, string label, string name, string size, float x, float y, Color accent)
+    {
+        c.Fill(accent, Rounded(x, y, 74, 34, 17));
+        c.DrawText(label, DiffInfographicFonts.Bold(16), Background, new PointF(x + 19, y + 7));
+        c.DrawText(DiffInfographicText.Fit(name, DiffInfographicFonts.Bold(30), 520), DiffInfographicFonts.Bold(30), Text, new PointF(x + 92, y - 2));
+        c.DrawText(size, DiffInfographicFonts.Regular(21), Muted, new PointF(x + 92, y + 40));
+    }
+
+    private static void DrawCounts(IImageProcessingContext c, DiffInfographicScene scene)
+    {
+        DrawCount(c, 70, 400, "+", scene.Counts.Added, "ADDED", Added);
+        DrawCount(c, 510, 400, "−", scene.Counts.Removed, "REMOVED", Removed);
+        DrawCount(c, 950, 400, "~", scene.Counts.Changed, "MODIFIED", Changed);
+    }
+
+    private static void DrawCount(IImageProcessingContext c, float x, float y, string mark, int count, string label, Color color)
+    {
+        c.Fill(Panel, Rounded(x, y, 380, 132, 22));
+        c.Draw(PanelEdge, 2, Rounded(x, y, 380, 132, 22));
+        c.Fill(color, new EllipsePolygon(x + 58, y + 65, 31));
+        c.DrawText(mark, DiffInfographicFonts.Bold(35), Background, new PointF(x + 47, y + 42));
+        c.DrawText(count.ToString("N0"), DiffInfographicFonts.Bold(48), Text, new PointF(x + 110, y + 23));
+        c.DrawText(label, DiffInfographicFonts.Bold(16), color, new PointF(x + 113, y + 80));
+    }
+
+    private static void DrawSpatial(IImageProcessingContext c, DiffInfographicScene scene)
+    {
+        const float x = 70;
+        const float y = 570;
+        const float w = 1260;
+        const float h = 420;
+        c.Fill(Panel, Rounded(x, y, w, h, 24));
+        c.Draw(PanelEdge, 2, Rounded(x, y, w, h, 24));
+        c.DrawText("XZ SPATIAL CONTEXT", DiffInfographicFonts.Bold(23), Text, new PointF(x + 30, y + 25));
+        c.DrawText("Where placement changes land", DiffInfographicFonts.Regular(18), Muted, new PointF(x + 287, y + 31));
+        Legend(c, x + 880, y + 33, Added, "added"); Legend(c, x + 1000, y + 33, Removed, "removed"); Legend(c, x + 1140, y + 33, Changed, "modified");
+
+        const float px = x + 30;
+        const float py = y + 78;
+        const float pw = w - 60;
+        const float ph = h - 130;
+        c.Fill(Color.ParseHex("0B1822"), Rounded(px, py, pw, ph, 14));
+        for (var i = 1; i < 6; i++)
+        {
+            var gx = px + pw * i / 6;
+            c.Draw(Color.FromRgba(157, 176, 188, 26), 1, new PathBuilder().AddLine(gx, py, gx, py + ph).Build());
+            var gy = py + ph * i / 6;
+            c.Draw(Color.FromRgba(157, 176, 188, 26), 1, new PathBuilder().AddLine(px, gy, px + pw, gy).Build());
+        }
+        foreach (var point in scene.Spatial.Context)
+            c.Fill(Color.FromRgba(157, 176, 188, 35), new EllipsePolygon(px + point.X * pw, py + (1 - point.Z) * ph, 2.1f));
+        foreach (var point in scene.Spatial.Changes)
+        {
+            var color = PointColor(point.Kind);
+            var cx = px + point.X * pw;
+            var cy = py + (1 - point.Z) * ph;
+            c.Fill(Color.FromRgba(color.ToPixel<Rgba32>().R, color.ToPixel<Rgba32>().G, color.ToPixel<Rgba32>().B, 35), new EllipsePolygon(cx, cy, 10));
+            if (point.Kind == DiffInfographicChangeKind.Removed)
+            {
+                c.Draw(color, 3, new PathBuilder().AddLine(cx - 5, cy - 5, cx + 5, cy + 5).Build());
+                c.Draw(color, 3, new PathBuilder().AddLine(cx + 5, cy - 5, cx - 5, cy + 5).Build());
+            }
+            else c.Fill(color, new EllipsePolygon(cx, cy, point.Kind == DiffInfographicChangeKind.Added ? 4 : 5));
+        }
+            var detail = scene.Spatial.ClippedToPlotEdge > 0 ? $" · {scene.Spatial.ClippedToPlotEdge:N0} edge-pinned" : "";
+            c.DrawText(scene.Spatial.RangeLabel + detail, DiffInfographicFonts.Regular(15), Muted, new PointF(px, py + ph + 17));
+        var plotted = $"{scene.Spatial.PlottedChanges:N0} plotted" + (scene.Spatial.OmittedChanges > 0 ? $" · {scene.Spatial.OmittedChanges:N0} omitted" : "");
+        var plottedFont = DiffInfographicFonts.Bold(15);
+        c.DrawText(plotted, plottedFont, Changed, new PointF(px + pw - 220, py + ph + 17));
+    }
+
+    private static void Legend(IImageProcessingContext c, float x, float y, Color color, string text)
+    {
+        c.Fill(color, new EllipsePolygon(x, y + 9, 5));
+        c.DrawText(text, DiffInfographicFonts.Regular(16), Muted, new PointF(x + 14, y));
+    }
+
+    private static void DrawDetails(IImageProcessingContext c, DiffInfographicScene scene)
+    {
+        var detailSections = scene.Sections.Where(x => x.Top >= 1000).ToArray();
+        foreach (var section in detailSections)
+        {
+            var accent = section.Id switch { "embedded-highlights" => Cyan, "deep-properties" => Changed, "metadata" => Added, _ => Removed };
+            c.Fill(Panel, Rounded(section.Left, section.Top, section.Right - section.Left, section.Bottom - section.Top, 22));
+            c.Draw(PanelEdge, 2, Rounded(section.Left, section.Top, section.Right - section.Left, section.Bottom - section.Top, 22));
+            c.Fill(accent, Rounded(section.Left, section.Top, 8, section.Bottom - section.Top, 4));
+            c.DrawText(section.Title.ToUpperInvariant(), DiffInfographicFonts.Bold(20), accent, new PointF(section.Left + 30, section.Top + 24));
+            var top = section.Top + 66;
+            foreach (var line in section.Lines)
+            {
+                if (top + 42 > section.Bottom) break;
+                var markerColor = line.StartsWith('+') ? Added : line.StartsWith('−') ? Removed : line.StartsWith("WARNING", StringComparison.Ordinal) ? Changed : Text;
+                c.Fill(markerColor, new EllipsePolygon(section.Left + 41, top + 10, 3));
+                var wrapped = DiffInfographicText.Wrap(line, DiffInfographicFonts.Regular(18), section.Right - section.Left - 100, 2);
+                foreach (var row in wrapped)
+                {
+                    c.DrawText(row, DiffInfographicFonts.Regular(18), Text, new PointF(section.Left + 60, top));
+                    top += 23;
+                }
+                top += 12;
+            }
+        }
+    }
+
+    private static void DrawFooter(IImageProcessingContext c, DiffInfographicScene scene)
+    {
+        c.DrawText("gbx-size-tree  ·  exact counts, bounded visual detail", DiffInfographicFonts.Regular(15), Muted, new PointF(70, scene.Height - 26));
+        c.DrawText("Positions in metres", DiffInfographicFonts.Regular(15), Muted, new PointF(1190, scene.Height - 26));
+    }
+
+    private static IPath Rounded(float x, float y, float width, float height, float radius)
+    {
+        radius = Math.Min(radius, Math.Min(width, height) / 2);
+        return new Polygon(new LinearLineSegment(
+            new PointF(x + radius, y), new PointF(x + width - radius, y),
+            new PointF(x + width, y + radius), new PointF(x + width, y + height - radius),
+            new PointF(x + width - radius, y + height), new PointF(x + radius, y + height),
+            new PointF(x, y + height - radius), new PointF(x, y + radius)));
+    }
+
+    private static Color PointColor(DiffInfographicChangeKind kind) => kind switch
+    {
+        DiffInfographicChangeKind.Added => Added,
+        DiffInfographicChangeKind.Removed => Removed,
+        _ => Changed,
+    };
+}
