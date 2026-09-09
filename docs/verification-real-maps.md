@@ -19,14 +19,14 @@ GBX_SIZE_TREE_SB2=/home/xertrov/tm-docs/Maps/SB2 \
   dotnet test --no-build -- --filter-class '*RealMapDiffRegressionTests*'
 ```
 
-To rebuild all data and rendered artifacts under `/tmp/gbx-final-real-*`:
+To rebuild the 14 CLI captures under `/tmp/gbx-final-real-*`:
 
 ```sh
 GBX_SIZE_TREE_SB2=/home/xertrov/tm-docs/Maps/SB2 \
   scripts/verify-real-map-diff.sh
 ```
 
-The script uses temporary output followed by rename for forward captures. It runs default and `--all` console, JSON, Markdown, styled HTML, and plain HTML, plus default/`--all` reverse and NEW self comparisons.
+The script authenticates both fixture files against the SHA-256 values above before building or running the expensive comparisons. It uses temporary output followed by rename for forward captures. It runs default and `--all` console, JSON, Markdown, styled HTML, and plain HTML, plus default/`--all` reverse and NEW self comparisons. Browser observations, the capture log, and screenshots described below were captured separately and are not rebuilt by this script.
 
 ## Results
 
@@ -49,7 +49,7 @@ The 17 modified embedded entries produce 89 rendered deep-property rows. Their b
 
 All 52 applicable left/right embedded contribution sides were measured. No side was unavailable, no `Removal trial budget exhausted.` result occurred, and the default 256-trial budget was not exhausted. Marginals remain context-dependent and non-additive.
 
-Reverse comparison swapped file sizes, blocks, items, embedded changes, metadata, deep property hashes/values/issues, and contribution sides. NEW-to-NEW self comparison was empty in both default and `--all`: no block, baked-block, item, embedded, chunk, metadata, contribution, deep-property, or warning entries.
+Reverse comparison in both default and `--all` modes swapped file sizes, blocks, items, embedded changes, metadata, deep property hashes/values/issues, and contribution sides. The `--all` reverse additionally swapped baked blocks and diagnostic chunks, retaining the same keys. NEW-to-NEW self comparison was empty in both default and `--all`: no block, baked-block, item, embedded, chunk, metadata, contribution, deep-property, or warning entries.
 
 Representative reusable artifacts:
 
@@ -81,8 +81,8 @@ set +e
 dotnet src/GbxSizeTree/bin/Debug/net10.0/gbx-size-tree.dll diff --json -- \
   '/home/xertrov/tm-docs/Maps/SB2/Sweet 2 burger v205.Map.gbx' \
   '/tmp/gbx-final-real-missing-"quote.Map.Gbx' \
-  > /tmp/gbx-final-real-error.json \
-  2> /tmp/gbx-final-real-error.stderr
+  > /tmp/gbx-final-real-error-fixed.json \
+  2> /tmp/gbx-final-real-error-fixed.stderr
 printf 'exit=%s\n' "$?"
 ```
 
@@ -90,10 +90,10 @@ The corrected process exits `4` (`IoError`) and the JSON envelope also reports c
 
 ## Test gate
 
-The focused regression passed 2/2 tests in 5m59s. The final full suite used both real-map fixture roots and passed 560/560 tests in 6m04s:
+The focused regression passed 2/2 tests in 8m12s. The final full suite used both real-map fixture roots and passed 562/562 tests in 7m50s:
 
 ```sh
-GBX_SIZE_TREE_SAMPLE='/home/xertrov/tm-docs/Maps/SB2/Sweet 2 Burger v180 (Ultra2).Map.gbx' \
+GBX_SIZE_TREE_SAMPLE='/home/xertrov/Downloads/Sweet 2 Burger v180 (Ultra2).Map.gbx' \
 GBX_SIZE_TREE_SB2='/home/xertrov/tm-docs/Maps/SB2' \
   flock --close /tmp/gbx-size-tree.build.lock dotnet test --no-build
 ```

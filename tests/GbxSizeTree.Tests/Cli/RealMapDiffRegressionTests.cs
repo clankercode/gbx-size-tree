@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using GbxSizeTree.Cli.Modes;
 using GbxSizeTree.Measure;
 
@@ -5,7 +6,10 @@ namespace GbxSizeTree.Tests.Cli;
 
 public sealed class RealMapDiffRegressionTests
 {
+    private const string OldName = "Sweet 2 burger v205.Map.gbx";
+    private const string OldSha256 = "b2802168218f1e6bfc26b3834d7934084eacaccfd5e108857bf3a35dabe88870";
     private const string NewName = "Sweet 2 burger v206.Map.Gbx";
+    private const string NewSha256 = "e784e1b1078ded693da232ae044b7effe2b60077e076ce241b08a3ebfcffec2e";
 
     [Fact]
     public void Sweet2BurgerV206_DefaultAllReverseAndSelfRemainConsistent()
@@ -14,6 +18,7 @@ public sealed class RealMapDiffRegressionTests
         var forward = DiffMode.CompareFiles(oldPath, newPath);
         var all = DiffMode.CompareFiles(oldPath, newPath, all: true);
         var reverse = DiffMode.CompareFiles(newPath, oldPath);
+        var reverseAll = DiffMode.CompareFiles(newPath, oldPath, all: true);
         var self = DiffMode.CompareFiles(newPath, newPath);
         var selfAll = DiffMode.CompareFiles(newPath, newPath, all: true);
 
@@ -46,14 +51,8 @@ public sealed class RealMapDiffRegressionTests
         Assert.DoesNotContain(contributionSides,
             contribution => contribution.UnavailableReason == "Removal trial budget exhausted.");
 
-        Assert.Equal(forward.LeftBytes, reverse.RightBytes);
-        Assert.Equal(forward.RightBytes, reverse.LeftBytes);
-        Assert.Equal(forward.Blocks.Select(Swap), reverse.Blocks);
-        Assert.Equal(forward.Items.Select(Swap), reverse.Items);
-        Assert.Equal(forward.Embedded.Select(Swap), reverse.Embedded);
-        Assert.Equal(forward.MetadataChanges.Select(change => change with { Left = change.Right, Right = change.Left }), reverse.MetadataChanges);
-        Assert.Equal(forward.EmbeddedContributions.Select(Swap), reverse.EmbeddedContributions);
-        AssertDeepPropertyReverse(forward.EmbeddedPropertyChanges, reverse.EmbeddedPropertyChanges);
+        AssertReverse(forward, reverse);
+        AssertReverse(all, reverseAll);
 
         AssertNoChanges(self);
         AssertNoChanges(selfAll);
@@ -95,12 +94,41 @@ public sealed class RealMapDiffRegressionTests
     private static (string Old, string New) Paths()
     {
         var root = Environment.GetEnvironmentVariable("GBX_SIZE_TREE_SB2");
-        var oldPath = root is null ? null : Path.Combine(root, "Sweet 2 burger v205.Map.gbx");
+        var oldPath = root is null ? null : Path.Combine(root, OldName);
         var newPath = root is null ? null : Path.Combine(root, NewName);
         Assert.SkipUnless(oldPath is not null && newPath is not null && File.Exists(oldPath) && File.Exists(newPath),
             "set GBX_SIZE_TREE_SB2 for Sweet 2 burger real-map diff regression tests");
+        VerifyFixture("OLD", oldPath!, OldSha256);
+        VerifyFixture("NEW", newPath!, NewSha256);
         return (oldPath!, newPath!);
     }
+
+    private static void VerifyFixture(string label, string path, string expectedSha256)
+    {
+        using var stream = File.OpenRead(path);
+        var actualSha256 = Convert.ToHexStringLower(SHA256.HashData(stream));
+        Assert.True(string.Equals(expectedSha256, actualSha256, StringComparison.Ordinal),
+            $"incorrect {label} fixture: {path}{Environment.NewLine}" +
+            $"expected SHA-256: {expectedSha256}{Environment.NewLine}" +
+            $"actual SHA-256:   {actualSha256}");
+    }
+
+    private static void AssertReverse(DiffReport forward, DiffReport reverse)
+    {
+        Assert.Equal(forward.LeftBytes, reverse.RightBytes);
+        Assert.Equal(forward.RightBytes, reverse.LeftBytes);
+        Assert.Equal(forward.Blocks.Select(Swap), reverse.Blocks);
+        Assert.Equal(forward.BakedBlocks.Select(Swap), reverse.BakedBlocks);
+        Assert.Equal(forward.Items.Select(Swap), reverse.Items);
+        Assert.Equal(forward.Embedded.Select(Swap), reverse.Embedded);
+        Assert.Equal(forward.Chunks.Select(Swap), reverse.Chunks);
+        Assert.Equal(forward.MetadataChanges.Select(change => change with { Left = change.Right, Right = change.Left }), reverse.MetadataChanges);
+        Assert.Equal(forward.EmbeddedContributions.Select(Swap), reverse.EmbeddedContributions);
+        AssertDeepPropertyReverse(forward.EmbeddedPropertyChanges, reverse.EmbeddedPropertyChanges);
+    }
+
+    private static Change Swap(Change change) =>
+        change with { Left = change.Right, Right = change.Left };
 
     private static ValueChange<T> Swap<T>(ValueChange<T> change) where T : class =>
         new(change.Right, change.Left);
