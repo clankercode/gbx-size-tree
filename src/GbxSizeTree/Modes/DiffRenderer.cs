@@ -142,7 +142,7 @@ public static class DiffRenderer
         yield return BlockTable("Blocks", report.Blocks);
         yield return BlockTable("Baked blocks", report.BakedBlocks, showGridPosition: true);
         yield return new("Map metadata", ["Mark", "Field", "Left", "Right"],
-            report.MetadataChanges.OrderBy(c => c.Path, StringComparer.Ordinal)
+            report.MetadataChanges.Where(c => LegacyMetadata(report, c.Path) is null).OrderBy(c => c.Path, StringComparer.Ordinal)
                 .Select(c => new Row([Marker(c.Left, c.Right), c.Path, MetadataValue(c.Left), MetadataValue(c.Right)])).ToArray());
         yield return new("Chunks", ["Mark", "Name", "Size"], report.Chunks.OrderBy(c => c.Key, StringComparer.Ordinal)
             .Select(c => new Row([Marker(c.Left, c.Right), c.Key ?? "chunk", c.Left is not null && c.Right is not null ? $"{c.Left} → {c.Right}" : c.Left ?? c.Right ?? "--"])).ToArray());
@@ -243,6 +243,16 @@ public static class DiffRenderer
 
     private static string DisplayPath(string path) => path.StartsWith("Embedded/items/", StringComparison.OrdinalIgnoreCase)
         ? path["Embedded/items/".Length..] : path;
+
+    private static Change? LegacyMetadata(DiffReport report, string path) => path switch
+    {
+        "map.uid" => report.MapUid,
+        "map.name" => report.MapName,
+        "author.login" => report.AuthorLogin,
+        "author.nickname" => report.AuthorNickname,
+        "security.passwordPresent" => report.Password,
+        _ => null,
+    };
 
     private static IEnumerable<(string Label, Change Change)> Metadata(DiffReport r)
     {

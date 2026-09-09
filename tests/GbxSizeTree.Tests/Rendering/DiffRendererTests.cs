@@ -545,6 +545,59 @@ public sealed class DiffRendererTests
         Assert.DoesNotContain("<script>", DiffRenderer.RenderMarkdown(report, "a", "b"));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Metadata_OverlappingFieldsAppearOnceAndLegacyOnlyReportsStillRender(bool legacyOnly)
+    {
+        var report = DiffMode.CompareMaps(
+            new() { MapUid = "uidBefore", MapName = "nameBefore", AuthorLogin = "loginBefore", AuthorNickname = "nickBefore" },
+            new() { MapUid = "uidAfter", MapName = "nameAfter", AuthorLogin = "loginAfter", AuthorNickname = "nickAfter", Password = "secret" });
+        var json = DiffMode.RenderJson(report);
+        using (var document = System.Text.Json.JsonDocument.Parse(json))
+        {
+            Assert.Equal(5, document.RootElement.GetProperty("MetadataChanges").GetArrayLength());
+            foreach (var field in new[] { "MapUid", "MapName", "AuthorLogin", "AuthorNickname", "Password" })
+                Assert.Equal(System.Text.Json.JsonValueKind.Object, document.RootElement.GetProperty(field).ValueKind);
+        }
+        if (legacyOnly) report = report with { MetadataChanges = [] };
+        foreach (var output in Outputs(report))
+        {
+            foreach (var label in new[] { "Map UID", "Map name", "Author login", "Author nickname", "Password chunk" })
+                Assert.Equal(1, output.Split(label, StringSplitOptions.None).Length - 1);
+            foreach (var value in new[] { "uidBefore", "uidAfter", "nameBefore", "nameAfter", "loginBefore", "loginAfter", "nickBefore", "nickAfter", "true", "false" })
+                Assert.Equal(1, output.ToLowerInvariant().Split(value.ToLowerInvariant(), StringSplitOptions.None).Length - 1);
+            foreach (var path in new[] { "map.uid", "map.name", "author.login", "author.nickname", "security.passwordPresent" })
+                Assert.DoesNotContain(path, output);
+            Assert.DoesNotContain("secret", output);
+        }
+        if (!legacyOnly) Assert.Equal(json, DiffMode.RenderJson(report));
+        if (Environment.GetEnvironmentVariable("GBX_RENDER_ARTIFACT_DIR") is { Length: > 0 } directory)
+        {
+            Directory.CreateDirectory(directory);
+            File.WriteAllText(Path.Combine(directory, $"diff-metadata-once-{legacyOnly}.html"), DiffRenderer.RenderHtml(report, "old", "new"));
+        }
+    }
+
+    [Fact]
+    public void Metadata_TypedOnlyOverlappingFieldPreservesAbsenceAndEmptyText()
+    {
+        var report = Empty() with
+        {
+            RightBytes = 1000,
+            MetadataChanges = [new("map.name", null, new(Text: ""))],
+        };
+        Assert.Null(report.MapName);
+        Assert.Single(report.MetadataChanges);
+        foreach (var output in Outputs(report))
+        {
+            Assert.Contains("map.name", output);
+            Assert.Contains("absent", output);
+            Assert.DoesNotContain("No differences", output);
+        }
+        Assert.Contains("&quot;&quot;", DiffRenderer.RenderHtml(report, "old", "new"));
+    }
+
     private static IEnumerable<string> Outputs(DiffReport report)
     {
         var console = new TestConsole().Width(500);
