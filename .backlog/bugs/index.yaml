@@ -47,3 +47,4 @@ bugs:
     - file: B046-t46-last-after-all-other-tasks.todo
     - file: B047-t47-explicit-password-chunk-re.todo
     - file: B048-t48-genuinely-useful-accurate.todo
+    - file: B049-t49-overall-local-comparison-a.todo

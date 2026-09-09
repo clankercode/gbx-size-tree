@@ -1,0 +1,29 @@
+---
+complexity: medium
+created_at: "2026-09-09T06:13:12Z"
+depends_on: []
+estimate_hours: 1
+id: B049
+priority: high
+status: pending
+tags:
+    - chat-astra
+    - T49
+    - source-inprog
+title: 'T49: Overall local-comparison and Discord automation usability'
+updated_at: "2026-09-09T06:13:12Z"
+---
+## Source
+Chat task: T49
+Source status: inprog
+Inventory: /tmp/gbx-size-tree-astra-chat-tasks.md
+Session: 01a08304-d48f-7631-913b-60e05abe13f3
+
+## Scope and acceptance criteria
+Overall local-comparison and Discord automation usability. CLI/JSON exists, completeness and clear embedded explanations outstanding. No bot implementation or automatic posting requested.
+
+## State at ingestion
+Partial implementation; remaining scope must be completed. No active agent claim is implied.
+
+## Source dependencies
+T1, T2, T3, T4, T5, T7, T14, T20, T21, T22, T23, T24
