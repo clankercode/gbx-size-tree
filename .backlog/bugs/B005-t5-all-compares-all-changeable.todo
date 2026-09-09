@@ -9,7 +9,10 @@ id: B005
 priority: high
 started_at: null
 status: in_progress
-tags: []
+tags:
+    - chat-astra
+    - T5
+    - source-inprog
 title: 'T5: --all compares ALL changeable map parts: lightmaps, genealogies, MediaTracker, other chunks and chunk removal, including equal-length c'
 updated_at: "2026-09-09T06:13:47Z"
 ---
