@@ -351,6 +351,35 @@ public sealed class DiffRendererTests
         Assert.DoesNotContain("<span", DiffRenderer.RenderHtml(report, "left", "right", colorOption: false));
     }
 
+    [Theory]
+    [InlineData(false, 1)]
+    [InlineData(true, 1)]
+    [InlineData(false, 3)]
+    [InlineData(true, 3)]
+    public void BlockColors_SingleAndHomogeneousNonDefaultKeepColumn(bool baked, int count)
+    {
+        var block = BlockSnapshot.From(new CGameCtnBlock { Name = "blueBlock", Color = DifficultyColor.Blue });
+        var changes = Enumerable.Range(0, count).Select(i => new ValueChange<BlockSnapshot>(null,
+            block with { Name = $"blueBlock{i}" })).ToArray();
+        var report = baked ? Empty() with { BakedBlocks = changes } : Empty() with { Blocks = changes };
+        foreach (var output in Outputs(report))
+        {
+            Assert.Contains("Color", output);
+            Assert.Contains("Blue", output);
+        }
+        var html = DiffRenderer.RenderHtml(report, "old", "new", colorOption: true);
+        Assert.Equal(count, html.Split("> Blue </span>", StringSplitOptions.None).Length - 1);
+        var plain = DiffRenderer.RenderHtml(report, "old", "new", colorOption: false);
+        Assert.DoesNotContain("<span", plain);
+        Assert.Contains("<td>Blue</td>", plain);
+        if (Environment.GetEnvironmentVariable("GBX_RENDER_ARTIFACT_DIR") is { Length: > 0 } directory)
+        {
+            Directory.CreateDirectory(directory);
+            File.WriteAllText(Path.Combine(directory, $"diff-blue-{baked}-{count}.html"), html);
+            File.WriteAllText(Path.Combine(directory, $"diff-blue-{baked}-{count}-plain.html"), plain);
+        }
+    }
+
     private static DiffReport ColorReport(string color)
     {
         var item = ItemSnapshot.From(new CGameCtnAnchoredObject());
@@ -499,6 +528,21 @@ public sealed class DiffRendererTests
         Assert.Contains("asset.bin", console.Output);
         Assert.Contains("display.comments", console.Output);
         Assert.DoesNotContain("\u001b", console.Output);
+    }
+
+    [Fact]
+    public void Warnings_AreEscapedAndDoNotCountAsChanges()
+    {
+        var report = Empty() with { RightBytes = 1000, Warnings = ["semantic unavailable [red]<script>\u001b"] };
+        foreach (var output in Outputs(report))
+        {
+            Assert.Contains("Warning", output);
+            Assert.Contains("No differences in the compared fields.", output);
+            Assert.DoesNotContain("~1 changed", output);
+            Assert.DoesNotContain("\u001b", output);
+        }
+        Assert.DoesNotContain("<script>", DiffRenderer.RenderHtml(report, "a", "b"));
+        Assert.DoesNotContain("<script>", DiffRenderer.RenderMarkdown(report, "a", "b"));
     }
 
     private static IEnumerable<string> Outputs(DiffReport report)

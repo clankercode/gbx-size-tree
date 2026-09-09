@@ -4,6 +4,7 @@ using GBX.NET.Engines.Game;
 using GbxSizeTree.Cli.Modes;
 using GbxSizeTree.Container;
 using GbxSizeTree.Tests.Fixtures;
+using Spectre.Console.Testing;
 
 namespace GbxSizeTree.Tests.Cli;
 
@@ -240,7 +241,8 @@ public sealed class DiffContentTests
             Assert.ThrowsAny<Exception>(() => DiffMode.CompareFiles(leftPath, rightPath));
             var report = DiffMode.CompareFiles(leftPath, rightPath, all: true);
             Assert.Contains(report.Chunks, c => c.Key == "content:decompressed-body" && c.Left != c.Right);
-            Assert.Contains(report.Chunks, c => c.Key == "content-only-fallback" && c.Left is not null);
+            Assert.Contains("semantic fields unavailable", Assert.Single(report.Warnings));
+            Assert.DoesNotContain(report.Chunks, c => c.Key == "content-only-fallback");
             Assert.Empty(report.Blocks);
             Assert.Null(report.MapUid);
         }
@@ -259,9 +261,42 @@ public sealed class DiffContentTests
             var report = DiffMode.CompareFiles(leftPath, rightPath, all: true);
             Assert.NotEmpty(report.Chunks);
             Assert.Contains(report.Chunks, c => c.Key == "body:03043FFF" && c.Right is null);
-            Assert.Contains(report.Chunks, c => c.Key == "content-only-fallback");
+            Assert.Contains("semantic fields unavailable", Assert.Single(report.Warnings));
+            Assert.DoesNotContain(report.Chunks, c => c.Key == "content-only-fallback");
         }
         finally { File.Delete(leftPath); File.Delete(rightPath); }
+    }
+
+    [Fact]
+    public void CompareFiles_IdenticalOpaqueInputsHaveWarningButNoInventedChanges()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllBytes(path, Container(Skip(0x03043FFF, [1, 2])));
+            var report = DiffMode.CompareFiles(path, path, all: true);
+            Assert.Empty(report.Chunks);
+            using var json = JsonDocument.Parse(DiffMode.RenderJson(report));
+            Assert.Empty(json.RootElement.GetProperty("Chunks").EnumerateArray());
+            Assert.Contains("semantic fields unavailable", Assert.Single(json.RootElement.GetProperty("Warnings").EnumerateArray()).GetString()!);
+            var console = new TestConsole().Width(160);
+            DiffRenderer.Render(console, report, "opaque", "opaque");
+            var html = DiffRenderer.RenderHtml(report, "opaque", "opaque");
+            foreach (var output in new[] { console.Output, html, DiffRenderer.RenderMarkdown(report, "opaque", "opaque") })
+            {
+                Assert.Contains("Warning", output);
+                Assert.Contains("semantic fields unavailable", output);
+                Assert.Contains("No differences in the compared fields.", output);
+                Assert.DoesNotContain("Chunks", output);
+                Assert.DoesNotContain("~1 changed", output);
+            }
+            if (Environment.GetEnvironmentVariable("GBX_RENDER_ARTIFACT_DIR") is { Length: > 0 } directory)
+            {
+                Directory.CreateDirectory(directory);
+                File.WriteAllText(Path.Combine(directory, "diff-opaque-warning.html"), html);
+            }
+        }
+        finally { File.Delete(path); }
     }
 
     private static byte[] Skip(uint id, byte[] payload)

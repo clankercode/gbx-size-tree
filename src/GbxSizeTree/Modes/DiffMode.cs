@@ -39,7 +39,7 @@ public static class DiffMode
         report.LeftEmbeddedSnapshots, report.RightEmbeddedSnapshots,
         report.MapUid, report.MapName, report.AuthorLogin, report.AuthorNickname, report.Password,
         report.MetadataChanges, report.EmbeddedContributions,
-        report.LeftContributionBaselineBytes, report.RightContributionBaselineBytes
+        report.LeftContributionBaselineBytes, report.RightContributionBaselineBytes, report.Warnings
     ), DiffJsonContext.Default.DiffJsonReport);
 
     private static IEnumerable<Change> Legacy<T>(IEnumerable<ValueChange<T>> changes, Func<T, string> format) where T : class =>
@@ -77,12 +77,11 @@ public static class DiffMode
     private static DiffReport ContentOnlyReport(long leftBytes, long rightBytes,
         IReadOnlyDictionary<string, string> left, IReadOnlyDictionary<string, string> right)
     {
-        var chunks = MapContentComparison.Compare(left, right).ToList();
-        chunks.Insert(0, new Change(
-            "GBX.NET map parse failed; semantic fields unavailable",
-            "GBX.NET map parse failed; semantic fields unavailable",
-            "content-only-fallback"));
-        return new DiffReport(leftBytes, rightBytes, [], [], [], [], chunks, null, null, null, null, null);
+        var chunks = MapContentComparison.Compare(left, right);
+        return new DiffReport(leftBytes, rightBytes, [], [], [], [], chunks, null, null, null, null, null)
+        {
+            Warnings = ["GBX.NET map parse failed; semantic fields unavailable. Only original serialized content was compared."],
+        };
     }
 
     private static DiffReport WithContributions(DiffReport report, byte[]? leftBytes, byte[]? rightBytes,

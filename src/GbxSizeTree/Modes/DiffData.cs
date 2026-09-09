@@ -87,6 +87,7 @@ public sealed record DiffReport(
     IReadOnlyList<ValueChange<EmbeddedSnapshot>> Embedded, IReadOnlyList<Change> Chunks,
     Change? MapUid, Change? MapName, Change? AuthorLogin, Change? AuthorNickname, Change? Password)
 {
+    public IReadOnlyList<string> Warnings { get; init; } = [];
     public IReadOnlyList<MapMetadataChange> MetadataChanges { get; init; } = [];
     public IReadOnlyList<ValueChange<EmbeddedFileContribution>> EmbeddedContributions { get; init; } = [];
     public long? LeftContributionBaselineBytes { get; init; }

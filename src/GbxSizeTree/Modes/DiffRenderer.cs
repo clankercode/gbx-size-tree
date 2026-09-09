@@ -29,6 +29,8 @@ public static class DiffRenderer
         console.MarkupLine($"[bold]Diff[/]: {Escape(oldPath)} [grey]→[/] {Escape(newPath)}");
         var delta = report.RightBytes - report.LeftBytes;
         console.MarkupLine($"Size: {report.LeftBytes:N0} [grey]→[/] {report.RightBytes:N0} bytes {Delta(delta, color)}");
+        foreach (var warning in report.Warnings)
+            console.MarkupLine($"[bold]Warning:[/] {Escape(warning)}");
         var tables = Tables(report).Where(t => t.Rows.Count > 0).ToArray();
         foreach (var data in tables)
         {
@@ -72,6 +74,8 @@ public static class DiffRenderer
     public static string RenderMarkdown(DiffReport report, string oldPath, string newPath)
     {
         var b = new StringBuilder($"## Diff: {MarkdownCell(oldPath)} → {MarkdownCell(newPath)}\n\nSize: {report.LeftBytes:N0} → {report.RightBytes:N0} bytes\n");
+        foreach (var warning in report.Warnings)
+            b.AppendLine($"\n**Warning:** {MarkdownCell(warning)}");
         foreach (var table in Tables(report).Where(t => t.Rows.Count > 0))
         {
             b.Append($"\n### {table.Title} ({Summary(table.Rows)})\n\n");
@@ -92,6 +96,8 @@ public static class DiffRenderer
         var color = colorOption ?? string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NO_COLOR"));
         var b = new StringBuilder("<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Map diff</title><style>body{font:14px system-ui;margin:24px;color:#18212b;background:#fafbfc}h2{overflow-wrap:anywhere}section{overflow-x:auto}table{border-collapse:collapse;margin:12px 0 28px;font-variant-numeric:tabular-nums}th,td{padding:8px 12px;border-bottom:1px solid #d5dce3;text-align:left;white-space:nowrap}th{background:#e9eef3}tbody tr:nth-child(even){background:#f0f4f7}td:first-child{font-weight:bold}.added td:first-child{color:#137333}.removed td:first-child{color:#b3261e}.changed td:first-child{color:#946000}td:nth-child(2){white-space:normal;min-width:240px;overflow-wrap:anywhere}@media(max-width:600px){body{margin:12px}}</style></head><body>");
         b.Append($"<h2>Diff: <code>{Html(oldPath)}</code> → <code>{Html(newPath)}</code></h2><p>Size: {report.LeftBytes:N0} → {report.RightBytes:N0} bytes</p>");
+        foreach (var warning in report.Warnings)
+            b.Append($"<p class=\"warning\"><strong>Warning:</strong> {Html(warning)}</p>");
         foreach (var table in Tables(report).Where(t => t.Rows.Count > 0))
         {
             b.Append($"<h3>{table.Title} ({Summary(table.Rows)})</h3>");
@@ -193,7 +199,7 @@ public static class DiffRenderer
         if (values.Any(x => x.IsFree)) columns.Add(new("Rotation", x => DisplayVector(x.Rotation)));
         if (values.Any(x => x.IsFree || x.IsGhost)) columns.Add(new("Mode", x => x.IsFree ? "Free" : x.IsGhost ? "Ghost" : "Normal"));
         AddVarying(columns, values, "Ground", x => x.IsGround.ToString());
-        AddVarying(columns, values, "Color", x => x.Color);
+        if (values.Any(x => x.Color != "Default")) columns.Add(new("Color", x => x.Color));
         AddVarying(columns, values, "Lightmap", x => x.LightmapQuality);
         AddVarying(columns, values, "Flags", x => x.Flags.ToString(CultureInfo.InvariantCulture));
         return SpatialTable(title, changes, columns, x => x.PhysicalPosition, x => x.Key, x => x.Color);
