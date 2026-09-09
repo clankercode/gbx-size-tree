@@ -33,3 +33,4 @@ bugs:
     - file: B032-t32-webp-output-encoding-of-pu.todo
     - file: B033-t33-visually-excellent-dedicat.todo
     - file: B034-t34-all-human-facing-pos-rot-f.todo
+    - file: B035-t35-stop-printing-item-scale-a.todo
