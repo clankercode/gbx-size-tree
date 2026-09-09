@@ -9,7 +9,10 @@ id: B024
 priority: high
 started_at: null
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T24
+    - source-done
 title: 'T24: --markdown with --md alias.'
 updated_at: "2026-09-09T06:13:52Z"
 ---
