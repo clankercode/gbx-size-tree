@@ -8,11 +8,11 @@ id: B001
 priority: high
 started_at: null
 status: done
-tags:
-    - chat-astra
-    - T1
-    - source-done
+tags: []
 title: 'T1: Add diff OLD_MAP NEW_MAP command'
 updated_at: "2026-09-09T06:13:47Z"
 ---
 Source task: T1. Source status: done. Add diff OLD_MAP NEW_MAP comparing two map versions. Implemented and verified in this session; imported as completed historical work. Source inventory: /tmp/gbx-size-tree-astra-chat-tasks.md. Dependencies: none.
+
+Chat task: T1
+Scope and acceptance criteria: Add diff OLD_MAP NEW_MAP comparing two map versions.
