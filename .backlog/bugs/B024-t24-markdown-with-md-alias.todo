@@ -1,0 +1,29 @@
+---
+complexity: medium
+created_at: "2026-09-09T06:13:09Z"
+depends_on: []
+estimate_hours: 1
+id: B024
+priority: high
+status: pending
+tags:
+    - chat-astra
+    - T24
+    - source-done
+title: 'T24: --markdown with --md alias.'
+updated_at: "2026-09-09T06:13:09Z"
+---
+## Source
+Chat task: T24
+Source status: done
+Inventory: /tmp/gbx-size-tree-astra-chat-tasks.md
+Session: 01a08304-d48f-7631-913b-60e05abe13f3
+
+## Scope and acceptance criteria
+--markdown with --md alias.
+
+## State at ingestion
+Historical implementation verified before ingestion.
+
+## Source dependencies
+T14
