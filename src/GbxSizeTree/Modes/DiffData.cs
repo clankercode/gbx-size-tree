@@ -2,6 +2,7 @@ using System.Globalization;
 using GBX.NET;
 using GBX.NET.Engines.Game;
 using GbxSizeTree.Measure;
+using GbxSizeTree.Semantics;
 
 namespace GbxSizeTree.Cli.Modes;
 
@@ -79,6 +80,12 @@ public sealed record EmbeddedSnapshot(string Path, string Sha256, long Compresse
     public string ToValue() => FormattableString.Invariant($"{Path}|compressed={Compressed}|uncompressed={Uncompressed}|ratio={Ratio:0.####}");
 }
 
+public sealed record EmbeddedPropertyEntryDiff(
+    string Path,
+    string LeftSha256,
+    string RightSha256,
+    EmbeddedPropertyDiff Properties);
+
 public sealed record Change(string? Left, string? Right, string? Key = null);
 
 public sealed record DiffReport(
@@ -100,4 +107,5 @@ public sealed record DiffReport(
     public IReadOnlyList<ItemSnapshot> RightItemSnapshots { get; init; } = [];
     public IReadOnlyList<EmbeddedSnapshot> LeftEmbeddedSnapshots { get; init; } = [];
     public IReadOnlyList<EmbeddedSnapshot> RightEmbeddedSnapshots { get; init; } = [];
+    public IReadOnlyList<EmbeddedPropertyEntryDiff> EmbeddedPropertyChanges { get; init; } = [];
 }
