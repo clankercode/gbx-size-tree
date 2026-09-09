@@ -12,7 +12,10 @@ id: B034
 priority: high
 started_at: "2026-09-09T06:21:52Z"
 status: in_progress
-tags: []
+tags:
+    - chat-astra
+    - T34
+    - source-pending
 title: 'T34: ALL human-facing pos/rot float formatting 1-3 decimal places; JSON/machine retains full precision'
 updated_at: "2026-09-09T06:21:52Z"
 ---
