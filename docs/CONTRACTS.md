@@ -75,6 +75,21 @@ JSON property names are **camelCase** throughout (envelope and model; changed pr
 2026-09-01); enum *values* stay PascalCase (`ExactOnDisk`). SizeNode `id` values are the frozen
 ids above, unaffected by casing policy.
 
+For `diff`, `--html`, `--markdown`/`--md`, `--json`, `--png`, and `--webp` are mutually
+exclusive formats. PNG and lossless WebP are purpose-built infographic encodings, not HTML
+screenshots; `--all` controls the same additional baked/serialized coverage in every format.
+Image bytes may use stdout only when it is redirected; an attached stdout requires
+`-o`/`--output`. Image file output uses a same-directory temporary file and atomic rename,
+refuses either input, does not create parent directories, and refuses an existing destination
+without `--force`. The format flag, never the filename extension, selects encoding. Successful
+image file output leaves stdout empty and errors use stderr. Image mode rejects `--pause`,
+`-i`/`--interactive`, color, and HTML style flags; harmless `--no-pause` and
+`-n`/`--non-interactive` remain allowed. `diff --help` remains pathless.
+
+Diff progress is transient and appears only on terminal stderr. It reports actual stages and
+elapsed time, leaves ETA unknown until measurable trials permit an estimate, clears before
+final output, and emits nothing when stderr is redirected.
+
 `IMapAction.RecommendByDefault` (default true): false means the action is applicable but the
 tool must never *suggest* it — it lands in `RecommendationReport.Cautions` (rendered as a
 warning, `cautions` in JSON), is excluded from `ranked` and from the under-limit verdict, and
