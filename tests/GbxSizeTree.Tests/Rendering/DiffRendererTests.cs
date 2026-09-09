@@ -351,6 +351,35 @@ public sealed class DiffRendererTests
         Assert.DoesNotContain("<span", DiffRenderer.RenderHtml(report, "left", "right", colorOption: false));
     }
 
+    [Theory]
+    [InlineData(false, 1)]
+    [InlineData(true, 1)]
+    [InlineData(false, 3)]
+    [InlineData(true, 3)]
+    public void BlockColors_SingleAndHomogeneousNonDefaultKeepColumn(bool baked, int count)
+    {
+        var block = BlockSnapshot.From(new CGameCtnBlock { Name = "blueBlock", Color = DifficultyColor.Blue });
+        var changes = Enumerable.Range(0, count).Select(i => new ValueChange<BlockSnapshot>(null,
+            block with { Name = $"blueBlock{i}" })).ToArray();
+        var report = baked ? Empty() with { BakedBlocks = changes } : Empty() with { Blocks = changes };
+        foreach (var output in Outputs(report))
+        {
+            Assert.Contains("Color", output);
+            Assert.Contains("Blue", output);
+        }
+        var html = DiffRenderer.RenderHtml(report, "old", "new", colorOption: true);
+        Assert.Equal(count, html.Split("> Blue </span>", StringSplitOptions.None).Length - 1);
+        var plain = DiffRenderer.RenderHtml(report, "old", "new", colorOption: false);
+        Assert.DoesNotContain("<span", plain);
+        Assert.Contains("<td>Blue</td>", plain);
+        if (Environment.GetEnvironmentVariable("GBX_RENDER_ARTIFACT_DIR") is { Length: > 0 } directory)
+        {
+            Directory.CreateDirectory(directory);
+            File.WriteAllText(Path.Combine(directory, $"diff-blue-{baked}-{count}.html"), html);
+            File.WriteAllText(Path.Combine(directory, $"diff-blue-{baked}-{count}-plain.html"), plain);
+        }
+    }
+
     private static DiffReport ColorReport(string color)
     {
         var item = ItemSnapshot.From(new CGameCtnAnchoredObject());
@@ -444,6 +473,129 @@ public sealed class DiffRendererTests
                 File.WriteAllText(Path.Combine(directory, enabled ? "diff-tty.txt" : "diff-plain.txt"), console.Output);
             }
         }
+    }
+
+    [Fact]
+    public void MetadataAndContributions_RenderTypedAbsenceAndSafeNonAdditiveMeasurements()
+    {
+        var report = Empty() with
+        {
+            MetadataChanges = [new("display.comments", null, new(Text: "")),
+                new("validation.forScriptModes", null, new(Boolean: false)),
+                new("medals.authorMs", null, new(Integer: 0)),
+                new("custom[red]<script>\u001b", new(Text: "old"), new(Text: "<script>\u001b"))],
+            LeftContributionBaselineBytes = 123,
+            RightContributionBaselineBytes = 456,
+            EmbeddedContributions = [new(new("asset", 10, 20, -5, null), new("asset", 11, 21, null, "budget<script>\u001b"))],
+        };
+        foreach (var output in Outputs(report))
+        {
+            Assert.Contains("display.comments", output);
+            Assert.Contains("absent", output);
+            Assert.Contains("false", output);
+            Assert.Contains("non-additive", output);
+            Assert.Contains("LZO", output);
+            Assert.Contains("123", output);
+            Assert.Contains("456", output);
+            Assert.Contains("unavailable", output);
+            Assert.DoesNotContain("No differences", output);
+            Assert.DoesNotContain("\u001b", output);
+        }
+        var html = DiffRenderer.RenderHtml(report, "a", "b");
+        Assert.DoesNotContain("<script>", html);
+        Assert.Contains("-5", html);
+        Assert.Contains("&quot;&quot;", html);
+        if (Environment.GetEnvironmentVariable("GBX_RENDER_ARTIFACT_DIR") is { Length: > 0 } directory)
+        {
+            Directory.CreateDirectory(directory);
+            File.WriteAllText(Path.Combine(directory, "diff-integration.html"), html);
+        }
+    }
+
+    [Theory]
+    [InlineData(80)]
+    [InlineData(120)]
+    public void MetadataAndContributions_FitOrdinaryTerminalWidths(int width)
+    {
+        var report = Empty() with
+        {
+            MetadataChanges = [new("display.comments", null, new(Text: ""))],
+            EmbeddedContributions = [new(new("asset.bin", 10, 20, -5, null),
+                new("asset.bin", 11, 21, null, "Removal trial budget exhausted."))],
+        };
+        var console = new TestConsole().Width(width);
+        DiffRenderer.Render(console, report, "a", "b");
+        Assert.Contains("asset.bin", console.Output);
+        Assert.Contains("display.comments", console.Output);
+        Assert.DoesNotContain("\u001b", console.Output);
+    }
+
+    [Fact]
+    public void Warnings_AreEscapedAndDoNotCountAsChanges()
+    {
+        var report = Empty() with { RightBytes = 1000, Warnings = ["semantic unavailable [red]<script>\u001b"] };
+        foreach (var output in Outputs(report))
+        {
+            Assert.Contains("Warning", output);
+            Assert.Contains("No differences in the compared fields.", output);
+            Assert.DoesNotContain("~1 changed", output);
+            Assert.DoesNotContain("\u001b", output);
+        }
+        Assert.DoesNotContain("<script>", DiffRenderer.RenderHtml(report, "a", "b"));
+        Assert.DoesNotContain("<script>", DiffRenderer.RenderMarkdown(report, "a", "b"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Metadata_OverlappingFieldsAppearOnceAndLegacyOnlyReportsStillRender(bool legacyOnly)
+    {
+        var report = DiffMode.CompareMaps(
+            new() { MapUid = "uidBefore", MapName = "nameBefore", AuthorLogin = "loginBefore", AuthorNickname = "nickBefore" },
+            new() { MapUid = "uidAfter", MapName = "nameAfter", AuthorLogin = "loginAfter", AuthorNickname = "nickAfter", Password = "secret" });
+        var json = DiffMode.RenderJson(report);
+        using (var document = System.Text.Json.JsonDocument.Parse(json))
+        {
+            Assert.Equal(5, document.RootElement.GetProperty("MetadataChanges").GetArrayLength());
+            foreach (var field in new[] { "MapUid", "MapName", "AuthorLogin", "AuthorNickname", "Password" })
+                Assert.Equal(System.Text.Json.JsonValueKind.Object, document.RootElement.GetProperty(field).ValueKind);
+        }
+        if (legacyOnly) report = report with { MetadataChanges = [] };
+        foreach (var output in Outputs(report))
+        {
+            foreach (var label in new[] { "Map UID", "Map name", "Author login", "Author nickname", "Password chunk" })
+                Assert.Equal(1, output.Split(label, StringSplitOptions.None).Length - 1);
+            foreach (var value in new[] { "uidBefore", "uidAfter", "nameBefore", "nameAfter", "loginBefore", "loginAfter", "nickBefore", "nickAfter", "true", "false" })
+                Assert.Equal(1, output.ToLowerInvariant().Split(value.ToLowerInvariant(), StringSplitOptions.None).Length - 1);
+            foreach (var path in new[] { "map.uid", "map.name", "author.login", "author.nickname", "security.passwordPresent" })
+                Assert.DoesNotContain(path, output);
+            Assert.DoesNotContain("secret", output);
+        }
+        if (!legacyOnly) Assert.Equal(json, DiffMode.RenderJson(report));
+        if (Environment.GetEnvironmentVariable("GBX_RENDER_ARTIFACT_DIR") is { Length: > 0 } directory)
+        {
+            Directory.CreateDirectory(directory);
+            File.WriteAllText(Path.Combine(directory, $"diff-metadata-once-{legacyOnly}.html"), DiffRenderer.RenderHtml(report, "old", "new"));
+        }
+    }
+
+    [Fact]
+    public void Metadata_TypedOnlyOverlappingFieldPreservesAbsenceAndEmptyText()
+    {
+        var report = Empty() with
+        {
+            RightBytes = 1000,
+            MetadataChanges = [new("map.name", null, new(Text: ""))],
+        };
+        Assert.Null(report.MapName);
+        Assert.Single(report.MetadataChanges);
+        foreach (var output in Outputs(report))
+        {
+            Assert.Contains("map.name", output);
+            Assert.Contains("absent", output);
+            Assert.DoesNotContain("No differences", output);
+        }
+        Assert.Contains("&quot;&quot;", DiffRenderer.RenderHtml(report, "old", "new"));
     }
 
     private static IEnumerable<string> Outputs(DiffReport report)

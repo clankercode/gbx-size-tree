@@ -184,6 +184,130 @@ public sealed class DiffModeTests
         Assert.True(new SpatialPosition(double.NaN, 0, 0).CompareTo(new(0, 0, 0)) < 0);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CompareFiles_MeasuresChangedEntriesFromOriginalBytes(bool all)
+    {
+        var left = MapWithEmbeds(("changed.bin", "aaaa"), ("removed.bin", "old"), ("keep.bin", "keep"));
+        var right = MapWithEmbeds(("changed.bin", "bbbb"), ("added.bin", "new"), ("keep.bin", "keep"));
+        var leftPath = Path.GetTempFileName();
+        var rightPath = Path.GetTempFileName();
+        try
+        {
+            SaveEmbeddedMap(left, leftPath);
+            SaveEmbeddedMap(right, rightPath);
+            var original = File.ReadAllBytes(leftPath);
+            var report = DiffMode.CompareFiles(leftPath, rightPath, all);
+            Assert.Equal(new[] { "added.bin", "changed.bin", "removed.bin" },
+                report.EmbeddedContributions.Select(c => (c.Right ?? c.Left)!.Path));
+            var expected = new GbxSizeTree.Measure.EmbeddedFileContributionMeasurer().Measure(original,
+                ["changed.bin", "removed.bin"], cancellationToken: TestContext.Current.CancellationToken);
+            Assert.NotNull(expected.BaselineCompressedBodyBytes);
+            Assert.Equal(expected.BaselineCompressedBodyBytes, report.LeftContributionBaselineBytes);
+            Assert.Equal(expected.Entries, report.EmbeddedContributions.Where(c => c.Left is not null).Select(c => c.Left!));
+            Assert.All(report.EmbeddedContributions, c => Assert.Null((c.Right ?? c.Left)!.UnavailableReason));
+            Assert.Equal(original, File.ReadAllBytes(leftPath));
+            Assert.Empty(DiffMode.CompareFiles(leftPath, leftPath).EmbeddedContributions);
+            using var json = JsonDocument.Parse(DiffMode.RenderJson(report));
+            Assert.Equal(JsonValueKind.Number, json.RootElement.GetProperty("EmbeddedContributions")[0]
+                .GetProperty("Right").GetProperty("MarginalCompressedBodyBytes").ValueKind);
+            Assert.Equal(JsonValueKind.Null, json.RootElement.GetProperty("EmbeddedContributions")[0].GetProperty("Left").ValueKind);
+            var budget = DiffMode.CompareFiles(leftPath, rightPath, contributionOptions: new() { MaxTrials = 0 });
+            Assert.All(budget.EmbeddedContributions, c =>
+            {
+                Assert.Null((c.Right ?? c.Left)!.MarginalCompressedBodyBytes);
+                Assert.Contains("budget", (c.Right ?? c.Left)!.UnavailableReason!);
+            });
+            using var plain = new MemoryStream();
+            using (var compressed = new MemoryStream(original)) Gbx.Decompress(compressed, plain);
+            File.WriteAllBytes(leftPath, plain.ToArray());
+            var uncompressed = DiffMode.CompareFiles(leftPath, rightPath);
+            Assert.All(uncompressed.EmbeddedContributions.Where(c => c.Left is not null), c =>
+            {
+                Assert.Null(c.Left!.MarginalCompressedBodyBytes);
+                Assert.Contains("uncompressed", c.Left.UnavailableReason!);
+            });
+        }
+        finally { File.Delete(leftPath); File.Delete(rightPath); }
+    }
+
+    [Fact]
+    public void CompareMaps_LabelsMissingOriginalContainerRatherThanInventingContributions()
+    {
+        var report = DiffMode.CompareMaps(MapWithEmbed("asset.bin", "a"), MapWithEmbed("asset.bin", "b"));
+        var change = Assert.Single(report.EmbeddedContributions);
+        Assert.Null(change.Left!.MarginalCompressedBodyBytes);
+        Assert.Null(change.Right!.MarginalCompressedBodyBytes);
+        Assert.Contains("original container", change.Left.UnavailableReason!);
+        Assert.Equal(1, change.Right.ZipRawBytes);
+    }
+
+    [Fact]
+    public void CompareFiles_DefaultBudgetMeasuresEightAndKeepsRemainingZipSizes()
+    {
+        var leftPath = Path.GetTempFileName();
+        var rightPath = Path.GetTempFileName();
+        try
+        {
+            SaveEmbeddedMap(MapWithEmbeds(), leftPath);
+            SaveEmbeddedMap(MapWithEmbeds(Enumerable.Range(0, 10).Reverse()
+                .Select(i => ($"asset{i:D2}.bin", $"content{i}")).ToArray()), rightPath);
+            var report = DiffMode.CompareFiles(leftPath, rightPath);
+            Assert.Equal(10, report.EmbeddedContributions.Count);
+            Assert.All(report.EmbeddedContributions.Take(8), c => Assert.NotNull(c.Right!.MarginalCompressedBodyBytes));
+            Assert.All(report.EmbeddedContributions.Skip(8), c =>
+            {
+                Assert.Null(c.Right!.MarginalCompressedBodyBytes);
+                Assert.Contains("budget", c.Right.UnavailableReason!);
+                Assert.True(c.Right.ZipRawBytes > 0);
+                Assert.True(c.Right.ZipCompressedBytes > 0);
+            });
+        }
+        finally { File.Delete(leftPath); File.Delete(rightPath); }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Run_HtmlForwardsExplicitColorOverride(bool color)
+    {
+        GbxSizeTree.Tests.Fixtures.SampleMap.SkipUnlessAvailable();
+        Gbx.LZO = new GBX.NET.LZO.Lzo();
+        Gbx.ZLib = new GBX.NET.ZLib.ZLib();
+        var map = Gbx.Parse<CGameCtnChallenge>(GbxSizeTree.Tests.Fixtures.SampleMap.Path);
+        var item = Assert.IsType<CGameCtnAnchoredObject>(map.Node.AnchoredObjects!.First());
+        item.Color = item.Color == DifficultyColor.Blue ? DifficultyColor.Red : DifficultyColor.Blue;
+        var changed = Path.GetTempFileName();
+        try
+        {
+            map.Save(changed);
+            var start = new System.Diagnostics.ProcessStartInfo("dotnet")
+            {
+                RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false,
+            };
+            foreach (var arg in new[] { typeof(DiffMode).Assembly.Location, "diff",
+                GbxSizeTree.Tests.Fixtures.SampleMap.Path, changed, "--html", color ? "--color" : "--no-color" })
+                start.ArgumentList.Add(arg);
+            start.Environment["NO_COLOR"] = color ? "1" : "";
+            using var process = System.Diagnostics.Process.Start(start)!;
+            var stdout = process.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
+            var stderr = process.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
+            await process.WaitForExitAsync(TestContext.Current.CancellationToken);
+            Assert.True(process.ExitCode == 0, await stderr);
+            var html = await stdout;
+            Assert.Equal(color, html.Contains("<span style=\"background-color:", StringComparison.Ordinal));
+        }
+        finally { File.Delete(changed); }
+    }
+
+    private static void SaveEmbeddedMap(CGameCtnChallenge map, string path)
+    {
+        Gbx.LZO = new GBX.NET.LZO.Lzo();
+        map.Chunks.Create<CGameCtnChallenge.Chunk03043054>().Version = 1;
+        new Gbx<CGameCtnChallenge>(map).Save(path);
+    }
+
     private static CGameCtnChallenge MapWithEmbed(string path, string content) => MapWithEmbeds((path, content));
 
     private static CGameCtnChallenge MapWithEmbeds(params (string Path, string Content)[] entries)
