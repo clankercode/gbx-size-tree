@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using System.Text.Json;
 using GBX.NET;
@@ -25,22 +24,20 @@ public static class DiffMode
     }
 
     // Keep the JSON envelope and string-valued changes compatible; snapshots carry typed detail.
-    [UnconditionalSuppressMessage("Trimming", "IL2026")]
-    public static string RenderJson(DiffReport report) => JsonSerializer.Serialize(new
-    {
+    public static string RenderJson(DiffReport report) => JsonSerializer.Serialize(new DiffJsonReport(
         report.LeftBytes, report.RightBytes,
-        Blocks = Legacy(report.Blocks, x => x.Key),
-        BakedBlocks = Legacy(report.BakedBlocks, x => x.Key),
-        Items = Legacy(report.Items, x => x.Key),
-        Embedded = report.Embedded.Select(c => new Change(c.Left?.ToValue(), c.Right?.ToValue(), (c.Right ?? c.Left)?.Path)),
-        EmbeddedChanges = report.Embedded,
+        Legacy(report.Blocks, x => x.Key),
+        Legacy(report.BakedBlocks, x => x.Key),
+        Legacy(report.Items, x => x.Key),
+        report.Embedded.Select(c => new Change(c.Left?.ToValue(), c.Right?.ToValue(), (c.Right ?? c.Left)?.Path)),
+        report.Embedded,
         report.Chunks,
         report.LeftBakedSnapshots, report.RightBakedSnapshots,
         report.LeftBlockSnapshots, report.RightBlockSnapshots,
         report.LeftItemSnapshots, report.RightItemSnapshots,
         report.LeftEmbeddedSnapshots, report.RightEmbeddedSnapshots,
-        report.MapUid, report.MapName, report.AuthorLogin, report.AuthorNickname, report.Password,
-    }, new JsonSerializerOptions { WriteIndented = true, NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals });
+        report.MapUid, report.MapName, report.AuthorLogin, report.AuthorNickname, report.Password
+    ), DiffJsonContext.Default.DiffJsonReport);
 
     private static IEnumerable<Change> Legacy<T>(IEnumerable<ValueChange<T>> changes, Func<T, string> format) where T : class =>
         changes.Select(c => new Change(c.Left is null ? null : format(c.Left), c.Right is null ? null : format(c.Right)));
