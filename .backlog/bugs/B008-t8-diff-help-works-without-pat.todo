@@ -9,7 +9,10 @@ id: B008
 priority: high
 started_at: null
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T8
+    - source-done
 title: 'T8: diff --help works without paths.'
 updated_at: "2026-09-09T06:13:48Z"
 ---
