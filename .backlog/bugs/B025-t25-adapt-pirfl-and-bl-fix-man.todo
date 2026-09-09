@@ -8,7 +8,10 @@ id: B025
 priority: high
 started_at: null
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T25
+    - source-done
 title: 'T25: Adapt /pirfl and /bl-fix-many to chat tasks; logical dependency/file-overlap lanes, parallel implementation and fresh review subagents.'
 updated_at: "2026-09-09T06:13:52Z"
 ---
