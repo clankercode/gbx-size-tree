@@ -48,3 +48,4 @@ bugs:
     - file: B047-t47-explicit-password-chunk-re.todo
     - file: B048-t48-genuinely-useful-accurate.todo
     - file: B049-t49-overall-local-comparison-a.todo
+    - file: B050-t50-comprehensive-sequential-t.todo

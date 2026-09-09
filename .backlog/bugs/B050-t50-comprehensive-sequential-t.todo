@@ -1,0 +1,29 @@
+---
+complexity: medium
+created_at: "2026-09-09T06:13:12Z"
+depends_on: []
+estimate_hours: 1
+id: B050
+priority: high
+status: pending
+tags:
+    - chat-astra
+    - T50
+    - source-done
+title: 'T50: Comprehensive sequential Tx task tables with pending/inprog/done and dependency references.'
+updated_at: "2026-09-09T06:13:12Z"
+---
+## Source
+Chat task: T50
+Source status: done
+Inventory: /tmp/gbx-size-tree-astra-chat-tasks.md
+Session: 01a08304-d48f-7631-913b-60e05abe13f3
+
+## Scope and acceptance criteria
+Comprehensive sequential Tx task tables with pending/inprog/done and dependency references.
+
+## State at ingestion
+Historical implementation verified before ingestion.
+
+## Source dependencies
+None
