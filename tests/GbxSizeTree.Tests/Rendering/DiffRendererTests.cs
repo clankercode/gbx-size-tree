@@ -166,7 +166,7 @@ public sealed class DiffRendererTests
             Assert.Contains("Subvariant", output);
             Assert.Contains("Ghost", output);
             Assert.Contains("Free", output);
-            Assert.Contains("48, 20, 112", output);
+            Assert.Contains("48.0, 20.0, 112.0", output);
             Assert.True(output.IndexOf("free", StringComparison.Ordinal) < output.IndexOf("grid", StringComparison.Ordinal));
         }
     }
@@ -236,6 +236,214 @@ public sealed class DiffRendererTests
         Assert.Contains(@"a\~\~removed\~\~.Item.Gbx", output);
         Assert.Contains(@"\~\~new\~\~", output);
         Assert.Contains(@"\~\~left\~\~", output);
+    }
+
+    [Theory]
+    [InlineData(".")]
+    [InlineData(",")]
+    public void Transforms_UseOneToThreeInvariantDecimalsWithoutChangingJson(string separator)
+    {
+        var previous = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            var culture = (System.Globalization.CultureInfo)System.Globalization.CultureInfo.InvariantCulture.Clone();
+            culture.NumberFormat.NumberDecimalSeparator = separator;
+            System.Globalization.CultureInfo.CurrentCulture = culture;
+            var vector = new SpatialPosition(1, 2.123456789, 3.1);
+            var item = ItemSnapshot.From(new CGameCtnAnchoredObject()) with
+            {
+                PhysicalPosition = vector, Rotation = vector, Pivot = vector, Scale = 2.1234567f,
+            };
+            var free = BlockSnapshot.From(new CGameCtnBlock { IsFree = true }) with
+            {
+                PhysicalPosition = vector, Rotation = vector,
+            };
+            var report = Empty() with
+            {
+                Items = [new(null, item)], Blocks = [new(null, free)], BakedBlocks = [new(null, free)],
+            };
+            var json = DiffMode.RenderJson(report);
+            foreach (var output in Outputs(report))
+            {
+                Assert.Equal(7, output.Split("1.0, 2.123, 3.1", StringSplitOptions.None).Length - 1);
+                Assert.DoesNotContain("2.123456", output);
+                Assert.Contains("2.123", output);
+            }
+            Assert.Equal(json, DiffMode.RenderJson(report));
+            Assert.Contains("2.123456789", json);
+            Assert.Contains("2.1234567", json);
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = previous;
+        }
+    }
+
+    [Fact]
+    public void Embedded_GroupsAddedRemovedBeforeModifiedAndSortsEachByOrdinalPath()
+    {
+        var report = Empty() with
+        {
+            Embedded = [
+                new(new("bModified", "old", 1, 2), new("bModified", "new", 2, 3)),
+                new(null, new("zAdded", "hash", 1, 2)),
+                new(new("aModified", "old", 1, 2), new("aModified", "new", 2, 3)),
+                new(new("BRemoved", "hash", 1, 2), null),
+            ],
+            Items = [new(null, ItemSnapshot.From(new CGameCtnAnchoredObject()))],
+        };
+        foreach (var output in Outputs(report))
+        {
+            var names = new[] { "Embedded files — added/removed", "BRemoved", "zAdded", "Embedded files — modified", "aModified", "bModified", "Placed items" };
+            var offset = 0;
+            foreach (var name in names)
+            {
+                var index = output.IndexOf(name, offset, StringComparison.Ordinal);
+                Assert.True(index >= offset, $"Missing or out-of-order group/row: {name}");
+                offset = index + name.Length;
+            }
+        }
+        Assert.Equal(DiffRenderer.RenderHtml(report, "left", "right"),
+            DiffRenderer.RenderHtml(report with { Embedded = report.Embedded.Reverse().ToArray() }, "left", "right"));
+        foreach (var output in Outputs(report with { Embedded = [report.Embedded[0]] }))
+        {
+            Assert.Contains("Embedded files — modified", output);
+            Assert.DoesNotContain("Embedded files — added/removed", output);
+        }
+    }
+
+    [Fact]
+    public void Colors_KnownPaletteHasPaddedChipsInEverySpatialTable()
+    {
+        var names = Enum.GetNames(typeof(CGameCtnBlock).GetProperty("Color")!.PropertyType);
+        Assert.Equal(new[] { "Default", "White", "Green", "Blue", "Red", "Black" }, names);
+        foreach (var name in names.Where(n => n != "Default"))
+        {
+            var report = ColorReport(name);
+            var html = DiffRenderer.RenderHtml(report, "left", "right", colorOption: true);
+            Assert.Equal(3, html.Split($"> {name} </span>", StringSplitOptions.None).Length - 1);
+            Assert.Contains("background-color:", html);
+            var console = new TestConsole().Width(500);
+            console.Profile.Capabilities.Ansi = true;
+            console.Profile.Capabilities.ColorSystem = Spectre.Console.ColorSystem.TrueColor;
+            console.EmitAnsiSequences = true;
+            DiffRenderer.Render(console, report, "left", "right");
+            Assert.Equal(3, console.Output.Split($" {name} \u001b", StringSplitOptions.None).Length - 1);
+        }
+    }
+
+    [Fact]
+    public void Colors_DefaultUnknownAndNoColorRemainOrdinaryAndSafe()
+    {
+        const string unknown = "Blue → Red [red]<script>\u001b";
+        foreach (var name in new[] { "Default", unknown })
+        {
+            var html = DiffRenderer.RenderHtml(ColorReport(name), "left", "right", colorOption: true);
+            Assert.DoesNotContain("<span", html);
+            Assert.DoesNotContain("<script>", html);
+            Assert.DoesNotContain("\u001b", html);
+        }
+        var report = ColorReport("Blue");
+        var console = new TestConsole().Width(500);
+        DiffRenderer.Render(console, report, "left", "right");
+        Assert.DoesNotContain("\u001b", console.Output);
+        Assert.DoesNotContain("<span", DiffRenderer.RenderMarkdown(report, "left", "right"));
+        Assert.DoesNotContain("<span", DiffRenderer.RenderHtml(report, "left", "right", colorOption: false));
+    }
+
+    private static DiffReport ColorReport(string color)
+    {
+        var item = ItemSnapshot.From(new CGameCtnAnchoredObject());
+        var block = BlockSnapshot.From(new CGameCtnBlock());
+        return Empty() with
+        {
+            Items = [new(item with { Color = "Default" }, item with { Color = color })],
+            Blocks = [new(block with { Color = "Default" }, block with { Color = color })],
+            BakedBlocks = [new(block with { Color = "Default" }, block with { Color = color })],
+        };
+    }
+
+    [Fact]
+    public void BlockPositions_HideOrdinaryAndGhostMidpointsButKeepFreeBakedAndSortOrder()
+    {
+        var normal = BlockSnapshot.From(new CGameCtnBlock { Name = "normalBlock", Coord = new(2, 2, 2) });
+        var ghost = BlockSnapshot.From(new CGameCtnBlock { Name = "ghost", Coord = new(1, 1, 1), IsGhost = true });
+        var free = BlockSnapshot.From(new CGameCtnBlock { Name = "free", IsFree = true }) with
+        {
+            PhysicalPosition = new(1.234567, 2, 3), Rotation = new(.1, .2, .3),
+        };
+        var report = Empty() with { Blocks = [new(null, normal), new(null, ghost), new(null, free)] };
+        foreach (var output in Outputs(report))
+        {
+            Assert.DoesNotContain("80.0, 20.0, 80.0", output);
+            Assert.DoesNotContain("48.0, 12.0, 48.0", output);
+            Assert.Contains("1.235, 2.0, 3.0", output);
+            Assert.True(output.IndexOf("free", StringComparison.Ordinal) < output.IndexOf("ghost", StringComparison.Ordinal));
+            Assert.True(output.IndexOf("ghost", StringComparison.Ordinal) < output.IndexOf("normalBlock", StringComparison.Ordinal));
+        }
+        Assert.Contains("<td>normalBlock</td><td>(2, 2, 2)</td><td>--</td>", DiffRenderer.RenderHtml(report, "a", "b"));
+        Assert.Contains("<td>ghost</td><td>(1, 1, 1)</td><td>--</td>", DiffRenderer.RenderHtml(report, "a", "b"));
+        foreach (var output in Outputs(report with { Blocks = [], BakedBlocks = report.Blocks }))
+        {
+            Assert.Contains("80.0, 20.0, 80.0", output);
+            Assert.Contains("48.0, 12.0, 48.0", output);
+            Assert.Contains("1.235, 2.0, 3.0", output);
+        }
+        Assert.Equal(new SpatialPosition(80, 20, 80), normal.PhysicalPosition);
+    }
+
+    [Fact]
+    public void SharedTables_BrowserFixtureCoversTransformsColorsAndEscaping()
+    {
+        var item = ItemSnapshot.From(new CGameCtnAnchoredObject()) with
+        {
+            PhysicalPosition = new(1.234567, 2, 3), Rotation = new(.123456, 0, 0),
+            Pivot = new(0, 1.234567, 0), Scale = 1.234567f,
+        };
+        var grid = BlockSnapshot.From(new CGameCtnBlock { Coord = new(1, 2, 3) });
+        var labels = new[] { "White", "Green", "Blue", "Red", "Black", "Default", "Blue → Red [red]<script>\u001b" };
+        var blocks = labels.Select((label, i) => new ValueChange<BlockSnapshot>(null, grid with
+        {
+            Name = $"grid{i}<img src=x onerror=alert(1)>", Color = label, IsGhost = i == 1,
+        })).Append(new(null, grid with
+        {
+            Name = "freeBlock", IsFree = true, PhysicalPosition = new(1.234567, 2, 3), Rotation = new(.123456, 0, 0),
+        })).ToArray();
+        var report = Empty() with
+        {
+            Embedded = [new(null, new("zAdded<script>", "h", 10, 20)), new(new("BRemoved", "h", 10, 20), null),
+                new(new("bModified", "h", 10, 20), new("bModified", "i", 12, 24)),
+                new(new("aModified", "h", 10, 20), new("aModified", "i", 12, 24))],
+            Items = labels.Select((label, i) => new ValueChange<ItemSnapshot>(null, item with
+            {
+                Path = $"item{i}[red]<script>.Item.Gbx", Color = label, AnimationPhase = i.ToString(),
+            })).Append(new(item with { Path = "transition", Color = "Blue" }, item with { Path = "transition", Color = "Red" })).ToArray(),
+            Blocks = blocks, BakedBlocks = blocks,
+            Chunks = [new("10 bytes", "20 bytes", "chunk<script>" )],
+            MapName = new("old", "<script>alert(1)</script>"),
+        };
+        var html = DiffRenderer.RenderHtml(report, "old<script>.Map.Gbx", "new[red].Map.Gbx", colorOption: true);
+        Assert.Equal(6, html.Split("<table>", StringSplitOptions.None).Length - 1);
+        Assert.Equal(17, html.Split("<span", StringSplitOptions.None).Length - 1);
+        Assert.DoesNotContain("<script>", html);
+        if (Environment.GetEnvironmentVariable("GBX_RENDER_ARTIFACT_DIR") is { Length: > 0 } directory)
+        {
+            Directory.CreateDirectory(directory);
+            File.WriteAllText(Path.Combine(directory, "diff.html"), html);
+            File.WriteAllText(Path.Combine(directory, "diff-no-color.html"), DiffRenderer.RenderHtml(report, "old", "new", colorOption: false));
+            File.WriteAllText(Path.Combine(directory, "diff-environment.html"), DiffRenderer.RenderHtml(report, "old", "new"));
+            File.WriteAllText(Path.Combine(directory, "diff.md"), DiffRenderer.RenderMarkdown(report, "old", "new"));
+            File.WriteAllText(Path.Combine(directory, "diff.json"), DiffMode.RenderJson(report));
+            foreach (var enabled in new[] { false, true })
+            {
+                var console = new TestConsole().Width(240);
+                console.Profile.Capabilities.Ansi = enabled;
+                console.Profile.Capabilities.ColorSystem = enabled ? Spectre.Console.ColorSystem.TrueColor : Spectre.Console.ColorSystem.NoColors;
+                console.EmitAnsiSequences = enabled;
+                DiffRenderer.Render(console, report, "old", "new");
+                File.WriteAllText(Path.Combine(directory, enabled ? "diff-tty.txt" : "diff-plain.txt"), console.Output);
+            }
+        }
     }
 
     private static IEnumerable<string> Outputs(DiffReport report)
