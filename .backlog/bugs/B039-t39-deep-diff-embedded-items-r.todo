@@ -1,0 +1,29 @@
+---
+complexity: medium
+created_at: "2026-09-09T06:13:10Z"
+depends_on: []
+estimate_hours: 1
+id: B039
+priority: high
+status: pending
+tags:
+    - chat-astra
+    - T39
+    - source-pending
+title: 'T39: Deep diff embedded items: readable nested property paths e.g'
+updated_at: "2026-09-09T06:13:10Z"
+---
+## Source
+Chat task: T39
+Source status: pending
+Inventory: /tmp/gbx-size-tree-astra-chat-tasks.md
+Session: 01a08304-d48f-7631-913b-60e05abe13f3
+
+## Scope and acceptance criteria
+Deep diff embedded items: readable nested property paths e.g. Prefab > Ent#2 > Solid2Model > Material#1: Grass -> Plastic, as parsing permits.
+
+## State at ingestion
+Outstanding work; not implemented by this ingestion.
+
+## Source dependencies
+T3, T38

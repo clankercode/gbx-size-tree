@@ -37,3 +37,4 @@ bugs:
     - file: B036-t36-sort-embedded-files-by-pat.todo
     - file: B037-t37-separate-embedded-added-re.todo
     - file: B038-t38-show-meaningful-embedded-d.todo
+    - file: B039-t39-deep-diff-embedded-items-r.todo
