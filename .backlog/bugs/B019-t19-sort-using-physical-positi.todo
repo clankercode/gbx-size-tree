@@ -9,7 +9,10 @@ id: B019
 priority: high
 started_at: null
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T19
+    - source-done
 title: 'T19: Sort using physical positions: actual items/free blocks; midpoint of 32x8x32 metre coord cells for normal/ghost/grid baked blocks.'
 updated_at: "2026-09-09T06:13:51Z"
 ---
