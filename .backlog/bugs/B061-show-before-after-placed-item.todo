@@ -1,0 +1,27 @@
+---
+complexity: medium
+created_at: "2026-09-09T08:11:09Z"
+depends_on: []
+estimate_hours: 2
+id: B061
+priority: high
+status: pending
+tags:
+    - chat-astra
+    - embedded-usage
+title: Show before/after placed-item usage counts for embedded files
+updated_at: "2026-09-09T08:11:09Z"
+---
+## User request
+For embedded files, particularly removals, show the number of items in the map dependent on each file before and after the change. Highlight zero-use embedded assets so users can distinguish unused-file cleanup from removing assets still referenced by placed items.
+
+## Acceptance criteria
+- Show clearly labeled before/after usage counts for added, removed and modified embedded files in applicable diff outputs, with structured counts for machine-readable consumers.
+- Count placed instances, preserving duplicates, and resolve actual embedded model identities/aliases rather than assuming displayed or compacted path equality.
+- Define dependency scope explicitly: direct placed-item references versus transitive asset dependencies. When transitive or unresolved dependencies cannot be established, report unknown/uncertain instead of asserting zero or safe removal.
+- Removed embedded files must show whether the new map still contains references to them. Missing file on one side does not imply zero usages on that side.
+- Distinguish confirmed zero direct uses from unknown counts; avoid claiming removal is risk-free solely from an incomplete reference scan.
+- Tests cover zero-use cleanup, multiple placed instances, alias/path variants, removed-but-still-referenced assets, additions, unchanged usage, and unresolved dependencies.
+
+## Sequencing
+Backlog addition requested during the fixed 26-ticket batch; preserve as a separate pending bug, not automatic expansion of that implementation batch.

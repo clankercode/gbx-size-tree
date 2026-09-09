@@ -59,3 +59,4 @@ bugs:
     - file: B058-t58-improve-pretty-tty-framing.todo
     - file: B059-t59-for-normal-ghost-non-free.todo
     - file: B060-summarize-changes-to-propertie.todo
+    - file: B061-show-before-after-placed-item.todo
