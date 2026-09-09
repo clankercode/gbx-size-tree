@@ -2,7 +2,6 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using GBX.NET;
 using GBX.NET.Engines.Game;
-using GbxSizeTree.Container;
 
 namespace GbxSizeTree.Cli.Modes;
 
@@ -11,7 +10,7 @@ public static class DiffMode
     public static int Run(IReadOnlyList<string> paths, CliOutputFormat format, bool all, bool? colorOption)
     {
         if (paths.Count != 2) throw new ArgumentException("diff requires exactly two map paths.");
-        var report = Compare(Read(paths[0]), Read(paths[1]), all);
+        var report = CompareFiles(paths[0], paths[1], all);
         if (format == CliOutputFormat.Json)
             Console.WriteLine(RenderJson(report));
         else if (format == CliOutputFormat.Html)
@@ -42,26 +41,40 @@ public static class DiffMode
     private static IEnumerable<Change> Legacy<T>(IEnumerable<ValueChange<T>> changes, Func<T, string> format) where T : class =>
         changes.Select(c => new Change(c.Left is null ? null : format(c.Left), c.Right is null ? null : format(c.Right)));
 
-    private static Snapshot Read(string path)
+    /// <summary>Compares parsed map placements and, with all, original serialized content.</summary>
+    public static DiffReport CompareFiles(string left, string right, bool all = false) =>
+        Compare(Read(left, all), Read(right, all), all);
+
+    private static Snapshot Read(string path, bool all)
     {
         if (!File.Exists(path)) throw new FileNotFoundException("map not found", path);
         var bytes = File.ReadAllBytes(path);
-        Gbx.LZO ??= new GBX.NET.LZO.Lzo();
-        Gbx.ZLib ??= new GBX.NET.ZLib.ZLib();
+        Gbx.LZO = new GBX.NET.LZO.Lzo();
+        Gbx.ZLib = new GBX.NET.ZLib.ZLib();
         using var stream = new MemoryStream(bytes, writable: false);
         var map = Gbx.Parse<CGameCtnChallenge>(stream).Node;
-        var layout = GbxContainerReader.Read(bytes);
-        var chunks = layout.HeaderChunks.ToDictionary(c => $"header:{c.ChunkId:X8}", c => c.Bytes);
-        var body = DecompressedBody.GetBody(bytes);
-        foreach (var region in new SkippableChunkScanner().Scan(body).Regions)
-            chunks[$"body:{region.ChunkId:X8}"] = region.Length;
-        return Capture(map, bytes.Length, chunks);
+        return Capture(map, bytes.Length, all ? MapContentComparison.Capture(bytes) : new Dictionary<string, string>());
     }
 
+    /// <summary>
+    /// Compares semantic placements; all also compares the chunks serialized by GBX.NET.
+    /// In-memory objects have no original container bytes, and properties without chunks are not serialized.
+    /// Use MapContentComparison.Compare for original bytes, including data GBX.NET does not preserve.
+    /// </summary>
     public static DiffReport CompareMaps(CGameCtnChallenge left, CGameCtnChallenge right, bool all = false) =>
-        Compare(Capture(left, 0, new Dictionary<string, long>()), Capture(right, 0, new Dictionary<string, long>()), all);
+        Compare(Capture(left, 0, SerializedContent(left, all)), Capture(right, 0, SerializedContent(right, all)), all);
 
-    private static Snapshot Capture(CGameCtnChallenge map, long fileBytes, IReadOnlyDictionary<string, long> chunks) => new(
+    private static IReadOnlyDictionary<string, string> SerializedContent(CGameCtnChallenge map, bool all)
+    {
+        if (!all) return new Dictionary<string, string>();
+        Gbx.LZO = new GBX.NET.LZO.Lzo();
+        Gbx.ZLib = new GBX.NET.ZLib.ZLib();
+        using var stream = new MemoryStream();
+        new Gbx<CGameCtnChallenge>(map).Save(stream);
+        return MapContentComparison.Capture(stream.ToArray());
+    }
+
+    private static Snapshot Capture(CGameCtnChallenge map, long fileBytes, IReadOnlyDictionary<string, string> chunks) => new(
         fileBytes, chunks,
         map.Blocks?.Select(BlockSnapshot.From).OrderBy(x => x.PhysicalPosition).ThenBy(x => x.Key, StringComparer.Ordinal).ToArray() ?? [],
         map.BakedBlocks?.Select(BlockSnapshot.From).OrderBy(x => x.PhysicalPosition).ThenBy(x => x.Key, StringComparer.Ordinal).ToArray() ?? [],
@@ -71,7 +84,7 @@ public static class DiffMode
     private static DiffReport Compare(Snapshot a, Snapshot b, bool all) => new(
         a.FileBytes, b.FileBytes, InstanceDiff(a.Blocks, b.Blocks, x => x.PhysicalPosition, x => x.Key),
         all ? InstanceDiff(a.BakedBlocks, b.BakedBlocks, x => x.PhysicalPosition, x => x.Key) : [],
-        InstanceDiff(a.Items, b.Items, x => x.PhysicalPosition, x => x.Key), EmbeddedDiff(a.Embedded, b.Embedded), all ? ChunkDiff(a.Chunks, b.Chunks) : [],
+        InstanceDiff(a.Items, b.Items, x => x.PhysicalPosition, x => x.Key), EmbeddedDiff(a.Embedded, b.Embedded), all ? MapContentComparison.Compare(a.Chunks, b.Chunks) : [],
         Different(a.MapUid, b.MapUid), Different(a.MapName, b.MapName),
         Different(a.AuthorLogin, b.AuthorLogin), Different(a.AuthorNickname, b.AuthorNickname),
         Different(a.Password.ToString(), b.Password.ToString()))
@@ -123,12 +136,7 @@ public static class DiffMode
             .Where(k => !a.TryGetValue(k, out var av) || !b.TryGetValue(k, out var bv) || av != bv)
             .Select(k => new ValueChange<EmbeddedSnapshot>(a.GetValueOrDefault(k), b.GetValueOrDefault(k))).ToArray();
 
-    private static IReadOnlyList<Change> ChunkDiff(IReadOnlyDictionary<string, long> a, IReadOnlyDictionary<string, long> b) =>
-        a.Keys.Union(b.Keys).OrderBy(k => k, StringComparer.Ordinal)
-            .Where(k => !a.TryGetValue(k, out var av) || !b.TryGetValue(k, out var bv) || av != bv)
-            .Select(k => new Change(a.TryGetValue(k, out var av) ? $"{av} bytes" : null, b.TryGetValue(k, out var bv) ? $"{bv} bytes" : null, k)).ToArray();
-
-    private sealed record Snapshot(long FileBytes, IReadOnlyDictionary<string, long> Chunks,
+    private sealed record Snapshot(long FileBytes, IReadOnlyDictionary<string, string> Chunks,
         BlockSnapshot[] Blocks, BlockSnapshot[] BakedBlocks, ItemSnapshot[] Items,
         IReadOnlyDictionary<string, EmbeddedSnapshot> Embedded,
         string MapUid, string MapName, string AuthorLogin, string AuthorNickname, bool Password);
