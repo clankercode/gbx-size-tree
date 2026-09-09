@@ -9,7 +9,7 @@ namespace GbxSizeTree.Measure;
 /// <summary>Limits sequential removal trials and input sizes before decompression or ZIP inspection.</summary>
 public sealed record EmbeddedFileContributionOptions
 {
-    public int MaxTrials { get; init; } = 8;
+    public int MaxTrials { get; init; } = 256;
     public int MaxBodyBytes { get; init; } = 256 * 1024 * 1024;
     public int MaxZipEntries { get; init; } = 4096;
     public long MaxZipRawBytes { get; init; } = 256 * 1024 * 1024;

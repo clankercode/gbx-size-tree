@@ -63,6 +63,57 @@ public sealed class EmbeddedFileContributionTests
     }
 
     [Fact]
+    public void Measure_DefaultTrialCapMeasuresMoreThanEightEntries()
+    {
+        var calls = 0;
+        var measurer = new EmbeddedFileContributionMeasurer(body =>
+        {
+            calls++;
+            return body.LongLength;
+        });
+        var paths = Enumerable.Range(0, 10).Select(i => $"asset{i:D2}.bin").ToArray();
+        var file = BuildFile(BuildZip(CompressionLevel.NoCompression,
+            paths.Select(path => (path, Data(32))).ToArray()));
+
+        var result = measurer.Measure(file, paths, cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(11, calls);
+        Assert.All(result.Entries, entry =>
+        {
+            Assert.NotNull(entry.MarginalCompressedBodyBytes);
+            Assert.Null(entry.UnavailableReason);
+        });
+    }
+
+    [Fact]
+    public void Measure_ExplicitLowTrialCapIsPreserved()
+    {
+        var calls = 0;
+        var measurer = new EmbeddedFileContributionMeasurer(body =>
+        {
+            calls++;
+            return body.LongLength;
+        });
+        var paths = Enumerable.Range(0, 10).Select(i => $"asset{i:D2}.bin").ToArray();
+        var file = BuildFile(BuildZip(CompressionLevel.NoCompression,
+            paths.Select(path => (path, Data(32))).ToArray()));
+
+        var result = measurer.Measure(file, paths, new() { MaxTrials = 3 }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(4, calls);
+        Assert.All(result.Entries.Take(3), entry =>
+        {
+            Assert.NotNull(entry.MarginalCompressedBodyBytes);
+            Assert.Null(entry.UnavailableReason);
+        });
+        Assert.All(result.Entries.Skip(3), entry =>
+        {
+            Assert.Null(entry.MarginalCompressedBodyBytes);
+            Assert.Equal("Removal trial budget exhausted.", entry.UnavailableReason);
+        });
+    }
+
+    [Fact]
     public void Measure_PreservesNegativeMeasurementsAndBoundsTrialsToRequestedPaths()
     {
         var seen = new List<byte[]>();
