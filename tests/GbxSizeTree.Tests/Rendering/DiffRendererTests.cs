@@ -392,6 +392,60 @@ public sealed class DiffRendererTests
         Assert.Equal(new SpatialPosition(80, 20, 80), normal.PhysicalPosition);
     }
 
+    [Fact]
+    public void SharedTables_BrowserFixtureCoversTransformsColorsAndEscaping()
+    {
+        var item = ItemSnapshot.From(new CGameCtnAnchoredObject()) with
+        {
+            PhysicalPosition = new(1.234567, 2, 3), Rotation = new(.123456, 0, 0),
+            Pivot = new(0, 1.234567, 0), Scale = 1.234567f,
+        };
+        var grid = BlockSnapshot.From(new CGameCtnBlock { Coord = new(1, 2, 3) });
+        var labels = new[] { "White", "Green", "Blue", "Red", "Black", "Default", "Blue → Red [red]<script>\u001b" };
+        var blocks = labels.Select((label, i) => new ValueChange<BlockSnapshot>(null, grid with
+        {
+            Name = $"grid{i}<img src=x onerror=alert(1)>", Color = label, IsGhost = i == 1,
+        })).Append(new(null, grid with
+        {
+            Name = "freeBlock", IsFree = true, PhysicalPosition = new(1.234567, 2, 3), Rotation = new(.123456, 0, 0),
+        })).ToArray();
+        var report = Empty() with
+        {
+            Embedded = [new(null, new("zAdded<script>", "h", 10, 20)), new(new("BRemoved", "h", 10, 20), null),
+                new(new("bModified", "h", 10, 20), new("bModified", "i", 12, 24)),
+                new(new("aModified", "h", 10, 20), new("aModified", "i", 12, 24))],
+            Items = labels.Select((label, i) => new ValueChange<ItemSnapshot>(null, item with
+            {
+                Path = $"item{i}[red]<script>.Item.Gbx", Color = label, AnimationPhase = i.ToString(),
+            })).Append(new(item with { Path = "transition", Color = "Blue" }, item with { Path = "transition", Color = "Red" })).ToArray(),
+            Blocks = blocks, BakedBlocks = blocks,
+            Chunks = [new("10 bytes", "20 bytes", "chunk<script>" )],
+            MapName = new("old", "<script>alert(1)</script>"),
+        };
+        var html = DiffRenderer.RenderHtml(report, "old<script>.Map.Gbx", "new[red].Map.Gbx", colorOption: true);
+        Assert.Equal(6, html.Split("<table>", StringSplitOptions.None).Length - 1);
+        Assert.Equal(17, html.Split("<span", StringSplitOptions.None).Length - 1);
+        Assert.DoesNotContain("<script>", html);
+        if (Environment.GetEnvironmentVariable("GBX_RENDER_ARTIFACT_DIR") is { Length: > 0 } directory)
+        {
+            Directory.CreateDirectory(directory);
+            File.WriteAllText(Path.Combine(directory, "diff.html"), html);
+            File.WriteAllText(Path.Combine(directory, "diff-no-color.html"), DiffRenderer.RenderHtml(report, "old", "new", colorOption: false));
+            File.WriteAllText(Path.Combine(directory, "diff-environment.html"), DiffRenderer.RenderHtml(report, "old", "new"));
+            File.WriteAllText(Path.Combine(directory, "diff.md"), DiffRenderer.RenderMarkdown(report, "old", "new"));
+            File.WriteAllText(Path.Combine(directory, "diff.json"), DiffMode.RenderJson(report));
+            foreach (var enabled in new[] { false, true })
+            {
+                var console = new TestConsole().Width(240);
+                console.Profile.Capabilities.Ansi = enabled;
+                console.Profile.Capabilities.ColorSystem = enabled ? Spectre.Console.ColorSystem.TrueColor : Spectre.Console.ColorSystem.NoColors;
+                console.EmitAnsiSequences = enabled;
+                DiffRenderer.Render(console, report, "old", "new");
+                File.WriteAllText(Path.Combine(directory, enabled ? "diff-tty.txt" : "diff-plain.txt"), console.Output);
+            }
+        }
+    }
+
     private static IEnumerable<string> Outputs(DiffReport report)
     {
         var console = new TestConsole().Width(500);

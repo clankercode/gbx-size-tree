@@ -50,7 +50,7 @@ public static class DiffRenderer
                 cells[0] = Colorize(cells[0], MarkerColor(cells[0]), color);
                 for (var i = 1; i < cells.Length; i++)
                     cells[i] = data.Columns[i] == "Color" && row.Color is { } change
-                        ? Transition(change, label => ColorChip(label, html: false, color), onlyDifferent: true)
+                        ? ColorTransition(change, html: false, color)
                         : Colorize(cells[i], data.Columns[i] is "Pos" or "Position" or "Coord" ? "cyan"
                             : data.Columns[i] is "Rotation" or "Direction" ? "yellow" : "default", color);
                 table.AddRow(cells);
@@ -99,7 +99,7 @@ public static class DiffRenderer
                 for (var i = 0; i < row.Cells.Length; i++)
                 {
                     var cell = table.Columns[i] == "Color" && row.Color is { } change
-                        ? Transition(change, label => ColorChip(label, html: true, color), onlyDifferent: true)
+                        ? ColorTransition(change, html: true, color)
                         : Html(row.Cells[i]);
                     b.Append($"<td>{cell}</td>");
                 }
@@ -236,6 +236,14 @@ public static class DiffRenderer
             b.Append(c == '<' ? "&lt;" : c == '&' ? "&amp;" : c.ToString());
         }
         return b.ToString();
+    }
+
+    private static string ColorTransition(ValueChange<string> change, bool html, bool enabled)
+    {
+        if (change.Left is null) return ColorChip(change.Right!, html, enabled);
+        if (change.Right is null) return ColorChip(change.Left, html, enabled);
+        if (change.Left == change.Right) return ColorChip(change.Left, html, enabled);
+        return $"{ColorChip(change.Left, html, enabled)} → {ColorChip(change.Right, html, enabled)}";
     }
 
     private static string ColorChip(string label, bool html, bool enabled)
