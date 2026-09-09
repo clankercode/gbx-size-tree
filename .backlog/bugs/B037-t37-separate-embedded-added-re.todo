@@ -10,10 +10,7 @@ id: B037
 priority: high
 started_at: null
 status: pending
-tags:
-    - chat-astra
-    - T37
-    - source-pending
+tags: []
 title: 'T37: Separate embedded added/removed group from modified group; modified comes after.'
 updated_at: "2026-09-09T06:13:10Z"
 ---
@@ -31,3 +28,5 @@ Outstanding work; not implemented by this ingestion.
 
 ## Source dependencies
 T3, T36
+
+Decision and lane plan: renderer lane with B034/B057/B059. Render additions/removals together first and modifications second, each ordinal path-sorted; retain both groups before placed items. Comparison/data lane does not edit renderer files concurrently.
