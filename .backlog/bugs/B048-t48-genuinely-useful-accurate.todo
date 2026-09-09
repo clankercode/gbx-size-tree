@@ -14,10 +14,7 @@ id: B048
 priority: high
 started_at: null
 status: in_progress
-tags:
-    - chat-astra
-    - T48
-    - source-inprog
+tags: []
 title: 'T48: Genuinely useful accurate diff help: explain baked gating, color flags, coverage limitations and new output/style flags when implemente'
 updated_at: "2026-09-09T06:13:55Z"
 ---
@@ -35,3 +32,5 @@ Partial implementation; remaining scope must be completed. No active agent claim
 
 ## Source dependencies
 T6, T8, T9, T12, T23, T24
+
+Decision and sequencing: Final CLI/docs lane after output flags and data coverage stabilize (despite existing dependencies already done). Decision: help documents actual coverage and opaque fallbacks, baked gating, NO_COLOR behavior, styles, binary outputs and OLD_MAP NEW_MAP examples; never overclaim semantic interpretation.
