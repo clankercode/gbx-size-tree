@@ -1,23 +1,21 @@
 ---
 claimed_at: "2026-09-09T07:22:01Z"
 claimed_by: astra
-completed_at: null
+completed_at: "2026-09-09T08:22:46Z"
 complexity: medium
 created_at: "2026-09-09T06:13:10Z"
 depends_on:
     - B002
     - B015
+duration_minutes: 60.76242595235
 estimate_hours: 1
 id: B035
 priority: high
 started_at: "2026-09-09T07:22:01Z"
-status: in_progress
-tags:
-    - chat-astra
-    - T35
-    - source-pending
+status: done
+tags: []
 title: 'T35: Stop printing item scale and remove scale from Key(...)'
-updated_at: "2026-09-09T07:22:01Z"
+updated_at: "2026-09-09T08:22:46Z"
 ---
 ## Source
 Chat task: T35

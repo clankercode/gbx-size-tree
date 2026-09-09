@@ -1,24 +1,22 @@
 ---
 claimed_at: "2026-09-09T07:22:01Z"
 claimed_by: astra
-completed_at: null
+completed_at: "2026-09-09T08:22:46Z"
 complexity: medium
 created_at: "2026-09-09T06:13:10Z"
 depends_on:
     - B003
     - B020
     - B037
+duration_minutes: 60.76245132061667
 estimate_hours: 1
 id: B038
 priority: high
 started_at: "2026-09-09T07:22:01Z"
-status: in_progress
-tags:
-    - chat-astra
-    - T38
-    - source-inprog
+status: done
+tags: []
 title: 'T38: Show meaningful embedded deltas and explain what changed (size, compression, content, other known properties)'
-updated_at: "2026-09-09T07:22:01Z"
+updated_at: "2026-09-09T08:22:46Z"
 ---
 ## Source
 Chat task: T38
