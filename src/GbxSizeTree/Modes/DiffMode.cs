@@ -62,17 +62,16 @@ public static class DiffMode
         a.AuthorNickname != b.AuthorNickname ? new Change(a.AuthorNickname, b.AuthorNickname) : null,
         a.Password != b.Password ? new Change(a.Password.ToString(), b.Password.ToString()) : null);
 
-    private static Dictionary<string, string> ReadEmbeds(CGameCtnChallenge map)
+    private static Dictionary<string, EmbedSnapshot> ReadEmbeds(CGameCtnChallenge map)
     {
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, EmbedSnapshot>(StringComparer.OrdinalIgnoreCase);
         if (map.EmbeddedZipData is not { Length: > 0 }) return result;
         using var archive = map.OpenReadEmbeddedZipData();
         foreach (var entry in archive.Entries)
         {
             using var input = entry.Open(); using var sha = SHA256.Create();
-            var hash = Convert.ToHexString(sha.ComputeHash(input));
-            var ratio = entry.Length == 0 ? 0 : (double)entry.CompressedLength / entry.Length;
-            result[entry.FullName] = $"{hash}|compressed={entry.CompressedLength}|uncompressed={entry.Length}|ratio={ratio:0.####}";
+            result[entry.FullName] = new EmbedSnapshot(entry.FullName, Convert.ToHexString(sha.ComputeHash(input)), entry.CompressedLength, entry.Length,
+                entry.Length == 0 ? 0 : (double)entry.CompressedLength / entry.Length);
         }
         return result;
     }
@@ -87,16 +86,23 @@ public static class DiffMode
         var x = n.ElementAtOrDefault(0); var y = n.ElementAtOrDefault(1); var z = n.ElementAtOrDefault(2);
         return (x & 0x3ff) | ((z & 0x3ff) << 10) ^ ((y & 0x3ff) << 20);
     }
-    private static string BlockKey(CGameCtnBlock block) => $"{block.Name}|coord={block.Coord}|dir={block.Direction}|variant={block.Variant}|subvariant={block.SubVariant}";
-    private static string ItemKey(CGameCtnAnchoredObject item) => $"{item.ItemModel?.Id ?? "<unknown>"}|position={item.AbsolutePositionInMap}|rotation={item.YawPitchRoll}";
+    private static string BlockKey(CGameCtnBlock block) => $"{block.Name}|coord={block.Coord}|pos=--|rotation={block.Direction}|variant={block.Variant}|subvariant={block.SubVariant}";
+    private static string ItemKey(CGameCtnAnchoredObject item) => $"{item.ItemModel?.Id ?? "<unknown>"}|position={item.AbsolutePositionInMap}|rotation={item.YawPitchRoll}|scale={item.Scale}";
     private static IReadOnlyList<Change> SetDiff(IEnumerable<string> a, IEnumerable<string> b) => a.Except(b).Select(x => new Change(x, null)).Concat(b.Except(a).Select(x => new Change(null, x))).ToArray();
     private static IReadOnlyList<Change> SetDiff(IReadOnlyDictionary<string, long> a, IReadOnlyDictionary<string, long> b) => a.Keys.Union(b.Keys).Where(k => !a.TryGetValue(k, out var av) || !b.TryGetValue(k, out var bv) || av != bv).Select(k => new Change(a.TryGetValue(k, out var av) ? $"{av} bytes" : null, b.TryGetValue(k, out var bv) ? $"{bv} bytes" : null, k)).ToArray();
     private static IReadOnlyList<Change> SetDiff(IReadOnlyDictionary<string, string> a, IReadOnlyDictionary<string, string> b) => a.Keys.Union(b.Keys).Where(k => !a.TryGetValue(k, out var av) || !b.TryGetValue(k, out var bv) || av != bv).Select(k => new Change(a.TryGetValue(k, out var av) ? av : null, b.TryGetValue(k, out var bv) ? bv : null, k)).ToArray();
-    private static IReadOnlyList<EmbedSnapshot> ToEmbedSnapshots(IReadOnlyDictionary<string,string> embeds) => embeds.Select(x => { var p=x.Value.Split('|'); return new EmbedSnapshot(x.Key,p[0],p.ElementAtOrDefault(1),p.ElementAtOrDefault(2),p.ElementAtOrDefault(3)); }).ToArray();
+    private static IReadOnlyList<Change> SetDiff(IReadOnlyDictionary<string, EmbedSnapshot> a, IReadOnlyDictionary<string, EmbedSnapshot> b) =>
+        a.Keys.Union(b.Keys).Where(k => !a.TryGetValue(k, out var av) || !b.TryGetValue(k, out var bv) || av != bv)
+            .Select(k => new Change(a.TryGetValue(k, out var av) ? av.ToValue() : null, b.TryGetValue(k, out var bv) ? bv.ToValue() : null, k)).ToArray();
+    private static IReadOnlyList<EmbedSnapshot> ToEmbedSnapshots(IReadOnlyDictionary<string, EmbedSnapshot> embeds) => embeds.Values.ToArray();
 
     private static DiffReport ToReport(DiffResult result) => new(result.LeftBytes, result.RightBytes, result.Blocks.Select(c => new Change(c.Left,c.Right,c.Key)).ToArray(), result.BakedBlocks.Select(c => new Change(c.Left,c.Right,c.Key)).ToArray(), result.Items.Select(c => new Change(c.Left,c.Right,c.Key)).ToArray(), result.Embedded.Select(c => new Change(c.Left,c.Right,c.Key)).ToArray(), result.Chunks.Select(c => new Change(c.Left,c.Right,c.Key)).ToArray(), ToExternal(result.MapUid),ToExternal(result.MapName),ToExternal(result.AuthorLogin),ToExternal(result.AuthorNickname),ToExternal(result.Password));
     private static Change? ToExternal(Change? c) => c is null ? null : new(c.Left,c.Right,c.Key);
-    private sealed record Snapshot(long FileBytes,IReadOnlyDictionary<string,long> Chunks,BlockSnapshot[] Blocks,BlockSnapshot[] BakedBlocks,ItemSnapshot[] Items,IReadOnlyDictionary<string,string> Embedded,string MapUid,string MapName,string AuthorLogin,string AuthorNickname,bool Password);
-    private sealed record BlockSnapshot(string Key,string Coord); private sealed record ItemSnapshot(string Key,string Position); private sealed record EmbedSnapshot(string Path,string Sha256,string? Compressed,string? Uncompressed,string? Ratio);
+    private sealed record Snapshot(long FileBytes,IReadOnlyDictionary<string,long> Chunks,BlockSnapshot[] Blocks,BlockSnapshot[] BakedBlocks,ItemSnapshot[] Items,IReadOnlyDictionary<string,EmbedSnapshot> Embedded,string MapUid,string MapName,string AuthorLogin,string AuthorNickname,bool Password);
+    private sealed record BlockSnapshot(string Key,string Coord); private sealed record ItemSnapshot(string Key,string Position);
+    private sealed record EmbedSnapshot(string Path, string Sha256, long Compressed, long Uncompressed, double Ratio)
+    {
+        public string ToValue() => $"{Path}|compressed={Compressed}|uncompressed={Uncompressed}|ratio={Ratio:0.####}";
+    }
     private sealed record DiffResult(long LeftBytes,long RightBytes,IReadOnlyList<global::GbxSizeTree.Cli.Modes.Change> Blocks,IReadOnlyList<global::GbxSizeTree.Cli.Modes.Change> BakedBlocks,IReadOnlyList<global::GbxSizeTree.Cli.Modes.Change> Items,IReadOnlyList<global::GbxSizeTree.Cli.Modes.Change> Embedded,IReadOnlyList<global::GbxSizeTree.Cli.Modes.Change> Chunks,BlockSnapshot[] LeftBakedSnapshots,BlockSnapshot[] RightBakedSnapshots,BlockSnapshot[] LeftBlockSnapshots,BlockSnapshot[] RightBlockSnapshots,ItemSnapshot[] LeftItemSnapshots,ItemSnapshot[] RightItemSnapshots,IReadOnlyList<EmbedSnapshot> LeftEmbeddedSnapshots,IReadOnlyList<EmbedSnapshot> RightEmbeddedSnapshots,global::GbxSizeTree.Cli.Modes.Change? MapUid,global::GbxSizeTree.Cli.Modes.Change? MapName,global::GbxSizeTree.Cli.Modes.Change? AuthorLogin,global::GbxSizeTree.Cli.Modes.Change? AuthorNickname,global::GbxSizeTree.Cli.Modes.Change? Password);
 }

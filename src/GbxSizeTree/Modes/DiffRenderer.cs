@@ -75,20 +75,27 @@ public static class DiffRenderer
     private static void RenderChanges(IAnsiConsole console, string title, IReadOnlyList<Change> changes, bool color, bool embedded = false, bool item = false, bool coordinates = false)
     {
         if (changes.Count == 0) return;
-        var table = new Table().Border(TableBorder.None).AddColumn(" ").AddColumn("Path");
-        if (coordinates) { table.AddColumn("Coord"); table.AddColumn("Pos"); }
-        if (embedded) table.AddColumn("Size (map / compressed; raw; ratio)");
-        foreach (var change in changes)
+        var table = new Table().Border(TableBorder.None).AddColumn(" ").AddColumn(embedded ? "Name / path" : item ? "Name / path" : "Name");
+        if (coordinates) { table.AddColumn("Coord"); table.AddColumn("Pos"); table.AddColumn("Rotation"); }
+        if (item) table.AddColumn("Scale");
+        if (embedded) { table.AddColumn("Compressed"); table.AddColumn("Uncompressed"); table.AddColumn("Ratio"); }
+        foreach (var change in SortChanges(changes, coordinates))
         {
             var value = change.Right ?? change.Left ?? change.Key ?? "change";
             var marker = change.Left is null ? "+" : change.Right is null ? "-" : "~";
             var path = Compact(value, embedded, item);
             var coord = coordinates ? Field(value, "coord") : null;
             var pos = coordinates ? Field(value, "position") ?? Field(value, "pos") : null;
-            var size = embedded ? EmbeddedSizeFormatter(value) : null;
+            var rotation = coordinates ? Field(value, "rotation") : null;
+            var scale = item ? Field(value, "scale") : null;
             var row = new List<string> { Colorize(marker, marker == "+" ? "green" : marker == "-" ? "red" : "yellow", color), Escape(path) };
-            if (coordinates) { row.Add(Escape(coord ?? "--")); row.Add(Escape(pos ?? "--")); }
-            if (embedded) row.Add(Escape(size!));
+            if (coordinates) { row.Add(Escape(coord ?? "--")); row.Add(Escape(pos ?? "--")); row.Add(Escape(rotation ?? "--")); }
+            if (item) row.Add(Escape(scale ?? "--"));
+            if (embedded)
+            {
+                var sizes = EmbeddedSizes(value);
+                row.Add(Escape(sizes.Compressed)); row.Add(Escape(sizes.Uncompressed)); row.Add(Escape(sizes.Ratio));
+            }
             table.AddRow(row.ToArray());
         }
         console.MarkupLine($"[bold]{Escape(title)}[/] [grey]({Summary(changes, color)})[/]");
@@ -97,6 +104,28 @@ public static class DiffRenderer
     }
 
     private static string Summary(IReadOnlyList<Change> c, bool color) => string.Join(" ", new[] { Colorize($"+{c.Count(x => x.Left is null)} added", "green", color), Colorize($"-{c.Count(x => x.Right is null)} removed", "red", color), Colorize($"~{c.Count(x => x.Left is not null && x.Right is not null)} changed", "yellow", color) }.Where(x => !x.StartsWith("+0") && !x.StartsWith("-0") && !x.StartsWith("~0")));
+
+    private static IEnumerable<Change> SortChanges(IReadOnlyList<Change> changes, bool spatial) => spatial
+        ? changes.OrderBy(c => SpatialKey(c.Right ?? c.Left ?? c.Key ?? "change")).ThenBy(c => c.Right ?? c.Left ?? c.Key, StringComparer.Ordinal)
+        : changes.OrderBy(c => c.Right ?? c.Left ?? c.Key, StringComparer.Ordinal);
+
+    private static int SpatialKey(string value)
+    {
+        var position = Field(value, "position") ?? Field(value, "pos") ?? Field(value, "coord") ?? string.Empty;
+        var numbers = Regex.Matches(position, "-?\\d+").Cast<Match>().Select(m => int.Parse(m.Value)).Take(3).ToArray();
+        var x = numbers.ElementAtOrDefault(0); var y = numbers.ElementAtOrDefault(1); var z = numbers.ElementAtOrDefault(2);
+        return (x & 0x3ff) | ((z & 0x3ff) << 10) ^ ((y & 0x3ff) << 20);
+    }
+
+    private static (string Compressed, string Uncompressed, string Ratio) EmbeddedSizes(string value)
+    {
+        static string Read(string text, string name) => Regex.Match(text, $"{name}=([0-9]+)", RegexOptions.IgnoreCase).Groups[1].Value is { Length: > 0 } result ? result : "--";
+        var compressed = Read(value, "compressed");
+        var uncompressed = Read(value, "uncompressed");
+        var ratio = Regex.Match(value, @"ratio=([0-9.]+)", RegexOptions.IgnoreCase).Groups[1].Value;
+        return (compressed, uncompressed, ratio.Length > 0 ? $"{double.Parse(ratio, System.Globalization.CultureInfo.InvariantCulture):P0}" : "--");
+    }
+
     private static string Compact(string value, bool embedded, bool item)
     {
         var s = value;
