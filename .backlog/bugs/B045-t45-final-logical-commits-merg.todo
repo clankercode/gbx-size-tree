@@ -1,7 +1,7 @@
 ---
 claimed_at: "2026-09-09T16:24:24Z"
 claimed_by: astra
-completed_at: null
+completed_at: "2026-09-09T16:25:54Z"
 complexity: medium
 created_at: "2026-09-09T06:13:11Z"
 depends_on:
@@ -28,14 +28,15 @@ depends_on:
     - B057
     - B058
     - B059
+duration_minutes: 1.5066480266333333
 estimate_hours: 1
 id: B045
 priority: high
 started_at: "2026-09-09T16:24:24Z"
-status: in_progress
+status: done
 tags: []
 title: 'T45: Final logical commits/merge/install for outstanding/new implementation.'
-updated_at: "2026-09-09T16:24:24Z"
+updated_at: "2026-09-09T16:25:54Z"
 ---
 ## Source
 Chat task: T45
