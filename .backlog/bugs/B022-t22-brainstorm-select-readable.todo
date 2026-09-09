@@ -9,13 +9,10 @@ estimate_hours: 1
 id: B022
 priority: high
 started_at: null
-status: in_progress
-tags:
-    - chat-astra
-    - T22
-    - source-inprog
+status: pending
+tags: []
 title: 'T22: Brainstorm/select readable embedded-size presentation conveying change and compression quality, with a seam for trying alternatives'
-updated_at: "2026-09-09T06:13:51Z"
+updated_at: "2026-09-09T08:03:27Z"
 ---
 ## Source
 Chat task: T22
