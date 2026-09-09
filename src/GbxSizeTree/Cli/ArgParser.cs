@@ -26,6 +26,9 @@ public static class ArgParser
         var json = false;
         var html = false;
         var markdown = false;
+        var styled = true;
+        var styledSpecified = false;
+        var notStyledSpecified = false;
         bool? color = null;
         var interactive = false;
         var nonInteractive = false;
@@ -105,6 +108,14 @@ public static class ArgParser
                 case "--markdown":
                 case "--md":
                     markdown = true;
+                    break;
+                case "--styled":
+                    styled = true;
+                    styledSpecified = true;
+                    break;
+                case "--not-styled":
+                    styled = false;
+                    notStyledSpecified = true;
                     break;
                 case "--color":
                     color = true;
@@ -231,6 +242,18 @@ public static class ArgParser
             }
         }
 
+        if (styledSpecified && notStyledSpecified)
+        {
+            return (null, "--styled and --not-styled cannot be combined.");
+        }
+
+        if ((styledSpecified || notStyledSpecified) && (!diff || !html))
+        {
+            return (null, "--styled/--not-styled can only be used with diff --html.");
+        }
+
+        var format = html ? CliOutputFormat.Html : markdown ? CliOutputFormat.Markdown : json ? CliOutputFormat.Json : CliOutputFormat.Console;
+
         if (diff && showHelp)
         {
             return (new CliOptions
@@ -238,6 +261,8 @@ public static class ArgParser
                 Diff = true,
                 CompareAll = compareAll,
                 Json = json,
+                Format = format,
+                Styled = styled,
                 ShowHelp = true,
             }, null);
         }
@@ -262,8 +287,6 @@ public static class ArgParser
         {
             return (null, "--html and --markdown/--md cannot be used with -i/--interactive.");
         }
-
-        var format = html ? CliOutputFormat.Html : markdown ? CliOutputFormat.Markdown : json ? CliOutputFormat.Json : CliOutputFormat.Console;
 
         if (interactive && nonInteractive)
         {
@@ -296,6 +319,7 @@ public static class ArgParser
             TopN = topN,
             Json = json,
             Format = format,
+            Styled = styled,
             Color = color,
             Interactive = interactive,
             NonInteractive = nonInteractive,
