@@ -82,8 +82,9 @@ Image bytes may use stdout only when it is redirected; an attached stdout requir
 `-o`/`--output`. Image file output uses a same-directory temporary file and atomic rename,
 refuses either input, does not create parent directories, and refuses an existing destination
 without `--force`. The format flag, never the filename extension, selects encoding. Successful
-image file output leaves stdout empty and errors use stderr. Image mode rejects pause,
-interactive/non-interactive, color, and HTML style flags. `diff --help` remains pathless.
+image file output leaves stdout empty and errors use stderr. Image mode rejects `--pause`,
+`-i`/`--interactive`, color, and HTML style flags; harmless `--no-pause` and
+`-n`/`--non-interactive` remain allowed. `diff --help` remains pathless.
 
 Diff progress is transient and appears only on terminal stderr. It reports actual stages and
 elapsed time, leaves ETA unknown until measurable trials permit an estimate, clears before

@@ -114,9 +114,9 @@ public static class HelpText
           redirected. Nothing is published or uploaded.
 
         Image restrictions:
-          Image output cannot be combined with --pause/--no-pause, -i/--interactive,
-          -n/--non-interactive, --color/--no-color, or --styled/--not-styled.
-          diff --help needs no map paths.
+          Image output cannot be combined with --pause, -i/--interactive,
+          --color/--no-color, or --styled/--not-styled. --no-pause and
+          -n/--non-interactive are allowed. diff --help needs no map paths.
 
         Options:
           --all                    Add baked blocks and serialized content fingerprints

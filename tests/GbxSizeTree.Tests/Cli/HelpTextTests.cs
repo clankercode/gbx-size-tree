@@ -92,9 +92,9 @@ public sealed class HelpTextTests
         Assert.Contains("leaves stdout empty", help);
         Assert.Contains("errors", help);
         Assert.Contains("stderr", help);
-        Assert.Contains("--pause/--no-pause", help);
-        Assert.Contains("-i/--interactive", help);
-        Assert.Contains("-n/--non-interactive", help);
+        Assert.Contains("cannot be combined with --pause, -i/--interactive", help);
+        Assert.Contains("--no-pause", help);
+        Assert.Contains("-n/--non-interactive are allowed", help);
         Assert.Contains("--color/--no-color", help);
         Assert.Contains("--styled/--not-styled", help);
         Assert.Contains("diff --help needs no map paths", help);

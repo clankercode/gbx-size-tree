@@ -76,7 +76,8 @@ capture './reports/v205-to-v206.webp' \
 ```
 
 Do not omit `-o` at a terminal: the CLI refuses to emit binary bytes to an attached terminal.
-Image output also rejects pause, interactive/non-interactive, color, and HTML style flags.
+Image output rejects `--pause`, `-i`/`--interactive`, color flags, and HTML style flags. The
+harmless `--no-pause` and `-n`/`--non-interactive` flags remain allowed.
 
 Terminal progress uses stderr only when stderr is an actual terminal. It shows actual stages
 and elapsed time; ETA stays unknown until measurable trials provide enough information. The
