@@ -24,3 +24,4 @@ bugs:
     - file: B023-t23-html-diff-output-styled-an.todo
     - file: B024-t24-markdown-with-md-alias.todo
     - file: B025-t25-adapt-pirfl-and-bl-fix-man.todo
+    - file: B026-t26-before-new-work-commit-pre.todo
