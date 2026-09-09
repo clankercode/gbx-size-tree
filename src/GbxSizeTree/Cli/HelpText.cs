@@ -91,8 +91,8 @@ public static class HelpText
         Coverage:
           Placement and metadata rows compare fields understood by GBX.NET; this is not a
           claim that every item property has deep semantic support. With --all, header/body
-          chunk candidates plus complete container, stored-body, and decompressed-body
-          fingerprints can detect opaque changes, but fingerprints identify changed bytes,
+          chunk candidates plus complete container-prefix, stored-body (when present), and
+          decompressed-body fingerprints can detect opaque changes. These fingerprints identify changed bytes,
           not their meaning. Warnings call out opaque or otherwise unavailable metadata.
           Marginal bytes recompress each original body after removing one changed embed;
           they are context-dependent, do not add up to map size, use a bounded trial budget,
