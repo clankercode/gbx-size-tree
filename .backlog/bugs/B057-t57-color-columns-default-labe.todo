@@ -13,10 +13,7 @@ id: B057
 priority: high
 started_at: "2026-09-09T06:21:52Z"
 status: in_progress
-tags:
-    - chat-astra
-    - T57
-    - source-pending
+tags: []
 title: 'T57: Color columns: Default label uses ordinary styling; other labels use actual color as background, contrast-appropriate foreground and on'
 updated_at: "2026-09-09T06:21:52Z"
 ---
@@ -36,3 +33,5 @@ Outstanding work; not implemented by this ingestion.
 T12, T15, T16
 
 Decision and lane plan: renderer lane, serial with other DiffRenderer edits. Use known Trackmania DifficultyColor labels with explicit palette and contrast-safe foreground, padded one space each side; Default and unknown labels remain ordinary. HTML gets equivalent styled chips; plain/NO_COLOR output remains uncolored.
+
+Independent review found single or homogeneous non-default block colors omitted by AddVarying(Color). Keep Color column for non-default blocks, test ordinary/baked single rows and homogeneous changes. Also forward CLI color option into HTML renderer. Remains open.
