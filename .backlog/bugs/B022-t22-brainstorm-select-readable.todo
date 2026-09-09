@@ -12,10 +12,7 @@ id: B022
 priority: high
 started_at: "2026-09-09T08:03:27Z"
 status: in_progress
-tags:
-    - chat-astra
-    - T22
-    - source-inprog
+tags: []
 title: 'T22: Brainstorm/select readable embedded-size presentation conveying change and compression quality, with a seam for trying alternatives'
 updated_at: "2026-09-09T08:03:27Z"
 ---
@@ -37,3 +34,5 @@ T20, T21
 Decision and sequencing: Presentation lane only after B021 is closed. Decision: show named ZIP/raw/marginal-map byte deltas with explicit compression context through a shared replaceable formatter, avoiding ambiguous c|u notation.
 
 Parallel lane refinement: develop a small replaceable embedded-size presentation helper and dedicated tests in NEW files only; integration waits active renderer lane. Prefer explicit named ZIP/raw/marginal-map columns, signed deltas and ratio with clear unavailable/baseline labels. No ambiguous c|u shorthand or percentage claims without denominator.
+
+Review disposition: formatter is intentionally format-neutral plain text, not raw HTML. Returning an unescaped reason is correct at this seam; every renderer must encode it at the output boundary. During integration add hostile reason tests across console/HTML/Markdown to prove escaping; avoid double encoding.
