@@ -1,0 +1,29 @@
+---
+complexity: medium
+created_at: "2026-09-09T06:13:10Z"
+depends_on: []
+estimate_hours: 1
+id: B038
+priority: high
+status: pending
+tags:
+    - chat-astra
+    - T38
+    - source-inprog
+title: 'T38: Show meaningful embedded deltas and explain what changed (size, compression, content, other known properties)'
+updated_at: "2026-09-09T06:13:10Z"
+---
+## Source
+Chat task: T38
+Source status: inprog
+Inventory: /tmp/gbx-size-tree-astra-chat-tasks.md
+Session: 01a08304-d48f-7631-913b-60e05abe13f3
+
+## Scope and acceptance criteria
+Show meaningful embedded deltas and explain what changed (size, compression, content, other known properties). Old/new sizes/ratios present, explicit delta and explanation absent.
+
+## State at ingestion
+Partial implementation; remaining scope must be completed. No active agent claim is implied.
+
+## Source dependencies
+T3, T20, T37
