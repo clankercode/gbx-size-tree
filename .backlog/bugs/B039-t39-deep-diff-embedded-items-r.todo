@@ -1,23 +1,21 @@
 ---
 claimed_at: "2026-09-09T08:22:47Z"
 claimed_by: astra
-completed_at: null
+completed_at: "2026-09-09T11:05:31Z"
 complexity: medium
 created_at: "2026-09-09T06:13:10Z"
 depends_on:
     - B003
     - B038
+duration_minutes: 162.73867363275
 estimate_hours: 1
 id: B039
 priority: high
 started_at: "2026-09-09T08:22:47Z"
-status: in_progress
-tags:
-    - chat-astra
-    - T39
-    - source-pending
+status: done
+tags: []
 title: 'T39: Deep diff embedded items: readable nested property paths e.g'
-updated_at: "2026-09-09T08:22:47Z"
+updated_at: "2026-09-09T11:05:31Z"
 ---
 ## Source
 Chat task: T39
