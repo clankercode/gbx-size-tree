@@ -9,7 +9,10 @@ id: B055
 priority: high
 started_at: null
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T55
+    - source-pending
 title: 'T55: Ingest ALL task rows as bl bugs, preserving source Tx IDs, scope, statuses and dependencies; reconcile counts.'
 updated_at: "2026-09-09T06:14:21Z"
 ---
