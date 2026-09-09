@@ -54,3 +54,4 @@ bugs:
     - file: B053-t53-launch-xgrok46-reviewer-ov.todo
     - file: B054-t54-commit-all-current-changes.todo
     - file: B055-t55-ingest-all-task-rows-as-bl.todo
+    - file: B056-t56-replace-thick-horizontal-r.todo

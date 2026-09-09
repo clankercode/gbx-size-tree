@@ -1,0 +1,29 @@
+---
+complexity: medium
+created_at: "2026-09-09T06:13:12Z"
+depends_on: []
+estimate_hours: 1
+id: B056
+priority: high
+status: pending
+tags:
+    - chat-astra
+    - T56
+    - source-pending
+title: 'T56: Replace thick horizontal rules between every CLI entry with rules between contextually appropriate row groups'
+updated_at: "2026-09-09T06:13:12Z"
+---
+## Source
+Chat task: T56
+Source status: pending
+Inventory: /tmp/gbx-size-tree-astra-chat-tasks.md
+Session: 01a08304-d48f-7631-913b-60e05abe13f3
+
+## Scope and acceptance criteria
+Replace thick horizontal rules between every CLI entry with rules between contextually appropriate row groups. Group using similarity, spatial distance/clustering etc; show changes in a region together. Grouping appropriate to table kind.
+
+## State at ingestion
+Outstanding work; not implemented by this ingestion.
+
+## Source dependencies
+T14, T17, T18, T37
