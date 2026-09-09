@@ -1,4 +1,6 @@
 ---
+claimed_at: "2026-09-09T09:54:49Z"
+claimed_by: astra
 completed_at: null
 complexity: medium
 created_at: "2026-09-09T06:13:12Z"
@@ -18,11 +20,11 @@ depends_on:
 estimate_hours: 1
 id: B049
 priority: high
-started_at: null
-status: pending
+started_at: "2026-09-09T09:54:49Z"
+status: in_progress
 tags: []
 title: 'T49: Overall local-comparison and Discord automation usability'
-updated_at: "2026-09-09T09:54:48Z"
+updated_at: "2026-09-09T09:54:49Z"
 ---
 ## Source
 Chat task: T49
