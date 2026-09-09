@@ -60,3 +60,4 @@ bugs:
     - file: B059-t59-for-normal-ghost-non-free.todo
     - file: B060-summarize-changes-to-propertie.todo
     - file: B061-show-before-after-placed-item.todo
+    - file: B062-raise-embedded-removal-measure.todo
