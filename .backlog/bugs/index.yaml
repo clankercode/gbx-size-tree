@@ -7,3 +7,4 @@ bugs:
     - file: B006-t6-baked-block-comparison-in-a.todo
     - file: B007-t7-map-metadata-comparison-by.todo
     - file: B008-t8-diff-help-works-without-pat.todo
+    - file: B009-t9-help-explicitly-explains-ol.todo
