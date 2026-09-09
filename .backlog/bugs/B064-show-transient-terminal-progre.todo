@@ -1,17 +1,18 @@
 ---
 claimed_at: "2026-09-09T14:29:24Z"
 claimed_by: astra
-completed_at: null
+completed_at: "2026-09-09T16:10:13Z"
 complexity: medium
 created_at: "2026-09-09T14:29:16Z"
 depends_on: []
+duration_minutes: 100.82955727435
 estimate_hours: 2
 id: B064
 priority: high
 started_at: "2026-09-09T14:29:24Z"
-status: in_progress
+status: done
 tags: []
 title: Show transient terminal progress while diff maps are processed
-updated_at: "2026-09-09T14:29:24Z"
+updated_at: "2026-09-09T16:10:13Z"
 ---
 User explicitly requests add bug and fold into active batch. During initial map processing CLI appears idle. Show one updating terminal progress line with current stage/work item, elapsed time, measured completed/total and ETA when estimable. Clear/remove it before final output. Decision: progress on interactive stderr only, never stdout; suppress redirected stderr, respect dumb terminals, avoid ANSI when unsupported, throttled updates, reliable cleanup on success/failure. ETA must be honest: unknown during unmeasurable parse stages, estimated for measured removal trials. Instrument actual stages and expensive contribution trials without changing comparison results, preserving all console/JSON/HTML/MD/PNG/WebP stream contracts. Verify using real maps and pseudo-terminal, capture stages then line removal; tests for redirects, failures, throttling, ETA bounds. Included implementation now, unlike backlog-only B060/B061. Serial shared CLI/DiffMode integration with image exports; independent core trial progress callback/helper work may run in parallel. Complete before final B044/B045/B046.
