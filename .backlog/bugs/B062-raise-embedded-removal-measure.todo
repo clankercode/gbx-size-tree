@@ -1,17 +1,18 @@
 ---
 claimed_at: "2026-09-09T09:13:10Z"
 claimed_by: astra
-completed_at: null
+completed_at: "2026-09-09T09:47:11Z"
 complexity: low
 created_at: "2026-09-09T09:13:03Z"
 depends_on: []
+duration_minutes: 34.03062101931667
 estimate_hours: 1
 id: B062
 priority: high
 started_at: "2026-09-09T09:13:10Z"
-status: in_progress
+status: done
 tags: []
 title: Raise embedded removal measurement budget for large map diffs
-updated_at: "2026-09-09T09:13:10Z"
+updated_at: "2026-09-09T09:47:11Z"
 ---
 User reports many unavailable: Removal trial budget exhausted messages on real diffs. Current default MaxTrials=8 per map is too low. Increase default to a practical bounded value covering typical large changed-embed batches (initial decision 256 per map), preserve explicit caller override and existing body/raw-byte/entry/cancellation safeguards. Regression must measure >8 distinct embedded entries with default options without budget exhaustion, and still verify low explicit overrides. Verify actual v205/v206 changed entries with available fixture and record runtime. Implement now as explicit follow-up requested during batch.
