@@ -17,3 +17,4 @@ bugs:
     - file: B016-t16-block-baked-columns-name-c.todo
     - file: B017-t17-mix-and-rows-within-each-s.todo
     - file: B018-t18-spatially-near-elements-ne.todo
+    - file: B019-t19-sort-using-physical-positi.todo
