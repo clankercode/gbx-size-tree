@@ -357,6 +357,100 @@ public sealed class DiffRendererTests
     }
 
     [Fact]
+    public void Html_ExposesStableSemanticSelectorsAndScopedHeadersInBothStyleModes()
+    {
+        var report = Empty() with
+        {
+            Embedded = [new(null, new("dir/asset", "hash", 1, 2)),
+                new(new("dir/changed", "old", 1, 2), new("dir/changed", "new", 2, 3))],
+            Items = [new(null, ItemSnapshot.From(new CGameCtnAnchoredObject()))],
+            Blocks = [new(null, BlockSnapshot.From(new CGameCtnBlock { Name = "block" }))],
+            BakedBlocks = [new(null, BlockSnapshot.From(new CGameCtnBlock { Name = "baked" }))],
+            MetadataChanges = [new("display.comments", null, new(Text: "new"))],
+            Chunks = [new(null, "1", "body:a")],
+            EmbeddedContributions = [new(null, new("dir/asset", 1, 2, 1, null))],
+            Warnings = ["careful"],
+            MapName = new("before", "after"),
+        };
+
+        foreach (var styled in new[] { false, true })
+        {
+            var html = DiffRenderer.RenderHtml(report, "old", "new", styled: styled);
+            Assert.Contains("<main id=\"map-diff\" class=\"diff-report\">", html);
+            Assert.Contains("<header id=\"diff-summary\" class=\"summary diff-summary\">", html);
+            Assert.Contains("id=\"diff-warnings\" class=\"warnings diff-warnings\"", html);
+            Assert.Contains("id=\"warning-0\" class=\"warning\"", html);
+            Assert.Contains("<section id=\"category-embedded-added-removed\" class=\"diff-category category-embedded-added-removed\"", html);
+            Assert.Contains("id=\"table-embedded-added-removed\" class=\"diff-table category-table\"", html);
+            Assert.Contains("id=\"table-embedded-added-removed-head\" class=\"table-header\"", html);
+            Assert.Contains("class=\"table-header-cell column-mark\" scope=\"col\"", html);
+            Assert.Contains("id=\"table-embedded-added-removed-group-0\" class=\"row-group\"", html);
+            Assert.Contains("id=\"table-embedded-added-removed-row-0\" class=\"diff-row added\"", html);
+            Assert.Contains("class=\"diff-cell marker-cell column-mark\" headers=\"table-embedded-added-removed-header-0-mark\"", html);
+            Assert.Contains("id=\"diff-metadata\" class=\"metadata diff-metadata\"", html);
+            Assert.Contains("id=\"metadata-row-0\" class=\"metadata-row changed\"", html);
+            foreach (var category in new[] { "embedded-added-removed", "embedded-modified", "embedded-contributions", "placed-items", "blocks", "baked-blocks", "map-metadata", "chunks" })
+            {
+                Assert.Contains($"id=\"category-{category}\"", html);
+                Assert.Contains($"id=\"category-{category}-scroll\" class=\"table-scroll\"", html);
+                Assert.Contains($"id=\"table-{category}\"", html);
+            }
+        }
+    }
+
+    [Fact]
+    public void Html_StyledCssTargetsEveryCategoryScrollContainer()
+    {
+        var report = Empty() with
+        {
+            Embedded = [new(null, new("added", "hash", 1, 2)),
+                new(new("modified", "old", 1, 2), new("modified", "new", 2, 3))],
+            EmbeddedContributions = [new(null, new("asset", 1, 2, 1, null))],
+            Items = [new(null, ItemSnapshot.From(new CGameCtnAnchoredObject()))],
+            Blocks = [new(null, BlockSnapshot.From(new CGameCtnBlock()))],
+            BakedBlocks = [new(null, BlockSnapshot.From(new CGameCtnBlock()))],
+            MetadataChanges = [new("display.comments", null, new(Text: "new"))],
+            Chunks = [new(null, "1", "body:a")],
+        };
+        var html = DiffRenderer.RenderHtml(report, "old", "new");
+
+        Assert.Contains(".table-scroll{overflow-x:auto}", html);
+        Assert.Equal(8, System.Text.RegularExpressions.Regex.Matches(html,
+            "<div id=\"category-[a-z-]+-scroll\" class=\"table-scroll\"><table").Count);
+    }
+
+    [Fact]
+    public void Html_UsesControlledUniqueIdsForDuplicateRowsAndUserContent()
+    {
+        const string hostile = "same id=\"injected\" <script>";
+        var item = ItemSnapshot.From(new CGameCtnAnchoredObject()) with { Path = hostile };
+        var report = Empty() with { Items = [new(null, item), new(null, item)] };
+        var html = DiffRenderer.RenderHtml(report, hostile, hostile, styled: false);
+        var ids = System.Text.RegularExpressions.Regex.Matches(html, "\\sid=\\\"([^\\\"]+)\\\"")
+            .Select(match => match.Groups[1].Value).ToArray();
+
+        Assert.NotEmpty(ids);
+        Assert.Equal(ids.Length, ids.Distinct(StringComparer.Ordinal).Count());
+        Assert.All(ids, id => Assert.Matches("^[a-z][a-z0-9-]*$", id));
+        Assert.Contains("id=\"table-placed-items-row-0\"", html);
+        Assert.Contains("id=\"table-placed-items-row-1\"", html);
+        Assert.DoesNotContain("id=\"injected\"", html);
+        Assert.DoesNotContain("<script>", html);
+    }
+
+    [Fact]
+    public void Html_EmptyStateHasStableContextAndNoCategoryTables()
+    {
+        var html = DiffRenderer.RenderHtml(Empty() with { RightBytes = 1000 }, "same", "same", styled: false);
+
+        Assert.Contains("<main id=\"map-diff\" class=\"diff-report\">", html);
+        Assert.Contains("<p id=\"diff-empty-state\" class=\"empty-state\">No differences in the compared fields.</p>", html);
+        Assert.DoesNotContain("class=\"diff-category", html);
+        Assert.DoesNotContain("<style", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(" style=", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void Html_StyledByDefaultAndUnstyledHasNoCssInlineStylesOrChipsWithContentParity()
     {
         var report = ColorReport("Blue") with
@@ -372,7 +466,7 @@ public sealed class DiffRendererTests
         Assert.Contains("border-radius:999px", styled);
         Assert.DoesNotContain("<style", plain, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(" style=", plain, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("color-chip", plain);
+        Assert.DoesNotContain("class=\"color-chip\"", plain);
         foreach (var text in new[] { "Map diff", "Size:", "Warning:", "Placed items", "Blocks", "Baked blocks", "Map name", "Before", "After", "Blue" })
         {
             Assert.Contains(text, styled);
@@ -509,7 +603,7 @@ public sealed class DiffRendererTests
         Assert.Equal(count, html.Split(">Blue</span>", StringSplitOptions.None).Length - 1);
         var plain = DiffRenderer.RenderHtml(report, "old", "new", colorOption: false);
         Assert.DoesNotContain("<span", plain);
-        Assert.Contains("<td>Blue</td>", plain);
+        Assert.Contains(">Blue</td>", plain);
         if (Environment.GetEnvironmentVariable("GBX_RENDER_ARTIFACT_DIR") is { Length: > 0 } directory)
         {
             Directory.CreateDirectory(directory);
@@ -548,8 +642,11 @@ public sealed class DiffRendererTests
             Assert.True(output.IndexOf("free", StringComparison.Ordinal) < output.IndexOf("ghost", StringComparison.Ordinal));
             Assert.True(output.IndexOf("ghost", StringComparison.Ordinal) < output.IndexOf("normalBlock", StringComparison.Ordinal));
         }
-        Assert.Contains("<td>normalBlock</td><td>(2, 2, 2)</td><td>--</td>", DiffRenderer.RenderHtml(report, "a", "b"));
-        Assert.Contains("<td>ghost</td><td>(1, 1, 1)</td><td>--</td>", DiffRenderer.RenderHtml(report, "a", "b"));
+        Assert.Contains("normalBlock</td><td", DiffRenderer.RenderHtml(report, "a", "b"));
+        Assert.Contains(">(2, 2, 2)</td><td", DiffRenderer.RenderHtml(report, "a", "b"));
+        Assert.Contains(">--</td>", DiffRenderer.RenderHtml(report, "a", "b"));
+        Assert.Contains("ghost</td><td", DiffRenderer.RenderHtml(report, "a", "b"));
+        Assert.Contains(">(1, 1, 1)</td><td", DiffRenderer.RenderHtml(report, "a", "b"));
         foreach (var output in Outputs(report with { Blocks = [], BakedBlocks = report.Blocks }))
         {
             Assert.Contains("80.0, 20.0, 80.0", output);
@@ -601,12 +698,12 @@ public sealed class DiffRendererTests
         };
         var html = DiffRenderer.RenderHtml(report, "old<script>.Map.Gbx", "new[red].Map.Gbx", colorOption: true);
         var plainHtml = DiffRenderer.RenderHtml(report, "old<script>.Map.Gbx", "new[red].Map.Gbx", colorOption: true, styled: false);
-        Assert.Equal(8, html.Split("<table>", StringSplitOptions.None).Length - 1);
-        Assert.Equal(17, html.Split("<span", StringSplitOptions.None).Length - 1);
+        Assert.Equal(8, html.Split("class=\"diff-table category-table\"", StringSplitOptions.None).Length - 1);
+        Assert.Equal(17, html.Split("class=\"color-chip\"", StringSplitOptions.None).Length - 1);
         Assert.DoesNotContain("<script>", html);
         Assert.DoesNotContain("<style", plainHtml, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(" style=", plainHtml, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("<span", plainHtml);
+        Assert.DoesNotContain("class=\"color-chip\"", plainHtml);
         foreach (var category in new[] { "Warning:", "Embedded files — added/removed", "Embedded files — modified", "Embedded outer-map contribution", "Placed items", "Blocks", "Baked blocks", "Map metadata", "Chunks", "Map name" })
             Assert.Contains(category, plainHtml);
         if (Environment.GetEnvironmentVariable("GBX_RENDER_ARTIFACT_DIR") is { Length: > 0 } directory)
@@ -854,7 +951,7 @@ public sealed class DiffRendererTests
         Assert.Contains("body:b", groups[7]);
     }
 
-    private static string[] HtmlGroups(string html) => System.Text.RegularExpressions.Regex.Matches(html, "<tbody>(.*?)</tbody>")
+    private static string[] HtmlGroups(string html) => System.Text.RegularExpressions.Regex.Matches(html, "<tbody[^>]*>(.*?)</tbody>")
         .Select(m => m.Groups[1].Value).ToArray();
 
     private static IEnumerable<string> Outputs(DiffReport report)
