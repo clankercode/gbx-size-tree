@@ -1,15 +1,37 @@
 ---
+completed_at: null
 complexity: medium
 created_at: "2026-09-09T06:13:11Z"
-depends_on: []
+depends_on:
+    - B005
+    - B007
+    - B021
+    - B022
+    - B031
+    - B032
+    - B033
+    - B034
+    - B035
+    - B037
+    - B038
+    - B039
+    - B040
+    - B041
+    - B042
+    - B043
+    - B044
+    - B047
+    - B048
+    - B056
+    - B057
+    - B058
+    - B059
 estimate_hours: 1
 id: B045
 priority: high
+started_at: null
 status: pending
-tags:
-    - chat-astra
-    - T45
-    - source-pending
+tags: []
 title: 'T45: Final logical commits/merge/install for outstanding/new implementation.'
 updated_at: "2026-09-09T06:13:11Z"
 ---
