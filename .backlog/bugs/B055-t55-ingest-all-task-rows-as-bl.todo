@@ -27,3 +27,5 @@ Outstanding work; not implemented by this ingestion.
 
 ## Source dependencies
 T54
+
+Ingestion completed: 59 chat tasks mapped one-to-one to B001-B059, including x-grok46 omission T59. Dependencies and historical statuses imported; bl check passes. No pending product features implemented during ingestion.
