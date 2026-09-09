@@ -12,7 +12,10 @@ id: B029
 priority: high
 started_at: null
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T29
+    - source-done
 title: 'T29: Actual-map console/HTML/Markdown/JSON checks, desktop/mobile HTML, pseudo-terminal color, empty diffs and installed JSON'
 updated_at: "2026-09-09T06:13:53Z"
 ---
