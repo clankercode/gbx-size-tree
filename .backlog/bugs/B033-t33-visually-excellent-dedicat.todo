@@ -17,7 +17,10 @@ id: B033
 priority: high
 started_at: "2026-09-09T11:05:31Z"
 status: in_progress
-tags: []
+tags:
+    - chat-astra
+    - T33
+    - source-pending
 title: 'T33: Visually excellent dedicated diff infographic: colorful, well composed, readable and understandable; not a trivial screencap of another'
 updated_at: "2026-09-09T11:05:31Z"
 ---
