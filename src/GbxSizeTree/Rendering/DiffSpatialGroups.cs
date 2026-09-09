@@ -1,4 +1,7 @@
+using System.Runtime.CompilerServices;
 using GbxSizeTree.Cli.Modes;
+
+[assembly: InternalsVisibleTo("GbxSizeTree.Tests")]
 
 namespace GbxSizeTree.Cli.Rendering;
 
@@ -6,10 +9,16 @@ internal static class DiffSpatialGroups
 {
     // Two horizontal grid cells; connected neighbours form a region, including across Morton seams.
     private const double Radius = 64;
+    // A 32-unit cube has diameter < 64, so every point in a cell is connected.
+    private const double CellSize = 32;
 
     public static IEnumerable<(ValueChange<T> Change, int Group)> Order<T>(IReadOnlyList<ValueChange<T>> changes,
-        Func<T, SpatialPosition?> position, Func<T, string> key) where T : class
+        Func<T, SpatialPosition?> position, Func<T, string> key) where T : class => OrderWithDiagnostics(changes, position, key, out _);
+
+    internal static IEnumerable<(ValueChange<T> Change, int Group)> OrderWithDiagnostics<T>(IReadOnlyList<ValueChange<T>> changes,
+        Func<T, SpatialPosition?> position, Func<T, string> key, out long distanceChecks) where T : class
     {
+        long checks = 0;
         var ordered = changes.OrderBy(c => position((c.Right ?? c.Left)!))
             .ThenBy(c => key((c.Right ?? c.Left)!), StringComparer.Ordinal)
             .ThenBy(c => c.Left is null ? 1 : 0).ToArray();
@@ -33,24 +42,40 @@ internal static class DiffSpatialGroups
             }
             ties.Add(p, i);
             if (!double.IsFinite(p.X) || !double.IsFinite(p.Y) || !double.IsFinite(p.Z)) continue;
-            var bucket = new SpatialPosition(Math.Floor(p.X / Radius), Math.Floor(p.Y / Radius), Math.Floor(p.Z / Radius));
-            for (var x = -1; x <= 1; x++)
-                for (var y = -1; y <= 1; y++)
-                    for (var z = -1; z <= 1; z++)
-                        if (buckets.TryGetValue(new(bucket.X + x, bucket.Y + y, bucket.Z + z), out var neighbours))
-                            foreach (var j in neighbours)
-                            {
-                                var q = positions[j]!.Value;
-                                var dx = p.X - q.X;
-                                var dy = p.Y - q.Y;
-                                var dz = p.Z - q.Z;
-                                if (dx * dx + dy * dy + dz * dz <= Radius * Radius) Join(i, j);
-                            }
+            var bucket = new SpatialPosition(Math.Floor(p.X / CellSize), Math.Floor(p.Y / CellSize), Math.Floor(p.Z / CellSize));
             if (!buckets.TryGetValue(bucket, out var entries)) buckets.Add(bucket, entries = []);
+            else Join(i, entries[0]);
             entries.Add(i);
         }
+        // Keep all unique positions: a non-representative point may be the only cross-cell bridge.
+        foreach (var (bucket, entries) in buckets)
+            for (var x = -2; x <= 2; x++)
+                for (var y = -2; y <= 2; y++)
+                    for (var z = -2; z <= 2; z++)
+                        if (buckets.TryGetValue(new(bucket.X + x, bucket.Y + y, bucket.Z + z), out var neighbours)
+                            && entries[0] < neighbours[0] && Root(entries[0]) != Root(neighbours[0]))
+                            Connect(entries, neighbours);
+        distanceChecks = checks;
         return Enumerable.Range(0, ordered.Length).GroupBy(Root).OrderBy(g => g.Key)
             .SelectMany(g => g.Select(i => (ordered[i], g.Key)));
+
+        void Connect(List<int> entries, List<int> neighbours)
+        {
+            foreach (var i in entries)
+                foreach (var j in neighbours)
+                {
+                    checks++;
+                    var p = positions[i]!.Value;
+                    var q = positions[j]!.Value;
+                    var dx = p.X - q.X;
+                    var dy = p.Y - q.Y;
+                    var dz = p.Z - q.Z;
+                    if (dx * dx + dy * dy + dz * dz > Radius * Radius) continue;
+                    // Both cells are cliques; one witnessed edge connects every member.
+                    Join(i, j);
+                    return;
+                }
+        }
 
         int Root(int i)
         {
