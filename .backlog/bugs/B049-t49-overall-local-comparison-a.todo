@@ -19,10 +19,10 @@ estimate_hours: 1
 id: B049
 priority: high
 started_at: null
-status: pending
+status: in_progress
 tags: []
 title: 'T49: Overall local-comparison and Discord automation usability'
-updated_at: "2026-09-09T06:13:12Z"
+updated_at: "2026-09-09T06:13:56Z"
 ---
 ## Source
 Chat task: T49
