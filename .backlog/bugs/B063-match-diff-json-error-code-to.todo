@@ -1,0 +1,15 @@
+---
+complexity: low
+created_at: "2026-09-09T12:09:46Z"
+depends_on: []
+estimate_hours: 1
+id: B063
+priority: high
+status: pending
+tags:
+    - chat-astra
+    - error-contract
+title: Match diff JSON error code to process exit status for missing files
+updated_at: "2026-09-09T12:09:46Z"
+---
+Real-map validation B043 reproduced missing NEW map with --json: process exits4 IoError while JSON code5 Internal. Ensure serialized error code and process exit classification agree for FileNotFound/IO errors and preserve safe escaped path messages. Add subprocess regression with quote-containing missing path, check stderr and valid JSON. Fix before final delivery because automation relies on contract.
