@@ -8,7 +8,10 @@ id: B050
 priority: high
 started_at: null
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T50
+    - source-done
 title: 'T50: Comprehensive sequential Tx task tables with pending/inprog/done and dependency references.'
 updated_at: "2026-09-09T06:13:56Z"
 ---
