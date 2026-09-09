@@ -78,6 +78,16 @@ public class StyleOptionParserTests
     }
 
     [Fact]
+    public void DiffHelpDocumentsFocusedHtmlStyleFlagsAndDefault()
+    {
+        var help = HelpText.Diff("test");
+
+        Assert.Contains("--styled", help);
+        Assert.Contains("--not-styled", help);
+        Assert.Contains("styled by default", help);
+    }
+
+    [Fact]
     public void Parse_HtmlDiffStyleHelpDoesNotRequireMapPaths()
     {
         var (options, error) = ArgParser.Parse(["diff", "--html", "--not-styled", "--help"]);

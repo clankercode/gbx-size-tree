@@ -9,14 +9,15 @@ namespace GbxSizeTree.Cli.Modes;
 
 public static class DiffMode
 {
-    public static int Run(IReadOnlyList<string> paths, CliOutputFormat format, bool all, bool? colorOption)
+    public static int Run(IReadOnlyList<string> paths, CliOutputFormat format, bool all,
+        bool? colorOption, bool styled = true)
     {
         if (paths.Count != 2) throw new ArgumentException("diff requires exactly two map paths.");
         var report = CompareFiles(paths[0], paths[1], all);
         if (format == CliOutputFormat.Json)
             Console.WriteLine(RenderJson(report));
         else if (format == CliOutputFormat.Html)
-            Console.WriteLine(DiffRenderer.RenderHtml(report, paths[0], paths[1], colorOption));
+            Console.WriteLine(DiffRenderer.RenderHtml(report, paths[0], paths[1], colorOption, styled));
         else if (format == CliOutputFormat.Markdown)
             Console.WriteLine(DiffRenderer.RenderMarkdown(report, paths[0], paths[1]));
         else

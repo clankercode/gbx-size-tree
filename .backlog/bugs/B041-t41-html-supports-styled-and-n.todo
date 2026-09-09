@@ -1,22 +1,23 @@
 ---
 claimed_at: "2026-09-09T08:03:02Z"
 claimed_by: astra
-completed_at: null
+completed_at: "2026-09-09T09:24:33Z"
 complexity: medium
 created_at: "2026-09-09T06:13:11Z"
 depends_on:
     - B023
+duration_minutes: 81.52512853775
 estimate_hours: 1
 id: B041
 priority: high
 started_at: "2026-09-09T08:03:02Z"
-status: in_progress
+status: done
 tags:
     - chat-astra
     - T41
     - source-pending
 title: 'T41: --html supports --styled and --not-styled; default styled.'
-updated_at: "2026-09-09T08:03:02Z"
+updated_at: "2026-09-09T09:24:33Z"
 ---
 ## Source
 Chat task: T41

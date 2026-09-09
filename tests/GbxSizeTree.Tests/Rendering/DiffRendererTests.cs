@@ -99,12 +99,12 @@ public sealed class DiffRendererTests
         };
         foreach (var output in Outputs(report))
         {
-            Assert.Contains("Compressed", output);
-            Assert.Contains("Uncompressed", output);
-            Assert.Contains("Ratio", output);
+            Assert.Contains("ZIP bytes", output);
+            Assert.Contains("Raw bytes", output);
+            Assert.Contains("ZIP / raw", output);
             Assert.Contains("20 → 30", output);
             Assert.Contains("100 → 120", output);
-            Assert.Contains("20.00 % → 25.00 %", output);
+            Assert.Contains("20.00% of raw → 25.00% of raw", output);
             Assert.Contains("asset", output);
             Assert.DoesNotContain("secret-hash", output);
             Assert.DoesNotContain("compressed=", output);
@@ -357,6 +357,100 @@ public sealed class DiffRendererTests
     }
 
     [Fact]
+    public void Html_StyledByDefaultAndUnstyledHasNoCssInlineStylesOrChipsWithContentParity()
+    {
+        var report = ColorReport("Blue") with
+        {
+            Warnings = ["warning<script>"],
+            MapName = new("Before", "After"),
+        };
+        var styled = DiffRenderer.RenderHtml(report, "old", "new", colorOption: true);
+        var plain = DiffRenderer.RenderHtml(report, "old", "new", colorOption: true, styled: false);
+
+        Assert.Contains("<style>", styled);
+        Assert.Contains("class=\"color-chip\"", styled);
+        Assert.Contains("border-radius:999px", styled);
+        Assert.DoesNotContain("<style", plain, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(" style=", plain, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("color-chip", plain);
+        foreach (var text in new[] { "Map diff", "Size:", "Warning:", "Placed items", "Blocks", "Baked blocks", "Map name", "Before", "After", "Blue" })
+        {
+            Assert.Contains(text, styled);
+            Assert.Contains(text, plain);
+        }
+        Assert.DoesNotContain("<script>", styled);
+        Assert.DoesNotContain("<script>", plain);
+    }
+
+    [Fact]
+    public void Html_ColorTransitionsUseSeparateBalancedChipsWhileDefaultStaysOrdinary()
+    {
+        var report = ColorReport("Red");
+        var html = DiffRenderer.RenderHtml(report, "left", "right", colorOption: true);
+
+        Assert.Contains("Default → <span class=\"color-chip\"", html);
+        Assert.DoesNotContain(">Default</span>", html);
+        Assert.Contains(">Red</span>", html);
+        Assert.Contains("padding:.18em .65em", html);
+        Assert.Contains("line-height:1.25", html);
+    }
+
+    [Fact]
+    public void UnavailableReasonsAreEscapedAtEveryOutputBoundaryWithoutEncodingTheHelper()
+    {
+        const string reason = "budget <script>&[red]`|\u001b";
+        Assert.Equal($"unavailable: {reason}", new EmbeddedSizePresentation().FormatMarginal(null, reason));
+        var report = Empty() with
+        {
+            EmbeddedContributions = [new(null, new("asset", 10, 20, null, reason))],
+        };
+
+        var console = new TestConsole().Width(120);
+        DiffRenderer.Render(console, report, "old", "new");
+        var html = DiffRenderer.RenderHtml(report, "old", "new");
+        var markdown = DiffRenderer.RenderMarkdown(report, "old", "new");
+        Assert.DoesNotContain("\u001b", console.Output);
+        Assert.DoesNotContain("<script>", html);
+        Assert.Contains("&lt;script&gt;&amp;", html);
+        Assert.DoesNotContain("<script>", markdown);
+        Assert.Contains("&lt;script\\>&amp;", markdown);
+    }
+
+    [Theory]
+    [InlineData(80)]
+    [InlineData(120)]
+    public void Render_UsesBalancedHeaderAndMetadataFrameAtOrdinaryWidths(int width)
+    {
+        var report = Empty() with
+        {
+            MapUid = new("uid-before", "uid-after"),
+            MapName = new("name-before", "name-after"),
+            AuthorNickname = new("author-before", "author-after"),
+            AuthorLogin = new("login-before", "login-after"),
+            Password = new("true", "false"),
+        };
+        var console = new TestConsole().Width(width);
+
+        DiffRenderer.Render(console, report, "/very/long/old/path/map.Map.Gbx", "/very/long/new/path/map.Map.Gbx");
+
+        var output = console.Output;
+        Assert.Contains("Map diff", output);
+        Assert.Contains("Old  /very/long/old/path/map.Map.Gbx", output);
+        Assert.Contains("New  /very/long/new/path/map.Map.Gbx", output);
+        Assert.Contains("Size 1,000 → 800 bytes", output);
+        Assert.Contains("Metadata", output);
+        Assert.Contains("Map UID", output);
+        Assert.Contains("Map name", output);
+        Assert.Contains("Author name", output);
+        Assert.Contains("Author login", output);
+        Assert.Contains("Plaintext password", output);
+        Assert.DoesNotContain("Password chunk", output);
+        Assert.DoesNotContain("┏", output);
+        Assert.DoesNotContain("╔", output);
+        Assert.DoesNotContain("\u001b", output);
+    }
+
+    [Fact]
     public void Colors_KnownPaletteHasPaddedChipsInEverySpatialTable()
     {
         var names = Enum.GetNames(typeof(CGameCtnBlock).GetProperty("Color")!.PropertyType);
@@ -365,7 +459,7 @@ public sealed class DiffRendererTests
         {
             var report = ColorReport(name);
             var html = DiffRenderer.RenderHtml(report, "left", "right", colorOption: true);
-            Assert.Equal(3, html.Split($"> {name} </span>", StringSplitOptions.None).Length - 1);
+            Assert.Equal(3, html.Split($">{name}</span>", StringSplitOptions.None).Length - 1);
             Assert.Contains("background-color:", html);
             var console = new TestConsole().Width(500);
             console.Profile.Capabilities.Ansi = true;
@@ -412,7 +506,7 @@ public sealed class DiffRendererTests
             Assert.Contains("Blue", output);
         }
         var html = DiffRenderer.RenderHtml(report, "old", "new", colorOption: true);
-        Assert.Equal(count, html.Split("> Blue </span>", StringSplitOptions.None).Length - 1);
+        Assert.Equal(count, html.Split(">Blue</span>", StringSplitOptions.None).Length - 1);
         var plain = DiffRenderer.RenderHtml(report, "old", "new", colorOption: false);
         Assert.DoesNotContain("<span", plain);
         Assert.Contains("<td>Blue</td>", plain);
@@ -496,19 +590,30 @@ public sealed class DiffRendererTests
             Blocks = blocks, BakedBlocks = blocks,
             Chunks = [new("10 bytes", "20 bytes", "body:a"), new("20 bytes", "30 bytes", "body:b"), new("10 bytes", "20 bytes", "header:c<script>")],
             MetadataChanges = [new("display.comments", new(Text: "old"), new(Text: "new")),
-                new("display.style", null, new(Text: "Race")), new("validation.validated", new(Boolean: false), new(Boolean: true))],
+                new("display.style", null, new(Text: "Race")), new("validation.validated", new(Boolean: false), new(Boolean: true)),
+                new("custom<script>", new(Text: "old"), new(Text: "new"))],
             EmbeddedContributions = [new(null, new("dir/a", 10, 20, 5, null)), new(null, new("dir/b", 10, 20, -2, null)),
-                new(new("else/c", 20, 30, null, "not measured"), new("else/c", 21, 31, 2, null))],
+                new(new("else/c", 20, 30, null, "not measured<script>"), new("else/c", 21, 31, 2, null))],
+            LeftContributionBaselineBytes = 1_000,
+            RightContributionBaselineBytes = 1_100,
+            Warnings = ["warning<script>"],
             MapName = new("old", "<script>alert(1)</script>"),
         };
         var html = DiffRenderer.RenderHtml(report, "old<script>.Map.Gbx", "new[red].Map.Gbx", colorOption: true);
+        var plainHtml = DiffRenderer.RenderHtml(report, "old<script>.Map.Gbx", "new[red].Map.Gbx", colorOption: true, styled: false);
         Assert.Equal(8, html.Split("<table>", StringSplitOptions.None).Length - 1);
         Assert.Equal(17, html.Split("<span", StringSplitOptions.None).Length - 1);
         Assert.DoesNotContain("<script>", html);
+        Assert.DoesNotContain("<style", plainHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(" style=", plainHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<span", plainHtml);
+        foreach (var category in new[] { "Warning:", "Embedded files — added/removed", "Embedded files — modified", "Embedded outer-map contribution", "Placed items", "Blocks", "Baked blocks", "Map metadata", "Chunks", "Map name" })
+            Assert.Contains(category, plainHtml);
         if (Environment.GetEnvironmentVariable("GBX_RENDER_ARTIFACT_DIR") is { Length: > 0 } directory)
         {
             Directory.CreateDirectory(directory);
             File.WriteAllText(Path.Combine(directory, "diff.html"), html);
+            File.WriteAllText(Path.Combine(directory, "diff-unstyled.html"), plainHtml);
             File.WriteAllText(Path.Combine(directory, "diff-no-color.html"), DiffRenderer.RenderHtml(report, "old", "new", colorOption: false));
             File.WriteAllText(Path.Combine(directory, "diff-environment.html"), DiffRenderer.RenderHtml(report, "old", "new"));
             File.WriteAllText(Path.Combine(directory, "diff.md"), DiffRenderer.RenderMarkdown(report, "old", "new"));
@@ -614,7 +719,7 @@ public sealed class DiffRendererTests
         if (legacyOnly) report = report with { MetadataChanges = [] };
         foreach (var output in Outputs(report))
         {
-            foreach (var label in new[] { "Map UID", "Map name", "Author login", "Author nickname", "Password chunk" })
+            foreach (var label in new[] { "Map UID", "Map name", "Author login", "Author name", "Plaintext password" })
                 Assert.Equal(1, output.Split(label, StringSplitOptions.None).Length - 1);
             foreach (var value in new[] { "uidBefore", "uidAfter", "nameBefore", "nameAfter", "loginBefore", "loginAfter", "nickBefore", "nickAfter", "true", "false" })
                 Assert.Equal(1, output.ToLowerInvariant().Split(value.ToLowerInvariant(), StringSplitOptions.None).Length - 1);

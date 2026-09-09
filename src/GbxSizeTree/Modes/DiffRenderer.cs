@@ -1,14 +1,18 @@
 using System.Globalization;
 using System.Net;
 using System.Text;
-using GbxSizeTree.Measure;
 using GbxSizeTree.Cli.Rendering;
+using GbxSizeTree.Measure;
 using Spectre.Console;
 
 namespace GbxSizeTree.Cli.Modes;
 
 public static class DiffRenderer
 {
+    private static readonly EmbeddedSizePresentation EmbeddedSizes = new();
+
+    private const string HtmlStyles = "body{font:14px system-ui;margin:24px;color:#18212b;background:#fafbfc}h2{overflow-wrap:anywhere}.summary,.metadata{padding:12px 16px;border:1px solid #d5dce3;border-radius:10px;background:#fff}.warning{color:#7a2e0b}section{overflow-x:auto}table{border-collapse:collapse;margin:12px 0 28px;font-variant-numeric:tabular-nums}th,td{padding:8px 12px;text-align:left;white-space:nowrap}th{background:#e9eef3;border-bottom:1px solid #d5dce3}tbody+tbody tr:first-child td{border-top:1px solid #aab8c5;padding-top:16px}tbody tr:nth-child(even){background:#f0f4f7}td:first-child{font-weight:bold}.added td:first-child{color:#137333}.removed td:first-child{color:#b3261e}.changed td:first-child{color:#946000}td:nth-child(2){white-space:normal;min-width:240px;overflow-wrap:anywhere}.color-chip{display:inline-block;min-width:3.5em;padding:.18em .65em;border-radius:999px;text-align:center;line-height:1.25;font-weight:600;box-sizing:border-box}@media(max-width:600px){body{margin:12px}.summary,.metadata{padding:10px 12px}}";
+
     public static bool ShouldUseColor(bool? requested, bool redirected, string? terminal, bool noColor) =>
         requested ?? (!redirected && !noColor && !string.Equals(terminal, "dumb", StringComparison.OrdinalIgnoreCase));
 
@@ -27,11 +31,12 @@ public static class DiffRenderer
     public static void Render(IAnsiConsole console, DiffReport report, string oldPath, string newPath)
     {
         var color = console.Profile.Capabilities.ColorSystem != ColorSystem.NoColors;
-        console.MarkupLine($"[bold]Diff[/]: {Escape(oldPath)} [grey]→[/] {Escape(newPath)}");
         var delta = report.RightBytes - report.LeftBytes;
-        console.MarkupLine($"Size: {report.LeftBytes:N0} [grey]→[/] {report.RightBytes:N0} bytes {Delta(delta, color)}");
+        RenderHeader(console, oldPath, newPath, report.LeftBytes, report.RightBytes, delta, color);
         foreach (var warning in report.Warnings)
             console.MarkupLine($"[bold]Warning:[/] {Escape(warning)}");
+        if (report.Warnings.Count > 0) console.WriteLine();
+
         var tables = Tables(report).Where(t => t.Rows.Count > 0).ToArray();
         foreach (var source in tables)
         {
@@ -70,16 +75,44 @@ public static class DiffRenderer
                             : data.Columns[i] is "Rotation" or "Direction" ? "yellow" : "default", color);
                 table.AddRow(cells);
             }
-            console.MarkupLine($"[bold]{data.Title}[/] [grey]({Summary(data.Rows)})[/]");
+            console.MarkupLine($"[bold]{Escape(data.Title)}[/] [grey]({Escape(Summary(data.Rows))})[/]");
             if (data.Note is not null) console.MarkupLine(Escape(data.Note));
             console.Write(table);
             console.WriteLine();
         }
-        var metadata = Metadata(report).ToArray();
-        foreach (var (label, change) in metadata)
-            console.MarkupLine($"{Colorize("~", "yellow", color)} [bold]{label}[/]: {Escape(change.Left ?? "removed")} [grey]→[/] {Escape(change.Right ?? "added")}");
-        if (tables.Length == 0 && metadata.Length == 0 && delta == 0)
+
+        RenderMetadata(console, Metadata(report).ToArray(), color);
+        if (tables.Length == 0 && !Metadata(report).Any() && delta == 0)
             console.MarkupLine("[grey]No differences in the compared fields.[/]");
+    }
+
+    private static void RenderHeader(IAnsiConsole console, string oldPath, string newPath,
+        long leftBytes, long rightBytes, long delta, bool color)
+    {
+        var width = Math.Max(20, console.Profile.Width);
+        console.MarkupLine("[bold]Map diff[/]");
+        if (width < 100)
+        {
+            console.MarkupLine($"[grey]Old[/]  {Escape(oldPath)}");
+            console.MarkupLine($"[grey]New[/]  {Escape(newPath)}");
+        }
+        else
+        {
+            console.MarkupLine($"[grey]Old[/]  {Escape(oldPath)}");
+            console.MarkupLine($"[grey]  ↓[/]");
+            console.MarkupLine($"[grey]New[/]  {Escape(newPath)}");
+        }
+        console.MarkupLine($"[grey]Size[/] {leftBytes:N0} → {rightBytes:N0} bytes {Delta(delta, color)}");
+        console.WriteLine();
+    }
+
+    private static void RenderMetadata(IAnsiConsole console, (string Label, Change Change)[] metadata, bool color)
+    {
+        if (metadata.Length == 0) return;
+        console.MarkupLine("[bold]Metadata[/]");
+        foreach (var (label, change) in metadata)
+            console.MarkupLine($"  {Colorize("~", "yellow", color)} [bold]{Escape(label)}[/]: {Escape(change.Left ?? "removed")} [grey]→[/] {Escape(change.Right ?? "added")}");
+        console.WriteLine();
     }
 
     public static string RenderMarkdown(DiffReport report, string oldPath, string newPath)
@@ -108,16 +141,19 @@ public static class DiffRenderer
         return b.ToString();
     }
 
-    public static string RenderHtml(DiffReport report, string oldPath, string newPath, bool? colorOption = null)
+    public static string RenderHtml(DiffReport report, string oldPath, string newPath,
+        bool? colorOption = null, bool styled = true)
     {
-        var color = colorOption ?? string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NO_COLOR"));
-        var b = new StringBuilder("<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Map diff</title><style>body{font:14px system-ui;margin:24px;color:#18212b;background:#fafbfc}h2{overflow-wrap:anywhere}section{overflow-x:auto}table{border-collapse:collapse;margin:12px 0 28px;font-variant-numeric:tabular-nums}th,td{padding:8px 12px;text-align:left;white-space:nowrap}th{background:#e9eef3;border-bottom:1px solid #d5dce3}tbody+tbody tr:first-child td{border-top:1px solid #aab8c5;padding-top:16px}tbody tr:nth-child(even){background:#f0f4f7}td:first-child{font-weight:bold}.added td:first-child{color:#137333}.removed td:first-child{color:#b3261e}.changed td:first-child{color:#946000}td:nth-child(2){white-space:normal;min-width:240px;overflow-wrap:anywhere}@media(max-width:600px){body{margin:12px}}</style></head><body>");
-        b.Append($"<h2>Diff: <code>{Html(oldPath)}</code> → <code>{Html(newPath)}</code></h2><p>Size: {report.LeftBytes:N0} → {report.RightBytes:N0} bytes</p>");
+        var color = styled && (colorOption ?? string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NO_COLOR")));
+        var b = new StringBuilder("<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Map diff</title>");
+        if (styled) b.Append($"<style>{HtmlStyles}</style>");
+        b.Append("</head><body>");
+        b.Append($"<div class=\"summary\"><h2>Diff: <code>{Html(oldPath)}</code> → <code>{Html(newPath)}</code></h2><p>Size: {report.LeftBytes:N0} → {report.RightBytes:N0} bytes</p></div>");
         foreach (var warning in report.Warnings)
             b.Append($"<p class=\"warning\"><strong>Warning:</strong> {Html(warning)}</p>");
         foreach (var table in Tables(report).Where(t => t.Rows.Count > 0))
         {
-            b.Append($"<h3>{table.Title} ({Summary(table.Rows)})</h3>");
+            b.Append($"<h3>{Html(table.Title)} ({Html(Summary(table.Rows))})</h3>");
             if (table.Note is not null) b.Append($"<p>{Html(table.Note)}</p>");
             b.Append("<section><table><thead><tr>");
             foreach (var column in table.Columns) b.Append($"<th>{Html(column)}</th>");
@@ -127,7 +163,8 @@ public static class DiffRenderer
             {
                 if (previousGroup is not null && previousGroup != row.Group) b.Append("</tbody><tbody>");
                 previousGroup = row.Group;
-                b.Append($"<tr class=\"{(row.Cells[0] == "+" ? "added" : row.Cells[0] == "-" ? "removed" : "changed")}\">");
+                var rowClass = row.Cells[0] == "+" ? "added" : row.Cells[0] == "-" ? "removed" : "changed";
+                b.Append($"<tr class=\"{rowClass}\">");
                 for (var i = 0; i < row.Cells.Length; i++)
                 {
                     var cell = table.Columns[i] == "Color" && row.Color is { } change
@@ -139,8 +176,14 @@ public static class DiffRenderer
             }
             b.Append("</tbody></table></section>");
         }
-        foreach (var (label, change) in Metadata(report))
-            b.Append($"<p>~ <strong>{label}</strong>: {Html(change.Left ?? "removed")} → {Html(change.Right ?? "added")}</p>");
+        var metadata = Metadata(report).ToArray();
+        if (metadata.Length > 0)
+        {
+            b.Append("<div class=\"metadata\"><h3>Metadata</h3>");
+            foreach (var (label, change) in metadata)
+                b.Append($"<p>~ <strong>{Html(label)}</strong>: {Html(change.Left ?? "removed")} → {Html(change.Right ?? "added")}</p>");
+            b.Append("</div>");
+        }
         if (IsEmpty(report)) b.Append("<p>No differences in the compared fields.</p>");
         b.Append("</body></html>");
         return b.ToString();
@@ -151,16 +194,21 @@ public static class DiffRenderer
         yield return EmbeddedTable("Embedded files — added/removed", report.Embedded.Where(c => c.Left is null || c.Right is null));
         yield return EmbeddedTable("Embedded files — modified", report.Embedded.Where(c => c.Left is not null && c.Right is not null));
         yield return new("Embedded outer-map contribution — non-additive LZO marginal bytes",
-            ["Mark", "Name / path", "Left marginal bytes", "Right marginal bytes", "ZIP bytes", "Raw bytes"],
+            ["Mark", "Name / path", EmbeddedSizePresentation.LeftMarginalColumn,
+                EmbeddedSizePresentation.RightMarginalColumn, EmbeddedSizePresentation.ZipColumn,
+                EmbeddedSizePresentation.RawColumn],
             report.EmbeddedContributions.OrderBy(c => ChangeOrder(c.Left, c.Right))
                 .ThenBy(c => DirectoryContext((c.Right ?? c.Left)!.Path), StringComparer.Ordinal)
                 .ThenBy(c => (c.Right ?? c.Left)!.Path, StringComparer.Ordinal)
-                .Select(c => new Row([Marker(c.Left, c.Right), (c.Right ?? c.Left)?.Path ?? "--",
-                    ContributionValue(c.Left), ContributionValue(c.Right),
-                    Transition(c, x => Bytes(x.ZipCompressedBytes)), Transition(c, x => Bytes(x.ZipRawBytes))],
-                    Group: Marker(c.Left, c.Right) + DirectoryContext((c.Right ?? c.Left)!.Path))).ToArray(),
-            $"Original-body recompressed LZO baseline bytes: left {Bytes(report.LeftContributionBaselineBytes)}, right {Bytes(report.RightContributionBaselineBytes)}. " +
-            "Marginal bytes are signed baseline-minus-removal savings; context-dependent and non-additive, not an allocation of map size. ZIP/raw bytes are independent. Default: at most 8 removal trials per map; remaining entries are unavailable.");
+                .Select(c =>
+                {
+                    var cells = EmbeddedSizes.FormatEntry(ContributionEntry(c.Left), ContributionEntry(c.Right));
+                    return new Row([Marker(c.Left, c.Right), (c.Right ?? c.Left)?.Path ?? "--",
+                        ContributionMarginal(c.Left), ContributionMarginal(c.Right), cells.ZipBytes, cells.RawBytes],
+                        Group: Marker(c.Left, c.Right) + DirectoryContext((c.Right ?? c.Left)!.Path));
+                }).ToArray(),
+            EmbeddedSizes.FormatOuterNote(report.LeftContributionBaselineBytes, report.RightContributionBaselineBytes) +
+            " Default: at most 8 removal trials per map; remaining entries are unavailable.");
         yield return ItemTable(report.Items);
         yield return BlockTable("Blocks", report.Blocks);
         yield return BlockTable("Baked blocks", report.BakedBlocks, showGridPosition: true);
@@ -181,29 +229,30 @@ public static class DiffRenderer
         _ => "absent",
     };
 
-    private static string Bytes(long? value) => value?.ToString(CultureInfo.InvariantCulture) ?? "unavailable";
-    private static string ContributionValue(EmbeddedFileContribution? value) => value is null ? "absent"
-        : value.MarginalCompressedBodyBytes is { } bytes ? Bytes(bytes)
-        : $"unavailable: {value.UnavailableReason ?? "not measured"}";
+    private static EmbeddedSizePresentation.EntrySize? ContributionEntry(EmbeddedFileContribution? value) => value is null
+        ? null
+        : new(value.ZipCompressedBytes, value.ZipRawBytes);
+
+    private static string ContributionMarginal(EmbeddedFileContribution? value) => value is null
+        ? "absent"
+        : EmbeddedSizes.FormatMarginal(value.MarginalCompressedBodyBytes, value.UnavailableReason);
 
     private static DiffTable EmbeddedTable(string title, IEnumerable<ValueChange<EmbeddedSnapshot>> changes) => new(
-        title, ["Mark", "Name / path", "Compressed", "Uncompressed", "Ratio", "What changed"],
+        title, ["Mark", "Name / path", EmbeddedSizePresentation.ZipColumn,
+            EmbeddedSizePresentation.RawColumn, EmbeddedSizePresentation.RatioColumn, "What changed"],
         changes.OrderBy(c => ChangeOrder(c.Left, c.Right))
             .ThenBy(c => DirectoryContext((c.Right ?? c.Left)!.Path), StringComparer.Ordinal)
-            .ThenBy(c => (c.Right ?? c.Left)!.Path, StringComparer.Ordinal).Select(c => new Row(
-            [Marker(c.Left, c.Right), Transition(c, x => DisplayPath(x.Path), onlyDifferent: true),
-                EmbeddedBytes(c, x => x.Compressed), EmbeddedBytes(c, x => x.Uncompressed),
-                Transition(c, x => x.Uncompressed == 0 ? "--" : x.Ratio.ToString("P2", CultureInfo.InvariantCulture)),
-                EmbeddedExplanation(c)], Group: Marker(c.Left, c.Right) + DirectoryContext((c.Right ?? c.Left)!.Path))).ToArray(),
-        "Sizes are entry ZIP-compressed and raw bytes, not total ZIP archive or outer-map size. " +
-        "Signed deltas are right minus left (absent = 0). Archive overhead and compression settings are not measured; " +
-        "a changed ZIP size with changed content does not by itself prove a compression-setting change.");
-
-    private static string EmbeddedBytes(ValueChange<EmbeddedSnapshot> change, Func<EmbeddedSnapshot, long> size)
-    {
-        var delta = (change.Right is null ? 0 : size(change.Right)) - (change.Left is null ? 0 : size(change.Left));
-        return $"{Transition(change, x => size(x).ToString(CultureInfo.InvariantCulture))} ({delta.ToString("+0;-0;0", CultureInfo.InvariantCulture)} B)";
-    }
+            .ThenBy(c => (c.Right ?? c.Left)!.Path, StringComparer.Ordinal).Select(c =>
+            {
+                var cells = EmbeddedSizes.FormatEntry(
+                    c.Left is null ? null : new(c.Left.Compressed, c.Left.Uncompressed),
+                    c.Right is null ? null : new(c.Right.Compressed, c.Right.Uncompressed));
+                return new Row([Marker(c.Left, c.Right), Transition(c, x => DisplayPath(x.Path), onlyDifferent: true),
+                    cells.ZipBytes, cells.RawBytes, cells.ZipToRawRatio, EmbeddedExplanation(c)],
+                    Group: Marker(c.Left, c.Right) + DirectoryContext((c.Right ?? c.Left)!.Path));
+            }).ToArray(),
+        EmbeddedSizes.EntryNote +
+        " Archive overhead and compression settings are not measured; a changed ZIP size with changed content does not by itself prove a compression-setting change.");
 
     private static string EmbeddedExplanation(ValueChange<EmbeddedSnapshot> change)
     {
@@ -311,7 +360,7 @@ public static class DiffRenderer
 
     private static IEnumerable<(string Label, Change Change)> Metadata(DiffReport r)
     {
-        foreach (var (label, change) in new[] { ("Map UID", r.MapUid), ("Map name", r.MapName), ("Author login", r.AuthorLogin), ("Author nickname", r.AuthorNickname), ("Password chunk", r.Password) })
+        foreach (var (label, change) in new[] { ("Map UID", r.MapUid), ("Map name", r.MapName), ("Author login", r.AuthorLogin), ("Author name", r.AuthorNickname), ("Plaintext password", r.Password) })
             if (change is not null) yield return (label, change);
     }
 
@@ -362,7 +411,7 @@ public static class DiffRenderer
         var text = html ? Html(label) : Escape(label);
         if (!enabled || background is null) return text;
         return html
-            ? $"<span style=\"background-color:{background};color:{foreground};white-space:pre\"> {text} </span>"
+            ? $"<span class=\"color-chip\" style=\"background-color:{background};color:{foreground}\">{text}</span>"
             : $"[{foreground} on {background}] {text} [/]";
     }
 
