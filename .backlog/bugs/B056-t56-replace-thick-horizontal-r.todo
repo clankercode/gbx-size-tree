@@ -14,10 +14,7 @@ id: B056
 priority: high
 started_at: "2026-09-09T07:22:01Z"
 status: in_progress
-tags:
-    - chat-astra
-    - T56
-    - source-pending
+tags: []
 title: 'T56: Replace thick horizontal rules between every CLI entry with rules between contextually appropriate row groups'
 updated_at: "2026-09-09T07:22:01Z"
 ---
@@ -37,3 +34,5 @@ Outstanding work; not implemented by this ingestion.
 T14, T17, T18, T37
 
 Decision and sequencing: Presentation lane after B037 closes. Decision: group embedded rows by change kind and path context; spatial rows by deterministic physical proximity while keeping coordinate ties together; separators only at group boundaries, not each entry. Cover distant/near/identical coordinate cases.
+
+Independent review found dense spatial grouping quadratic: 16k 1.08s, 32k 3.79s, 64k 15.8s. Keep ticket open; fix deterministic connected grouping to avoid all pairs inside dense components and add operation-count/performance regression plus cross-cell bridge correctness tests.
