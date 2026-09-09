@@ -29,3 +29,5 @@ Partial implementation; remaining scope must be completed. No active agent claim
 T1
 
 Decision and sequencing: Comparison lane after B005 to avoid concurrent DiffMode/report edits. Decision: explicitly capture useful editable map metadata with stable labels and typed/source-generated JSON support; exclude heavy object collections handled elsewhere. Record tested coverage rather than claim every parsed property.
+
+Refined ownership: metadata extraction helper and new isolated tests may proceed alongside content hashing; shared report/renderer integration waits until initial lanes land. Explicit scalar/map settings metadata plus all typed script traits, deterministic stable paths and absent/empty distinction. Exclude lazy heavy getters and avoid unbounded reflection.
