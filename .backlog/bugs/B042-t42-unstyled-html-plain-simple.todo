@@ -9,10 +9,7 @@ id: B042
 priority: high
 started_at: null
 status: pending
-tags:
-    - chat-astra
-    - T42
-    - source-pending
+tags: []
 title: 'T42: Unstyled HTML plain/simple/easy to parse or restyle; retain useful stable classes AND id attributes.'
 updated_at: "2026-09-09T06:13:11Z"
 ---
@@ -30,3 +27,5 @@ Outstanding work; not implemented by this ingestion.
 
 ## Source dependencies
 T41
+
+Decision and sequencing: Same presentation worktree after B041 merges/closes. Decision: semantic HTML with stable category/column/metadata identifiers, no inline or embedded styles in unstyled mode, proper escaping and responsive styled mode.
