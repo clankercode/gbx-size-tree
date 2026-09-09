@@ -10,7 +10,10 @@ id: B039
 priority: high
 started_at: null
 status: pending
-tags: []
+tags:
+    - chat-astra
+    - T39
+    - source-pending
 title: 'T39: Deep diff embedded items: readable nested property paths e.g'
 updated_at: "2026-09-09T06:13:10Z"
 ---
