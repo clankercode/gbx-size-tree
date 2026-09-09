@@ -45,3 +45,4 @@ bugs:
     - file: B044-t44-validate-new-requests-with.todo
     - file: B045-t45-final-logical-commits-merg.todo
     - file: B046-t46-last-after-all-other-tasks.todo
+    - file: B047-t47-explicit-password-chunk-re.todo
