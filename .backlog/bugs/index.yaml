@@ -41,3 +41,4 @@ bugs:
     - file: B040-t40-diff-embedded-map-metadata.todo
     - file: B041-t41-html-supports-styled-and-n.todo
     - file: B042-t42-unstyled-html-plain-simple.todo
+    - file: B043-t43-real-map-verification-gbx.todo

@@ -1,0 +1,29 @@
+---
+complexity: medium
+created_at: "2026-09-09T06:13:11Z"
+depends_on: []
+estimate_hours: 1
+id: B043
+priority: high
+status: pending
+tags:
+    - chat-astra
+    - T43
+    - source-pending
+title: 'T43: Real-map verification: gbx-size-tree diff ~/tm-docs/Maps/SB2/Sweet\ 2\ burger\ v205.Map.gbx ~/tm-docs/Maps/SB2/Sweet\ 2\ burger\ v206.M'
+updated_at: "2026-09-09T06:13:11Z"
+---
+## Source
+Chat task: T43
+Source status: pending
+Inventory: /tmp/gbx-size-tree-astra-chat-tasks.md
+Session: 01a08304-d48f-7631-913b-60e05abe13f3
+
+## Scope and acceptance criteria
+Real-map verification: gbx-size-tree diff ~/tm-docs/Maps/SB2/Sweet\ 2\ burger\ v205.Map.gbx ~/tm-docs/Maps/SB2/Sweet\ 2\ burger\ v206.Map.Gbx. User offered this rich example; not yet run.
+
+## State at ingestion
+Outstanding work; not implemented by this ingestion.
+
+## Source dependencies
+T37, T38, T39, T40
