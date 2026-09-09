@@ -11,7 +11,9 @@ id: B062
 priority: high
 started_at: "2026-09-09T09:13:10Z"
 status: done
-tags: []
+tags:
+    - chat-astra
+    - measurement-budget
 title: Raise embedded removal measurement budget for large map diffs
 updated_at: "2026-09-09T09:47:11Z"
 ---
