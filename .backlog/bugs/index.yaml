@@ -28,3 +28,4 @@ bugs:
     - file: B027-t27-worktree-based-delegation.todo
     - file: B028-t28-review-fix-loops-and-regre.todo
     - file: B029-t29-actual-map-console-html-ma.todo
+    - file: B030-t30-commit-merge-completed-wor.todo
