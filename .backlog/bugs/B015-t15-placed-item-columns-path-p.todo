@@ -10,7 +10,10 @@ id: B015
 priority: high
 started_at: null
 status: done
-tags: []
+tags:
+    - chat-astra
+    - T15
+    - source-done
 title: 'T15: Placed-item columns path, position, rotation, color and meaningful changing properties (pivot/animation/flags; scale currently present,'
 updated_at: "2026-09-09T06:13:50Z"
 ---
