@@ -61,6 +61,7 @@ public static class DiffMode
         report.LeftEmbeddedSnapshots, report.RightEmbeddedSnapshots,
         report.MapUid, report.MapName, report.AuthorLogin, report.AuthorNickname, report.Password,
         report.MetadataChanges, report.EmbeddedContributions, report.EmbeddedPropertyChanges,
+        report.PropertyChangeSummaries, report.EmbeddedUsages,
         report.LeftContributionBaselineBytes, report.RightContributionBaselineBytes, report.Warnings
     ), DiffJsonContext.Default.DiffJsonReport);
 
@@ -236,8 +237,29 @@ public static class DiffMode
         return report with
         {
             EmbeddedPropertyChanges = EmbeddedPropertyReport.Capture(a.EmbeddedZipData, b.EmbeddedZipData, embedded),
+            PropertyChangeSummaries = PropertySummaries(a.Blocks, b.Blocks, a.Items, b.Items),
+            EmbeddedUsages = EmbeddedUsages(a.Embedded.Keys, b.Embedded.Keys, a.Items, b.Items),
         };
     }
+
+    private static IReadOnlyList<PropertyChangeSummary> PropertySummaries(IEnumerable<BlockSnapshot> leftBlocks, IEnumerable<BlockSnapshot> rightBlocks, IEnumerable<ItemSnapshot> leftItems, IEnumerable<ItemSnapshot> rightItems)
+    {
+        var result = new Dictionary<string, int>(StringComparer.Ordinal);
+        Count(leftBlocks, rightBlocks, x => x.LightmapQuality, "Lightmap quality");
+        Count(leftBlocks, rightBlocks, x => x.IsGround, "Ground state");
+        Count(leftItems, rightItems, x => x.LightmapQuality, "Lightmap quality");
+        Count(leftItems, rightItems, x => x.AnimationPhase, "Animation phase");
+        return result.OrderBy(x => x.Key, StringComparer.Ordinal).Select(x => new PropertyChangeSummary(x.Key, x.Value)).ToArray();
+        void Count<T>(IEnumerable<T> left, IEnumerable<T> right, Func<T, object> property, string label) where T : class
+        {
+            var l = left.GroupBy(property).ToDictionary(x => x.Key, x => x.Count()); var r = right.GroupBy(property).ToDictionary(x => x.Key, x => x.Count());
+            foreach (var key in l.Keys.Union(r.Keys)) result[label] = result.GetValueOrDefault(label) + Math.Min(l.GetValueOrDefault(key), r.GetValueOrDefault(key));
+        }
+    }
+
+    private static IReadOnlyList<EmbeddedUsage> EmbeddedUsages(IEnumerable<string> leftPaths, IEnumerable<string> rightPaths, IEnumerable<ItemSnapshot> leftItems, IEnumerable<ItemSnapshot> rightItems) =>
+        leftPaths.Union(rightPaths, StringComparer.Ordinal).Order(StringComparer.Ordinal).Select(path => new EmbeddedUsage(path,
+            leftItems.Count(x => string.Equals(x.Path, path, StringComparison.OrdinalIgnoreCase)), rightItems.Count(x => string.Equals(x.Path, path, StringComparison.OrdinalIgnoreCase)))).ToArray();
 
     private static Change? Different(string a, string b) => a == b ? null : new(a, b);
 

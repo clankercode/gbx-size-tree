@@ -228,6 +228,8 @@ public static class DiffRenderer
         "Embedded item properties — modified" => "embedded-properties-modified",
         "Embedded outer-map contribution — non-additive LZO marginal bytes" => "embedded-contributions",
         "Placed items" => "placed-items",
+        "Property changes — summary" => "property-summary",
+        "Embedded usage — placed items" => "embedded-usage",
         "Blocks" => "blocks",
         "Baked blocks" => "baked-blocks",
         "Map metadata" => "map-metadata",
@@ -266,6 +268,10 @@ public static class DiffRenderer
         "ZIP bytes" => "zip-bytes",
         "Raw bytes" => "raw-bytes",
         "ZIP / raw" => "zip-raw-ratio",
+        "Property" => "property",
+        "Changed instances" => "changed-instances",
+        "Before" => "before",
+        "After" => "after",
         _ => throw new ArgumentOutOfRangeException(nameof(column), column, "Unknown HTML diff column."),
     };
 
@@ -291,6 +297,8 @@ public static class DiffRenderer
             EmbeddedSizes.FormatOuterNote(report.LeftContributionBaselineBytes, report.RightContributionBaselineBytes) +
             $" Default: at most {new EmbeddedFileContributionOptions().MaxTrials} removal trials per map; remaining entries are unavailable.");
         yield return ItemTable(report.Items);
+        yield return PropertySummaryTable(report.PropertyChangeSummaries);
+        yield return UsageTable(report.EmbeddedUsages);
         yield return BlockTable("Blocks", report.Blocks);
         yield return BlockTable("Baked blocks", report.BakedBlocks, showGridPosition: true);
         yield return new("Map metadata", ["Mark", "Field", "Left", "Right"],
@@ -393,6 +401,9 @@ public static class DiffRenderer
         _ => $"text: \"{value.Text}\"",
     };
 
+    private static DiffTable PropertySummaryTable(IReadOnlyList<PropertyChangeSummary> summaries) => new("Property changes — summary", ["Property", "Changed instances"], summaries.OrderBy(x => x.Property, StringComparer.Ordinal).Select(x => new Row([x.Property, x.Count.ToString(CultureInfo.InvariantCulture)])).ToArray());
+    private static DiffTable UsageTable(IReadOnlyList<EmbeddedUsage> usages) => new("Embedded usage — placed items", ["Name / path", "Before", "After"], usages.Select(x => new Row([x.Path, x.LeftDirectUses?.ToString(CultureInfo.InvariantCulture) ?? "unknown", x.RightDirectUses?.ToString(CultureInfo.InvariantCulture) ?? "unknown"])).ToArray());
+
     private static DiffTable ItemTable(IReadOnlyList<ValueChange<ItemSnapshot>> changes)
     {
         var columns = new List<Column<ItemSnapshot>>
@@ -488,7 +499,7 @@ public static class DiffRenderer
     private static bool IsEmpty(DiffReport r) => r.LeftBytes == r.RightBytes && r.Embedded.Count == 0 && r.Items.Count == 0
         && r.Blocks.Count == 0 && r.BakedBlocks.Count == 0 && r.Chunks.Count == 0
         && r.MetadataChanges.Count == 0 && r.EmbeddedContributions.Count == 0
-        && r.EmbeddedPropertyChanges.Count == 0 && !Metadata(r).Any();
+        && r.EmbeddedPropertyChanges.Count == 0 && r.PropertyChangeSummaries.Count == 0 && r.EmbeddedUsages.Count == 0 && !Metadata(r).Any();
 
     private static string Summary(IReadOnlyList<Row> rows) => string.Join(" ", new[] { ("+", "added"), ("-", "removed"), ("~", "changed") }
         .Select(x => (x.Item1, x.Item2, Count: rows.Count(r => r.Cells[0] == x.Item1)))
