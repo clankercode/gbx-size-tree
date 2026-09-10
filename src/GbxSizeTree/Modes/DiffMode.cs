@@ -245,21 +245,30 @@ public static class DiffMode
     private static IReadOnlyList<PropertyChangeSummary> PropertySummaries(IEnumerable<BlockSnapshot> leftBlocks, IEnumerable<BlockSnapshot> rightBlocks, IEnumerable<ItemSnapshot> leftItems, IEnumerable<ItemSnapshot> rightItems)
     {
         var result = new Dictionary<string, int>(StringComparer.Ordinal);
-        Count(leftBlocks, rightBlocks, x => x.LightmapQuality, "Lightmap quality");
-        Count(leftBlocks, rightBlocks, x => x.IsGround, "Ground state");
-        Count(leftItems, rightItems, x => x.LightmapQuality, "Lightmap quality");
-        Count(leftItems, rightItems, x => x.AnimationPhase, "Animation phase");
+        Compare(leftBlocks, rightBlocks, x => $"{x.Name}|{x.Coord}|{x.PhysicalPosition}|{x.Rotation}|{x.Variant}|{x.SubVariant}", (l, r) => { if (l.LightmapQuality != r.LightmapQuality) Add("Lightmap quality"); if (l.IsGround != r.IsGround) Add("Ground state"); });
+        Compare(leftItems, rightItems, x => $"{x.Path}|{x.Position}|{x.Rotation}|{x.Color}|{x.Pivot}|{x.Flags}", (l, r) => { if (l.LightmapQuality != r.LightmapQuality) Add("Lightmap quality"); if (l.AnimationPhase != r.AnimationPhase) Add("Animation phase"); });
         return result.OrderBy(x => x.Key, StringComparer.Ordinal).Select(x => new PropertyChangeSummary(x.Key, x.Value)).ToArray();
-        void Count<T>(IEnumerable<T> left, IEnumerable<T> right, Func<T, object> property, string label) where T : class
+        void Add(string property) => result[property] = result.GetValueOrDefault(property) + 1;
+        static void Compare<T>(IEnumerable<T> left, IEnumerable<T> right, Func<T, string> identity, Action<T, T> compare) where T : class
         {
-            var l = left.GroupBy(property).ToDictionary(x => x.Key, x => x.Count()); var r = right.GroupBy(property).ToDictionary(x => x.Key, x => x.Count());
-            foreach (var key in l.Keys.Union(r.Keys)) result[label] = result.GetValueOrDefault(label) + Math.Min(l.GetValueOrDefault(key), r.GetValueOrDefault(key));
+            var remaining = right.GroupBy(identity).ToDictionary(x => x.Key, x => new Queue<T>(x), StringComparer.Ordinal);
+            foreach (var item in left)
+                if (remaining.TryGetValue(identity(item), out var matches) && matches.Count > 0)
+                    compare(item, matches.Dequeue());
         }
     }
 
-    private static IReadOnlyList<EmbeddedUsage> EmbeddedUsages(IEnumerable<string> leftPaths, IEnumerable<string> rightPaths, IEnumerable<ItemSnapshot> leftItems, IEnumerable<ItemSnapshot> rightItems) =>
-        leftPaths.Union(rightPaths, StringComparer.Ordinal).Order(StringComparer.Ordinal).Select(path => new EmbeddedUsage(path,
-            leftItems.Count(x => string.Equals(x.Path, path, StringComparison.OrdinalIgnoreCase)), rightItems.Count(x => string.Equals(x.Path, path, StringComparison.OrdinalIgnoreCase)))).ToArray();
+    private static IReadOnlyList<EmbeddedUsage> EmbeddedUsages(IEnumerable<string> leftPaths, IEnumerable<string> rightPaths, IEnumerable<ItemSnapshot> leftItems, IEnumerable<ItemSnapshot> rightItems)
+    {
+        var left = leftItems.GroupBy(x => x.Path, StringComparer.OrdinalIgnoreCase).ToDictionary(x => x.Key, x => x.Count(), StringComparer.OrdinalIgnoreCase);
+        var right = rightItems.GroupBy(x => x.Path, StringComparer.OrdinalIgnoreCase).ToDictionary(x => x.Key, x => x.Count(), StringComparer.OrdinalIgnoreCase);
+        return leftPaths.Union(rightPaths, StringComparer.Ordinal).Order(StringComparer.Ordinal).Select(path =>
+        {
+            var leftKnown = left.ContainsKey(path); var rightKnown = right.ContainsKey(path);
+            return new EmbeddedUsage(path, leftKnown ? left[path] : null, rightKnown ? right[path] : null,
+                leftKnown && rightKnown ? null : "Embedded identity does not match a placed-item model exactly; aliases and transitive dependencies were not resolved.");
+        }).ToArray();
+    }
 
     private static Change? Different(string a, string b) => a == b ? null : new(a, b);
 

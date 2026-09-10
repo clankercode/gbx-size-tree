@@ -272,6 +272,7 @@ public static class DiffRenderer
         "Changed instances" => "changed-instances",
         "Before" => "before",
         "After" => "after",
+        "Status" => "status",
         _ => throw new ArgumentOutOfRangeException(nameof(column), column, "Unknown HTML diff column."),
     };
 
@@ -297,10 +298,10 @@ public static class DiffRenderer
             EmbeddedSizes.FormatOuterNote(report.LeftContributionBaselineBytes, report.RightContributionBaselineBytes) +
             $" Default: at most {new EmbeddedFileContributionOptions().MaxTrials} removal trials per map; remaining entries are unavailable.");
         yield return ItemTable(report.Items);
-        yield return PropertySummaryTable(report.PropertyChangeSummaries);
-        yield return UsageTable(report.EmbeddedUsages);
         yield return BlockTable("Blocks", report.Blocks);
         yield return BlockTable("Baked blocks", report.BakedBlocks, showGridPosition: true);
+        yield return PropertySummaryTable(report.PropertyChangeSummaries);
+        yield return UsageTable(report.EmbeddedUsages);
         yield return new("Map metadata", ["Mark", "Field", "Left", "Right"],
             report.MetadataChanges.Where(c => LegacyMetadata(report, c.Path) is null).OrderBy(c => c.Path, StringComparer.Ordinal)
                 .Select(c => new Row([Marker(c.Left, c.Right), c.Path, MetadataValue(c.Left), MetadataValue(c.Right)],
@@ -402,7 +403,7 @@ public static class DiffRenderer
     };
 
     private static DiffTable PropertySummaryTable(IReadOnlyList<PropertyChangeSummary> summaries) => new("Property changes — summary", ["Property", "Changed instances"], summaries.OrderBy(x => x.Property, StringComparer.Ordinal).Select(x => new Row([x.Property, x.Count.ToString(CultureInfo.InvariantCulture)])).ToArray());
-    private static DiffTable UsageTable(IReadOnlyList<EmbeddedUsage> usages) => new("Embedded usage — placed items", ["Name / path", "Before", "After"], usages.Select(x => new Row([x.Path, x.LeftDirectUses?.ToString(CultureInfo.InvariantCulture) ?? "unknown", x.RightDirectUses?.ToString(CultureInfo.InvariantCulture) ?? "unknown"])).ToArray());
+    private static DiffTable UsageTable(IReadOnlyList<EmbeddedUsage> usages) => new("Embedded usage — placed items", ["Name / path", "Before", "After", "Status"], usages.Select(x => new Row([x.Path, x.LeftDirectUses?.ToString(CultureInfo.InvariantCulture) ?? "unknown", x.RightDirectUses?.ToString(CultureInfo.InvariantCulture) ?? "unknown", x.Uncertainty ?? "confirmed direct count"])).ToArray());
 
     private static DiffTable ItemTable(IReadOnlyList<ValueChange<ItemSnapshot>> changes)
     {
