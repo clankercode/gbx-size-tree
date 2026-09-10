@@ -20,5 +20,7 @@ internal sealed record DiffJsonReport(
     IReadOnlyList<MapMetadataChange> MetadataChanges,
     IReadOnlyList<ValueChange<EmbeddedFileContribution>> EmbeddedContributions,
     IReadOnlyList<EmbeddedPropertyEntryDiff> EmbeddedPropertyChanges,
+    IReadOnlyList<PropertyChangeSummary> PropertyChangeSummaries,
+    IReadOnlyList<EmbeddedUsage> EmbeddedUsages,
     long? LeftContributionBaselineBytes, long? RightContributionBaselineBytes,
     IReadOnlyList<string> Warnings);
