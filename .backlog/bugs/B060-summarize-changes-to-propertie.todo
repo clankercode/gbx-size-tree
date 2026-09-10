@@ -1,18 +1,19 @@
 ---
 claimed_at: "2026-09-10T04:10:04Z"
 claimed_by: cli-user
-completed_at: null
+completed_at: "2026-09-10T04:31:05Z"
 complexity: medium
 created_at: "2026-09-09T07:49:16Z"
 depends_on: []
+duration_minutes: 21.025987617633334
 estimate_hours: 2
 id: B060
 priority: high
 started_at: "2026-09-10T04:10:04Z"
-status: in_progress
+status: done
 tags: []
 title: Summarize changes to properties omitted from detailed diff tables
-updated_at: "2026-09-10T04:10:04Z"
+updated_at: "2026-09-10T04:31:05Z"
 ---
 ## User request
 After the other diff tables, show a summary table for changed properties that are not represented in those detailed tables, such as lightmap quality and is flying. List how many changes occurred for each such property; omit the summary when there are none.
