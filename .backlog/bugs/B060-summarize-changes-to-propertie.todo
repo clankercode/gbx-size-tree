@@ -1,14 +1,14 @@
 ---
+completed_at: null
 complexity: medium
 created_at: "2026-09-09T07:49:16Z"
 depends_on: []
 estimate_hours: 2
 id: B060
 priority: high
+started_at: null
 status: pending
-tags:
-    - chat-astra
-    - property-summary
+tags: []
 title: Summarize changes to properties omitted from detailed diff tables
 updated_at: "2026-09-09T07:49:16Z"
 ---
@@ -25,3 +25,5 @@ After the other diff tables, show a summary table for changed properties that ar
 
 ## Sequencing
 Newly requested backlog addition while the original 26-ticket batch is running. Keep as its own ticket, not silently inserted into the fixed batch. Coordinate with renderer/comparison ownership when implementing; do not overwrite ongoing work.
+
+Decision: serialize B060 before B061 in one worktree because both extend diff comparison/report models and human/JSON renderers; B060 establishes property-change summary contracts that B061 must preserve.
