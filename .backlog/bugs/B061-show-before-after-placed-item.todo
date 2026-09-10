@@ -1,18 +1,19 @@
 ---
 claimed_at: "2026-09-10T04:10:04Z"
 claimed_by: cli-user
-completed_at: null
+completed_at: "2026-09-10T04:31:05Z"
 complexity: medium
 created_at: "2026-09-09T08:11:09Z"
 depends_on: []
+duration_minutes: 21.02691441945
 estimate_hours: 2
 id: B061
 priority: high
 started_at: "2026-09-10T04:10:04Z"
-status: in_progress
+status: done
 tags: []
 title: Show before/after placed-item usage counts for embedded files
-updated_at: "2026-09-10T04:10:04Z"
+updated_at: "2026-09-10T04:31:05Z"
 ---
 ## User request
 For embedded files, particularly removals, show the number of items in the map dependent on each file before and after the change. Highlight zero-use embedded assets so users can distinguish unused-file cleanup from removing assets still referenced by placed items.
