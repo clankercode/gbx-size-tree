@@ -1,14 +1,14 @@
 ---
+completed_at: null
 complexity: medium
 created_at: "2026-09-09T08:11:09Z"
 depends_on: []
 estimate_hours: 2
 id: B061
 priority: high
+started_at: null
 status: pending
-tags:
-    - chat-astra
-    - embedded-usage
+tags: []
 title: Show before/after placed-item usage counts for embedded files
 updated_at: "2026-09-09T08:11:09Z"
 ---
@@ -25,3 +25,5 @@ For embedded files, particularly removals, show the number of items in the map d
 
 ## Sequencing
 Backlog addition requested during the fixed 26-ticket batch; preserve as a separate pending bug, not automatic expansion of that implementation batch.
+
+Decision: implement after B060 in the same worktree because both touch shared diff comparison/report models and renderers; validate B061 against the landed B060 contracts.
