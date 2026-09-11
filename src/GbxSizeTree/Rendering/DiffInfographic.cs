@@ -53,13 +53,13 @@ public static class DiffInfographic
             finiteChanges.Length - plotted.Length, invalidChanges, unpositionedChanges,
             finiteContext.Length - sampledContext.Length, invalidContext);
 
-        var sectionContent = new List<(string Id, string Title, IReadOnlyList<string> Lines)>();
+        var sectionContent = new List<(string Id, string Title, IReadOnlyList<DiffInfographicSectionLine> Lines)>();
         var highlights = Highlights(report);
         if (highlights.Count > 0) sectionContent.Add(("embedded-highlights", "Embedded highlights", highlights));
         var properties = Properties(report);
         if (properties.Count > 0) sectionContent.Add(("deep-properties", $"Deep properties · {detailCounts.DeepProperties:N0}", properties));
         var warnings = Warnings(report, spatial).ToArray();
-        if (warnings.Length > 0) sectionContent.Add(("coverage", "Coverage notes", warnings));
+        if (warnings.Length > 0) sectionContent.Add(("coverage", "Coverage notes", warnings.Select(x => new DiffInfographicSectionLine(x)).ToArray()));
         var metadata = Metadata(report);
         if (metadata.Count > 0) sectionContent.Add(("metadata", $"Metadata · {detailCounts.Metadata:N0}", metadata));
         var chunks = Chunks(report);
@@ -195,9 +195,9 @@ public static class DiffInfographic
         }
     }
 
-    private static IReadOnlyList<string> Highlights(DiffReport report)
+    private static IReadOnlyList<DiffInfographicSectionLine> Highlights(DiffReport report)
     {
-        var lines = new List<string>();
+        var lines = new List<DiffInfographicSectionLine>();
         var ranked = report.Embedded.Select(c =>
         {
             var value = c.Right ?? c.Left!;
@@ -208,7 +208,7 @@ public static class DiffInfographic
                 : $"ZIP {DiffInfographicText.Bytes(value.Compressed)}";
             return (Rank: Math.Abs((double)delta), Text: $"{kind} {value.Path}  ·  {detail}");
         }).OrderByDescending(x => x.Rank).ThenBy(x => x.Text, StringComparer.Ordinal).ToArray();
-        lines.AddRange(ranked.Select(x => x.Text));
+        lines.AddRange(ranked.Select(x => new DiffInfographicSectionLine(x.Text)));
 
         var highlightedPaths = new HashSet<string>(report.Embedded.Select(x => (x.Right ?? x.Left)!.Path), StringComparer.Ordinal);
         foreach (var contribution in report.EmbeddedContributions)
@@ -238,10 +238,10 @@ public static class DiffInfographic
         return LimitLines(lines, MaxHighlightLines, "embedded highlight", note);
     }
 
-    private static IReadOnlyList<string> Properties(DiffReport report)
+    private static IReadOnlyList<DiffInfographicSectionLine> Properties(DiffReport report)
     {
         var rows = report.EmbeddedPropertyChanges.SelectMany(entry => entry.Properties.Changes.Select(change =>
-            $"{entry.Path} › {change.Path}: {Property(change.Left)} to {Property(change.Right)}")).ToList();
+            new DiffInfographicSectionLine($"{entry.Path} › {change.Path}: {Property(change.Left)} to {Property(change.Right)}"))).ToList();
         var issues = report.EmbeddedPropertyChanges.Sum(x => x.Properties.LeftIssues.Count + x.Properties.RightIssues.Count);
         var note = issues > 0
             ? $"WARNING · {issues:N0} opaque or partial-coverage diagnostic{(issues == 1 ? "" : "s")}; content hashes still prove the entries changed."
@@ -266,29 +266,29 @@ public static class DiffInfographic
         }
     }
 
-    private static IReadOnlyList<string> Metadata(DiffReport report)
+    private static IReadOnlyList<DiffInfographicSectionLine> Metadata(DiffReport report)
     {
         var rows = MetadataEntries(report).Select(row =>
         {
             var marker = row.Left is null ? "+" : row.Right is null ? "−" : "~";
             var value = row.Left is null ? row.Right! : row.Right is null ? row.Left : $"{row.Left} to {row.Right}";
-            return $"{marker} {row.Label}: {value}";
+            return new DiffInfographicSectionLine($"{marker} {row.Label}: {value}", Mono: true);
         }).ToArray();
         return LimitLines(rows, MaxMetadataLines, "metadata change");
     }
 
-    private static IReadOnlyList<string> Chunks(DiffReport report)
+    private static IReadOnlyList<DiffInfographicSectionLine> Chunks(DiffReport report)
     {
         var rows = report.Chunks.Select(chunk =>
         {
             var marker = chunk.Left is null ? "+" : chunk.Right is null ? "−" : "~";
             var value = chunk.Left is null ? chunk.Right! : chunk.Right is null ? chunk.Left : $"{chunk.Left} to {chunk.Right}";
-            return $"{marker} {chunk.Key ?? "chunk"}: {value}";
+            return new DiffInfographicSectionLine($"{marker} {chunk.Key ?? "chunk"}: {value}");
         }).ToArray();
         return LimitLines(rows, MaxChunkLines, "chunk observation");
     }
 
-    private static IReadOnlyList<string> LimitLines(IReadOnlyList<string> details, int limit, string description, string? finalNote = null)
+    private static IReadOnlyList<DiffInfographicSectionLine> LimitLines(IReadOnlyList<DiffInfographicSectionLine> details, int limit, string description, string? finalNote = null)
     {
         var detailLimit = limit - (finalNote is null ? 0 : 1);
         var visible = details.Take(detailLimit).ToList();

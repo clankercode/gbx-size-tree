@@ -28,7 +28,12 @@ public sealed record DiffInfographicSpatialScene(
     string RangeLabel,
     string CoverageLabel);
 
-public sealed record DiffInfographicSection(string Id, string Title, IReadOnlyList<string> Lines, int Left, int Top, int Right, int Bottom);
+public sealed record DiffInfographicSectionLine(string Text, bool Mono = false)
+{
+    public static implicit operator DiffInfographicSectionLine(string text) => new(text);
+}
+
+public sealed record DiffInfographicSection(string Id, string Title, IReadOnlyList<DiffInfographicSectionLine> Lines, int Left, int Top, int Right, int Bottom);
 
 public sealed record DiffInfographicScene(
     int Width,

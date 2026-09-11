@@ -53,15 +53,15 @@ internal static class DiffInfographicPainter
 
     private static Font FitFont(string text, float maxSize, float minSize, float maxWidth)
     {
-        var maxFont = DiffInfographicFonts.Bold(maxSize);
+        var maxFont = DiffInfographicFonts.MonoBold(maxSize);
         var measuredBounds = TextMeasurer.MeasureBounds(text, new TextOptions(maxFont));
         var measuredWidth = measuredBounds.X + measuredBounds.Width;
         if (measuredWidth <= maxWidth) return maxFont;
         var fittedSize = Math.Max(minSize, maxSize * maxWidth / measuredWidth);
-        var fittedFont = DiffInfographicFonts.Bold(fittedSize);
+        var fittedFont = DiffInfographicFonts.MonoBold(fittedSize);
         var fittedBounds = TextMeasurer.MeasureBounds(text, new TextOptions(fittedFont));
         if (fittedBounds.X + fittedBounds.Width <= maxWidth) return fittedFont;
-        return DiffInfographicFonts.Bold(Math.Max(minSize, fittedSize * maxWidth / (fittedBounds.X + fittedBounds.Width)));
+        return DiffInfographicFonts.MonoBold(Math.Max(minSize, fittedSize * maxWidth / (fittedBounds.X + fittedBounds.Width)));
     }
 
     private static void DrawHero(IImageProcessingContext c, DiffInfographicScene scene)
@@ -86,7 +86,7 @@ internal static class DiffInfographicPainter
         c.Fill(accent, Rounded(x, y, 74, 34, 17));
         c.DrawText(label, DiffInfographicFonts.Bold(16), Background, new PointF(x + 19, y + 7));
         c.DrawText(DiffInfographicText.Fit(name, DiffInfographicFonts.Bold(30), 520), DiffInfographicFonts.Bold(30), Text, new PointF(x + 92, y - 2));
-        c.DrawText(size, DiffInfographicFonts.Regular(21), Muted, new PointF(x + 92, y + 40));
+        c.DrawText(size, DiffInfographicFonts.Mono(21), Muted, new PointF(x + 92, y + 40));
     }
 
     private static void DrawCounts(IImageProcessingContext c, DiffInfographicScene scene)
@@ -103,7 +103,7 @@ internal static class DiffInfographicPainter
         c.Draw(PanelEdge, 2, Rounded(x, y, 380, 132, 22));
         c.Fill(color, new EllipsePolygon(x + 58, y + 65, 31));
         c.DrawText(mark, DiffInfographicFonts.Bold(35), Background, new PointF(x + 47, y + 42));
-        c.DrawText(count.ToString("N0"), DiffInfographicFonts.Bold(48), Text, new PointF(x + 110, y + 23));
+        c.DrawText(count.ToString("N0"), DiffInfographicFonts.MonoBold(48), Text, new PointF(x + 110, y + 23));
         c.DrawText(label, DiffInfographicFonts.Bold(16), color, new PointF(x + 113, y + 80));
     }
 
@@ -151,8 +151,8 @@ internal static class DiffInfographicPainter
 
     private static void DrawInlineSpatialFooter(IImageProcessingContext c, DiffInfographicScene scene, float x, float y, float width)
     {
-        var rangeFont = DiffInfographicFonts.Regular(15);
-        var coverageFont = DiffInfographicFonts.Bold(15);
+        var rangeFont = DiffInfographicFonts.Mono(15);
+        var coverageFont = DiffInfographicFonts.MonoBold(15);
         var coverage = SpatialFooterLabel(scene);
         var coverageWidth = TextMeasurer.MeasureAdvance(coverage, new TextOptions(coverageFont)).Width;
         var maxRangeWidth = Math.Max(80, width - coverageWidth - 32);
@@ -181,12 +181,13 @@ internal static class DiffInfographicPainter
             foreach (var line in section.Lines)
             {
                 if (top + 42 > section.Bottom) break;
-                var markerColor = line.StartsWith('+') ? Added : line.StartsWith('−') ? Removed : line.StartsWith("WARNING", StringComparison.Ordinal) ? Changed : Text;
+                var markerColor = line.Text.StartsWith('+') ? Added : line.Text.StartsWith('−') ? Removed : line.Text.StartsWith("WARNING", StringComparison.Ordinal) ? Changed : Text;
+                var font = line.Mono ? DiffInfographicFonts.Mono(17) : DiffInfographicFonts.Regular(18);
                 c.Fill(markerColor, new EllipsePolygon(section.Left + 41, top + 10, 3));
-                var wrapped = DiffInfographicText.Wrap(line, DiffInfographicFonts.Regular(18), section.Right - section.Left - 100, 2);
+                var wrapped = DiffInfographicText.Wrap(line.Text, font, section.Right - section.Left - 100, 2);
                 foreach (var row in wrapped)
                 {
-                    c.DrawText(row, DiffInfographicFonts.Regular(18), Text, new PointF(section.Left + 60, top));
+                    c.DrawText(row, font, Text, new PointF(section.Left + 60, top));
                     top += 23;
                 }
                 top += 12;

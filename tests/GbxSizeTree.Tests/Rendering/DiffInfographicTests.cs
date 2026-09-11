@@ -73,8 +73,8 @@ public sealed class DiffInfographicTests
         var highlights = Assert.Single(scene.Sections, x => x.Id == "embedded-highlights");
 
         Assert.Equal(5, highlights.Lines.Count);
-        Assert.Equal("+ 19 more embedded highlights omitted", highlights.Lines[^2]);
-        Assert.Equal("Marginal measurements are non-additive; 22 unavailable contribution sides: unavailable-0", highlights.Lines[^1]);
+        Assert.Equal("+ 19 more embedded highlights omitted", highlights.Lines[^2].Text);
+        Assert.Equal("Marginal measurements are non-additive; 22 unavailable contribution sides: unavailable-0", highlights.Lines[^1].Text);
     }
 
     [Fact]
@@ -87,8 +87,8 @@ public sealed class DiffInfographicTests
         var highlights = Assert.Single(scene.Sections, x => x.Id == "embedded-highlights");
 
         Assert.Equal(5, highlights.Lines.Count);
-        Assert.Equal("+ 2 more embedded highlights omitted", highlights.Lines[^2]);
-        Assert.Equal("Marginal measurements are non-additive; 2 unavailable contribution sides: left unavailable", highlights.Lines[^1]);
+        Assert.Equal("+ 2 more embedded highlights omitted", highlights.Lines[^2].Text);
+        Assert.Equal("Marginal measurements are non-additive; 2 unavailable contribution sides: left unavailable", highlights.Lines[^1].Text);
     }
 
     [Fact]
@@ -105,8 +105,8 @@ public sealed class DiffInfographicTests
         var properties = Assert.Single(scene.Sections, x => x.Id == "deep-properties");
 
         Assert.Equal(5, properties.Lines.Count);
-        Assert.Equal("+ 3 more deep-property details omitted", properties.Lines[^2]);
-        Assert.Equal("WARNING · 2 opaque or partial-coverage diagnostics; content hashes still prove the entries changed.", properties.Lines[^1]);
+        Assert.Equal("+ 3 more deep-property details omitted", properties.Lines[^2].Text);
+        Assert.Equal("WARNING · 2 opaque or partial-coverage diagnostics; content hashes still prove the entries changed.", properties.Lines[^1].Text);
     }
 
     [Fact]
@@ -136,11 +136,11 @@ public sealed class DiffInfographicTests
         Assert.InRange(scene.Height, 2100, DiffInfographic.MaximumHeight);
         Assert.All(detailSections, section => Assert.True(section.Top + 66 + section.Lines.Count * 57 <= section.Bottom));
         Assert.All(detailSections, section => Assert.True(section.Bottom <= scene.Height - 36));
-        Assert.Contains("+ 4 more embedded highlights omitted", Assert.Single(detailSections, x => x.Id == "embedded-highlights").Lines);
-        Assert.Contains("+ 5 more deep-property details omitted", Assert.Single(detailSections, x => x.Id == "deep-properties").Lines);
-        Assert.Contains("+ 4 more metadata changes omitted", Assert.Single(detailSections, x => x.Id == "metadata").Lines);
-        Assert.Contains("+ 5 more chunk observations omitted", Assert.Single(detailSections, x => x.Id == "chunks").Lines);
-        Assert.Equal(scene.Warnings, coverage.Lines);
+        Assert.Contains("+ 4 more embedded highlights omitted", Assert.Single(detailSections, x => x.Id == "embedded-highlights").Lines.Select(x => x.Text));
+        Assert.Contains("+ 5 more deep-property details omitted", Assert.Single(detailSections, x => x.Id == "deep-properties").Lines.Select(x => x.Text));
+        Assert.Contains("+ 4 more metadata changes omitted", Assert.Single(detailSections, x => x.Id == "metadata").Lines.Select(x => x.Text));
+        Assert.Contains("+ 5 more chunk observations omitted", Assert.Single(detailSections, x => x.Id == "chunks").Lines.Select(x => x.Text));
+        Assert.Equal(scene.Warnings, coverage.Lines.Select(x => x.Text));
         Assert.Equal("Coverage notes: 11 below", DiffInfographicPainter.SpatialFooterLabel(scene));
     }
 
@@ -225,9 +225,10 @@ public sealed class DiffInfographicTests
 
         Assert.Equal(new DiffInfographicCounts(0, 0, 0), scene.Counts);
         Assert.Equal(3, scene.DetailCounts.Metadata);
-        Assert.Contains(metadata.Lines, x => x == "+ custom.added: yes");
-        Assert.Contains(metadata.Lines, x => x == "− custom.removed: yes");
-        Assert.Contains(metadata.Lines, x => x == "~ Password present: False to True");
+        Assert.Contains(metadata.Lines.Select(x => x.Text), x => x == "+ custom.added: yes");
+        Assert.Contains(metadata.Lines.Select(x => x.Text), x => x == "− custom.removed: yes");
+        Assert.Contains(metadata.Lines.Select(x => x.Text), x => x == "~ Password present: False to True");
+        Assert.All(metadata.Lines, x => Assert.True(x.Mono));
     }
 
     [Fact]
@@ -297,8 +298,8 @@ public sealed class DiffInfographicTests
         };
 
         var scene = DiffInfographic.BuildScene(report, "a", "b");
-        var rangeFont = TestFont(15);
-        var coverageFont = TestFont(15, bold: true);
+        var rangeFont = MonoTestFont(15);
+        var coverageFont = MonoTestFont(15, bold: true);
         var fittedCoverage = DiffInfographicText.Fit(scene.Spatial.CoverageLabel, coverageFont, 440);
         var coverageWidth = SixLabors.Fonts.TextMeasurer.MeasureAdvance(fittedCoverage, new SixLabors.Fonts.TextOptions(coverageFont)).Width;
         var fittedRange = DiffInfographicText.Fit(scene.Spatial.RangeLabel, rangeFont, 1200 - coverageWidth - 32);
@@ -307,12 +308,44 @@ public sealed class DiffInfographicTests
         Assert.True(rangeWidth + coverageWidth + 32 <= 1200.5f);
     }
 
-    private static SixLabors.Fonts.Font TestFont(float size, bool bold = false)
+    private static SixLabors.Fonts.Font MonoTestFont(float size, bool bold = false)
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "GbxSizeTree", "Resources", "Fonts", bold
-            ? "AtkinsonHyperlegibleNext-Bold.ttf" : "AtkinsonHyperlegibleNext-Regular.ttf");
+            ? "JetBrainsMono-Bold.ttf" : "JetBrainsMono-Regular.ttf");
         var collection = new SixLabors.Fonts.FontCollection();
         return collection.Add(path).CreateFont(size);
+    }
+
+    [Fact]
+    public void MonoFontResources_AreEmbeddedJetBrainsMono()
+    {
+        Assert.Equal("JetBrains Mono", DiffInfographicFonts.Mono(15).Family.Name);
+        Assert.Equal("JetBrains Mono", DiffInfographicFonts.MonoBold(15).Family.Name);
+    }
+
+    [Fact]
+    public void BuildScene_MetadataLinesAreRenderedMonospace()
+    {
+        var report = Empty() with
+        {
+            MapUid = new("u5byRl2QnqZ6a1e_YumY._6plk", "36ROAOA.O5tyi7744S_L9xyQ1k"),
+            MetadataChanges = [new("editor.version", new(Integer: 100), new(Integer: 101))],
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var metadata = Assert.Single(scene.Sections, x => x.Id == "metadata");
+
+        Assert.NotEmpty(metadata.Lines);
+        Assert.All(metadata.Lines, x => Assert.True(x.Mono));
+    }
+
+    [Fact]
+    public void BuildScene_ProseSectionLinesAreNotMarkedMonospace()
+    {
+        var scene = DiffInfographic.BuildScene(Empty() with { Chunks = [new("old", "new", "chunk")] }, "a", "b");
+        var chunks = Assert.Single(scene.Sections, x => x.Id == "chunks");
+
+        Assert.All(chunks.Lines, x => Assert.False(x.Mono));
     }
 
     [Fact]
@@ -329,7 +362,7 @@ public sealed class DiffInfographicTests
         };
 
         var scene = DiffInfographic.BuildScene(report, "a", "b");
-        var allText = string.Join('\n', scene.Sections.SelectMany(x => x.Lines));
+        var allText = string.Join('\n', scene.Sections.SelectMany(x => x.Lines.Select(line => line.Text)));
 
         Assert.DoesNotContain("Scale", allText, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("13", allText);
@@ -359,7 +392,7 @@ public sealed class DiffInfographicTests
         var metadata = Assert.Single(scene.Sections, x => x.Id == "metadata");
 
         Assert.Equal(1, scene.DetailCounts.Metadata);
-        Assert.Equal("~ map.name: Before to After", Assert.Single(metadata.Lines));
+        Assert.Equal("~ map.name: Before to After", Assert.Single(metadata.Lines).Text);
     }
 
     [Fact]
@@ -377,7 +410,7 @@ public sealed class DiffInfographicTests
         Assert.Equal(2, scene.DetailCounts.Metadata);
         Assert.Equal(new DiffInfographicCounts(0, 0, 0), scene.Counts);
         Assert.Equal(2, metadata.Lines.Count);
-        Assert.Single(metadata.Lines, x => x.StartsWith("~ Map name:", StringComparison.Ordinal));
+        Assert.Single(metadata.Lines, x => x.Text.StartsWith("~ Map name:", StringComparison.Ordinal));
     }
 
     [Fact]
