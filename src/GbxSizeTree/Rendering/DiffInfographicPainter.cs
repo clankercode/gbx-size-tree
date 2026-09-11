@@ -347,17 +347,18 @@ internal static class DiffInfographicPainter
             if (section.Table is { Rows.Count: > 0 } table) top = DrawTable(c, section, table, top);
             foreach (var line in section.Lines)
             {
-                if (top + DiffInfographicLayout.LineHeight > section.Bottom) break;
+                var wrapped = DiffInfographicLayout.WrapLine(line, section.Right - section.Left);
+                var lineHeight = DiffInfographicLayout.LineBlockHeight(wrapped.Count);
+                if (top + lineHeight > section.Bottom - DiffInfographicLayout.SectionBottomPadding) break;
                 var markerColor = line.Text.StartsWith('+') ? Added : line.Text.StartsWith('−') ? Removed : line.Text.StartsWith("WARNING", StringComparison.Ordinal) ? Changed : Text;
-                var font = line.Mono ? DiffInfographicFonts.Mono(17) : DiffInfographicFonts.Regular(18);
+                var font = DiffInfographicLayout.LineFont(line);
                 c.Fill(markerColor, new EllipsePolygon(section.Left + 41, top + 10, 3));
-                var wrapped = DiffInfographicText.Wrap(line.Text, font, section.Right - section.Left - 100, 2);
                 foreach (var row in wrapped)
                 {
                     c.DrawText(row, font, Text, new PointF(section.Left + 60, top));
-                    top += 23;
+                    top += DiffInfographicLayout.WrappedRowHeight;
                 }
-                top += 12;
+                top += DiffInfographicLayout.LineBottomGap;
             }
         }
     }

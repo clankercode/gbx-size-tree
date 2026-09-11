@@ -92,12 +92,12 @@ public static class DiffInfographic
             var top = fullWidth ? Math.Max(columnTops[0], columnTops[1]) : columnTops[column];
             var left = fullWidth ? 70 : column == 0 ? 70 : 710;
             var right = fullWidth ? 1330 : left + 620;
-            var requestedBottom = top + DiffInfographicLayout.SectionHeight(content.Lines.Count, content.Table);
+            var requestedBottom = top + DiffInfographicLayout.SectionHeight(content.Lines, content.Table, right - left);
             sections.Add(new(content.Id, content.Title, content.Lines, left, top, right, requestedBottom, content.Table));
             if (fullWidth)
-                columnTops[0] = columnTops[1] = requestedBottom + 22;
+                columnTops[0] = columnTops[1] = requestedBottom + DiffInfographicLayout.SectionGap;
             else
-                columnTops[column] = requestedBottom + 22;
+                columnTops[column] = requestedBottom + DiffInfographicLayout.SectionGap;
         }
         var height = Math.Max(Math.Max(columnTops[0], columnTops[1]) + 24, MinimumHeight);
 

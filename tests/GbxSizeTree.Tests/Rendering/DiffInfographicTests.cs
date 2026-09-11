@@ -134,7 +134,7 @@ public sealed class DiffInfographicTests
         Assert.DoesNotContain("omitted", complete.Title, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(complete.Lines, x => x.Text.Contains("omitted", StringComparison.OrdinalIgnoreCase));
         Assert.Equal(
-            DiffInfographicLayout.SectionHeight(0, complete.Table),
+            DiffInfographicLayout.SectionHeight(complete.Lines, complete.Table, complete.Right - complete.Left),
             complete.Bottom - complete.Top);
         Assert.True(complete.Bottom <= scene.Height - 36);
     }
@@ -301,14 +301,12 @@ public sealed class DiffInfographicTests
         var coverage = Assert.Single(detailSections, x => x.Id == "coverage");
 
         Assert.True(scene.Height >= 2100);
-        // Mirrors what the painter consumes: title block, optional table header + 30px rows + gap, 58px per line.
+        // The shared layout mirrors the painter's measured wrapping and table consumption.
         Assert.All(detailSections, section =>
         {
-            var table = section.Table;
-            var consumed = 66 + (table is null ? 0 : 28 + (table.Rows.Count * (table.Density == DiffInfographicTableDensity.Compact ? 24 : 30)) + 12)
-                + (section.Lines.Count * 58);
-            Assert.True(section.Top + consumed <= section.Bottom, $"{section.Id} content does not fit");
-            Assert.Equal(consumed + 22, section.Bottom - section.Top);
+            var expectedHeight = DiffInfographicLayout.SectionHeight(
+                section.Lines, section.Table, section.Right - section.Left);
+            Assert.Equal(expectedHeight, section.Bottom - section.Top);
         });
         Assert.All(detailSections, section => Assert.True(section.Bottom <= scene.Height - 36));
         Assert.Equal(5, Assert.Single(detailSections, x => x.Id == "embedded-highlights").Table!.Rows.Count);
@@ -750,6 +748,71 @@ public sealed class DiffInfographicTests
     }
 
     [Fact]
+    public void BuildScene_CompactsPlacementSummaryToRenderedRowsBeforeFirstPlacementTable()
+    {
+        var names = Enumerable.Range(0, 21).Select(i => $"Placement {i:D2}").ToArray();
+        var report = Empty() with
+        {
+            Blocks = names.Select((name, i) => new ValueChange<BlockSnapshot>(null, Block(name, i * 32, 0))).ToArray(),
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var summary = Assert.Single(scene.Sections, x => x.Id == "placement-summary");
+        var firstPlacementTable = Assert.Single(scene.Sections, x => x.Id == "ordinary-block-changes");
+        var sectionWidth = summary.Right - summary.Left;
+        var renderedRowCounts = summary.Lines
+            .Select(line => DiffInfographicLayout.WrapLine(line, sectionWidth).Count)
+            .ToArray();
+
+        Assert.Equal(21, summary.Lines.Count);
+        Assert.All(renderedRowCounts, count => Assert.Equal(1, count));
+        Assert.Equal(
+            summary.Top + DiffInfographicLayout.SectionHeader
+                + (renderedRowCounts.Sum() * DiffInfographicLayout.WrappedRowHeight)
+                + (summary.Lines.Count * DiffInfographicLayout.LineBottomGap)
+                + DiffInfographicLayout.SectionBottomPadding,
+            summary.Bottom);
+
+        var lastRenderedRowBottom = summary.Top + DiffInfographicLayout.SectionHeader
+            + (renderedRowCounts.Sum() * DiffInfographicLayout.WrappedRowHeight)
+            + ((summary.Lines.Count - 1) * DiffInfographicLayout.LineBottomGap);
+        Assert.Equal(
+            DiffInfographicLayout.LineBottomGap
+                + DiffInfographicLayout.SectionBottomPadding
+                + DiffInfographicLayout.SectionGap,
+            firstPlacementTable.Top - lastRenderedRowBottom);
+    }
+
+    [Fact]
+    public void BuildScene_PlacementSummaryReservesBothRowsForWrappedGroupedName()
+    {
+        var wrappingName = "ZZZ " + string.Join(' ', Enumerable.Repeat("long-placement-name", 24));
+        var report = Empty() with
+        {
+            Blocks =
+            [
+                new(null, Block(wrappingName, 0, 0)),
+                new(null, Block(wrappingName, 32, 0)),
+            ],
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var summary = Assert.Single(scene.Sections, x => x.Id == "placement-summary");
+        var firstPlacementTable = Assert.Single(scene.Sections, x => x.Id == "ordinary-block-changes");
+        var line = Assert.Single(summary.Lines);
+        var wrappedRows = DiffInfographicLayout.WrapLine(line, summary.Right - summary.Left);
+
+        Assert.StartsWith("+ 2x ZZZ", line.Text, StringComparison.Ordinal);
+        Assert.Equal(2, wrappedRows.Count);
+        Assert.Equal(
+            DiffInfographicLayout.SectionHeader
+                + DiffInfographicLayout.LineBlockHeight(wrappedRows.Count)
+                + DiffInfographicLayout.SectionBottomPadding,
+            summary.Bottom - summary.Top);
+        Assert.Equal(summary.Bottom + DiffInfographicLayout.SectionGap, firstPlacementTable.Top);
+    }
+
+    [Fact]
     public void BuildScene_ListsEveryAddedAndRemovedPlacementInSeparateSpatiallyOrderedTables()
     {
         var ordinaryModified = new ValueChange<BlockSnapshot>(
@@ -865,7 +928,9 @@ public sealed class DiffInfographicTests
             Assert.Equal(1330, section.Right);
             Assert.InRange(section.Table!.Rows.Count, 1, 300);
             Assert.Equal(DiffInfographicTableDensity.Compact, section.Table.Density);
-            Assert.Equal(DiffInfographicLayout.SectionHeight(0, section.Table), section.Bottom - section.Top);
+            Assert.Equal(
+                DiffInfographicLayout.SectionHeight(section.Lines, section.Table, section.Right - section.Left),
+                section.Bottom - section.Top);
             Assert.True(section.Bottom <= scene.Height - 36);
         });
         Assert.Equal(633, rows.Length);
