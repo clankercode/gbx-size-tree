@@ -1,0 +1,14 @@
+---
+complexity: low
+created_at: "2026-09-11T04:09:53Z"
+depends_on:
+    - B073
+estimate_hours: 1
+id: B073
+priority: medium
+status: pending
+tags: []
+title: 'Infographic: grouped per-name summaries of added/removed blocks and items'
+updated_at: "2026-09-11T04:09:53Z"
+---
+Above the full added/removed block and item lists (see sibling task), add summary lines grouped by block/item name, e.g.:\n\n  + 5x PlatformTechInvisible\n  - 2x Items/BF2/speq/bf2 special.Item.Gbx\n\nPurpose: make stray/odd-one-out placements obvious at a glance (an isolated '+1x <name>' line stands out), complementing the XZ zoom plot. Use counts x name format, monospace numbers, +/- coloring consistent with the rest of the infographic.
