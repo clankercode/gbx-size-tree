@@ -1,4 +1,6 @@
 ---
+claimed_at: "2026-09-11T06:06:38Z"
+claimed_by: cli-user
 completed_at: null
 complexity: medium
 created_at: "2026-09-11T04:09:13Z"
@@ -6,11 +8,11 @@ depends_on: []
 estimate_hours: 1
 id: B069
 priority: medium
-started_at: null
-status: pending
+started_at: "2026-09-11T06:06:38Z"
+status: in_progress
 tags: []
 title: 'Embedded highlights: real highlights as sorted table (name order, omit ZIP, elided paths, colored size delta)'
-updated_at: "2026-09-11T04:09:13Z"
+updated_at: "2026-09-11T06:06:38Z"
 ---
 Embedded highlights on the infographic are currently arbitrary entries (e.g. '+14 more embedded highlights omitted'). Make them actual highlights: pick the most relevant changed embedded items (largest absolute size delta, or by importance), not just the first/random ones. Lay them out as a table with columns: +/-, Path (elide folder names with ellipsis when too long, e.g. Items/.../bf2 Item.Gbx), Size change. Omit the 'ZIP' marker/extension since effectively everything is a ZIP. Use faint green/red coloring on the size-change column to indicate add/remove. Sort rows by name.
 
