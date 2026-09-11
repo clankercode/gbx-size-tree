@@ -1,13 +1,17 @@
 ---
+claimed_at: "2026-09-11T04:15:22Z"
+claimed_by: cli-user
+completed_at: null
 complexity: low
 created_at: "2026-09-11T04:09:42Z"
 depends_on: []
 estimate_hours: 1
 id: B072
 priority: medium
-status: pending
+started_at: "2026-09-11T04:15:22Z"
+status: in_progress
 tags: []
 title: Use monospace typography for numbers, author logins, map UIDs and similar values
-updated_at: "2026-09-11T04:09:42Z"
+updated_at: "2026-09-11T04:15:22Z"
 ---
 All numeric values, author logins, map UIDs, coordinates, sizes and similar identifier-like values on the infographic should render in a monospace font. Font preference: JetBrains Mono first, then fallback to other good-looking monospace fonts before falling back to generic system monospace (e.g. 'JetBrains Mono', 'Cascadia Code', 'Fira Code', 'SF Mono', 'Consolas', monospace). Ensure figures align in tables so +/- comparisons are easy to scan.

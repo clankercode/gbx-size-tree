@@ -1,13 +1,17 @@
 ---
+claimed_at: "2026-09-11T04:15:22Z"
+claimed_by: cli-user
+completed_at: null
 complexity: low
 created_at: "2026-09-11T04:09:33Z"
 depends_on: []
 estimate_hours: 1
 id: B071
 priority: medium
-status: pending
+started_at: "2026-09-11T04:15:22Z"
+status: in_progress
 tags: []
 title: 'Metadata delta: show all main info with old/new left-aligned monospace pairs'
-updated_at: "2026-09-11T04:09:33Z"
+updated_at: "2026-09-11T04:15:22Z"
 ---
 The METADATA section currently omits most changes ('+16 more metadata changes omitted') and renders long values inline mid-sentence. Show all main metadata info. For values like map UID and author login (and other long identifiers), format each as old and new on separate lines aligned on the left, in a monospace font, e.g.:\n\n  - Map UID: u5byRl2QnqZ6a1e_YumY._6plk\n  + Map UID: 36ROAOA.O5tyi7744S_L9xyQ1k\n\nso old/new can be compared visually. Same alignment pattern for author login, author name, map name, and any other long string values.
