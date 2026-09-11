@@ -1,19 +1,20 @@
 ---
 claimed_at: "2026-09-11T06:47:34Z"
 claimed_by: cli-user
-completed_at: null
+completed_at: "2026-09-11T08:04:41Z"
 complexity: low
 created_at: "2026-09-11T04:09:20Z"
 depends_on:
     - B069
+duration_minutes: 77.1208424208
 estimate_hours: 1
 id: B070
 priority: medium
 started_at: "2026-09-11T06:47:34Z"
-status: in_progress
+status: done
 tags: []
 title: 'Embedded changes: full list section at smaller font'
-updated_at: "2026-09-11T06:47:34Z"
+updated_at: "2026-09-11T08:04:41Z"
 ---
 In addition to the embedded highlights table, add a complete list of ALL embedded changes on the infographic, rendered at a slightly smaller font so everything fits. This complements B069 (highlights) - the highlights draw attention, the full list guarantees nothing is hidden behind 'N more omitted'. Keep rows compact; same +/-/path/size-change conventions as the highlights table.
 
