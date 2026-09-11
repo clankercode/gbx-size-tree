@@ -17,3 +17,5 @@ updated_at: "2026-09-11T04:15:22Z"
 Above the full added/removed block and item lists (see sibling task), add summary lines grouped by block/item name, e.g.:\n\n  + 5x PlatformTechInvisible\n  - 2x Items/BF2/speq/bf2 special.Item.Gbx\n\nPurpose: make stray/odd-one-out placements obvious at a glance (an isolated '+1x <name>' line stands out), complementing the XZ zoom plot. Use counts x name format, monospace numbers, +/- coloring consistent with the rest of the infographic.
 
 Lane plan: last in the serial infographic lane B072 -> B071 -> B067 -> B073. Standalone section until B074 lands; B074 will move it above the full lists.
+
+Decision (2026-09-11): included modified placements as '~ Nx name' lines (grouping by kind+name made it trivial); summary is a standalone section in the two-column detail balancing after chunk observations (B074 will relocate it); removed marker uses the typographic minus (U+2212) consistent with the rest of the infographic; lines render fully in JetBrains Mono.
