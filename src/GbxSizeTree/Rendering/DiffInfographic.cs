@@ -13,12 +13,10 @@ public static class DiffInfographic
 {
     public const int Width = 1400;
     public const int MinimumHeight = 900;
-    public const int MaximumHeight = 2200;
     private const int MaxSpatialChanges = 400;
     private const int MaxSpatialContext = 900;
     private const int MaxHighlightLines = 5;
     private const int MaxPropertyLines = 5;
-    private const int MaxMetadataLines = 5;
     private const int MaxChunkLines = 4;
 
     public static Image<Rgba32> Render(DiffReport report, string oldPath, string newPath)
@@ -80,7 +78,7 @@ public static class DiffInfographic
             sections.Add(new(content.Id, content.Title, content.Lines, left, columnTops[column], left + 620, requestedBottom));
             columnTops[column] = requestedBottom + 22;
         }
-        var height = Math.Clamp(Math.Max(columnTops[0], columnTops[1]) + 24, MinimumHeight, MaximumHeight);
+        var height = Math.Max(Math.Max(columnTops[0], columnTops[1]) + 24, MinimumHeight);
 
         return new DiffInfographicScene(Width, height,
             DiffInfographicText.FileName(oldPath), DiffInfographicText.FileName(newPath),
@@ -268,13 +266,23 @@ public static class DiffInfographic
 
     private static IReadOnlyList<DiffInfographicSectionLine> Metadata(DiffReport report)
     {
-        var rows = MetadataEntries(report).Select(row =>
+        var rows = new List<DiffInfographicSectionLine>();
+        foreach (var row in MetadataEntries(report))
         {
-            var marker = row.Left is null ? "+" : row.Right is null ? "−" : "~";
-            var value = row.Left is null ? row.Right! : row.Right is null ? row.Left : $"{row.Left} to {row.Right}";
-            return new DiffInfographicSectionLine($"{marker} {row.Label}: {value}", Mono: true);
-        }).ToArray();
-        return LimitLines(rows, MaxMetadataLines, "metadata change");
+            if (row.Left is not null && row.Right is not null)
+            {
+                rows.Add($"~ {row.Label}");
+                rows.Add(new DiffInfographicSectionLine($"- {row.Left}", Mono: true));
+                rows.Add(new DiffInfographicSectionLine($"+ {row.Right}", Mono: true));
+            }
+            else
+            {
+                var marker = row.Left is null ? "+" : "−";
+                var value = row.Left is null ? row.Right! : row.Left;
+                rows.Add(new DiffInfographicSectionLine($"{marker} {row.Label}: {value}", Mono: true));
+            }
+        }
+        return rows;
     }
 
     private static IReadOnlyList<DiffInfographicSectionLine> Chunks(DiffReport report)
