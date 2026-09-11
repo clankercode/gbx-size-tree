@@ -194,7 +194,7 @@ internal static class DiffInfographicPainter
             var top = section.Top + 66;
             foreach (var line in section.Lines)
             {
-                if (top + 42 > section.Bottom) break;
+                if (top + 58 > section.Bottom) break;
                 var markerColor = line.Text.StartsWith('+') ? Added : line.Text.StartsWith('−') ? Removed : line.Text.StartsWith("WARNING", StringComparison.Ordinal) ? Changed : Text;
                 var font = line.Mono ? DiffInfographicFonts.Mono(17) : DiffInfographicFonts.Regular(18);
                 c.Fill(markerColor, new EllipsePolygon(section.Left + 41, top + 10, 3));

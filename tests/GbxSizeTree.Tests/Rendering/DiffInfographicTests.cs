@@ -234,7 +234,7 @@ public sealed class DiffInfographicTests
         Assert.Contains(metadata.Lines.Select(x => x.Text), x => x == "+ custom.added: yes");
         Assert.Contains(metadata.Lines.Select(x => x.Text), x => x == "− custom.removed: yes");
         Assert.Contains(metadata.Lines.Select(x => x.Text), x => x == "~ Password present");
-        Assert.Contains(metadata.Lines.Select(x => x.Text), x => x == "- False");
+        Assert.Contains(metadata.Lines.Select(x => x.Text), x => x == "− False");
         Assert.Contains(metadata.Lines.Select(x => x.Text), x => x == "+ True");
         Assert.All(metadata.Lines, x => Assert.Equal(x.Text.StartsWith('~'), !x.Mono));
     }
@@ -344,7 +344,7 @@ public sealed class DiffInfographicTests
         var metadata = Assert.Single(scene.Sections, x => x.Id == "metadata");
 
         Assert.Equal(
-            ["~ Map UID", "- u5byRl2QnqZ6a1e_YumY._6plk", "+ 36ROAOA.O5tyi7744S_L9xyQ1k", "~ editor.version", "- 100", "+ 101"],
+            ["~ Map UID", "− u5byRl2QnqZ6a1e_YumY._6plk", "+ 36ROAOA.O5tyi7744S_L9xyQ1k", "~ editor.version", "− 100", "+ 101"],
             metadata.Lines.Select(x => x.Text));
         Assert.False(metadata.Lines[0].Mono);
         Assert.True(metadata.Lines[1].Mono);
@@ -448,7 +448,7 @@ public sealed class DiffInfographicTests
         var metadata = Assert.Single(scene.Sections, x => x.Id == "metadata");
 
         Assert.Equal(1, scene.DetailCounts.Metadata);
-        Assert.Equal(["~ map.name", "- Before", "+ After"], metadata.Lines.Select(x => x.Text));
+        Assert.Equal(["~ map.name", "− Before", "+ After"], metadata.Lines.Select(x => x.Text));
     }
 
     [Fact]

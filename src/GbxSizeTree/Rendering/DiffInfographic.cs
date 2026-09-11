@@ -77,7 +77,7 @@ public static class DiffInfographic
         {
             var column = columnTops[0] <= columnTops[1] ? 0 : 1;
             var left = column == 0 ? 70 : 710;
-            var requestedBottom = columnTops[column] + 88 + Math.Max(1, content.Lines.Count) * 57;
+            var requestedBottom = columnTops[column] + 88 + Math.Max(1, content.Lines.Count) * 58;
             sections.Add(new(content.Id, content.Title, content.Lines, left, columnTops[column], left + 620, requestedBottom));
             columnTops[column] = requestedBottom + 22;
         }
@@ -278,7 +278,7 @@ public static class DiffInfographic
             if (row.Left is not null && row.Right is not null)
             {
                 rows.Add($"~ {row.Label}");
-                rows.Add(new DiffInfographicSectionLine($"- {row.Left}", Mono: true));
+                rows.Add(new DiffInfographicSectionLine($"− {row.Left}", Mono: true));
                 rows.Add(new DiffInfographicSectionLine($"+ {row.Right}", Mono: true));
             }
             else
