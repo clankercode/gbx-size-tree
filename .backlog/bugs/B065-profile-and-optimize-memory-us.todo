@@ -1,0 +1,13 @@
+---
+complexity: high
+created_at: "2026-09-11T04:08:28Z"
+depends_on: []
+estimate_hours: 1
+id: B065
+priority: high
+status: pending
+tags: []
+title: Profile and optimize memory usage during map diffing (target <1 GB for super large maps)
+updated_at: "2026-09-11T04:08:28Z"
+---
+Profile memory usage when diffing large maps and optimize so peak RSS stays under 1 GB even for super large maps. Likely needs light memory management: avoid keeping references to old objects alive (event handlers, caches, captured locals) so GC can reclaim between phases, and stream/release intermediate buffers instead of accumulating them. Test map pair: 'Sweet 2 burger v206 -> v207' in ~/Downloads/. Acceptance: measured peak memory for that pair (and a stress case) documented before/after; no functional regressions in diff output.
