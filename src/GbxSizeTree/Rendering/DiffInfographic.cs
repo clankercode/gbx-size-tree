@@ -30,7 +30,8 @@ public static class DiffInfographic
     {
         ArgumentNullException.ThrowIfNull(report);
         var placementChanges = PlacementChanges(report).ToArray();
-        var counts = CountEntities(report, placementChanges);
+        var placements = new DiffInfographicCountGroup("Placements", CountKinds(placementChanges));
+        var embedded = new DiffInfographicCountGroup("Embedded", Count(report.Embedded));
         var detailCounts = new DiffInfographicDetailCounts(
             MetadataEntries(report).Count,
             report.EmbeddedPropertyChanges.Sum(x => x.Properties.Changes.Count),
@@ -83,27 +84,30 @@ public static class DiffInfographic
         return new DiffInfographicScene(Width, height,
             DiffInfographicText.FileName(oldPath), DiffInfographicText.FileName(newPath),
             report.LeftBytes, report.RightBytes, SaturatingSubtract(report.RightBytes, report.LeftBytes),
-            counts, "PLACEMENTS + EMBEDDED", detailCounts, spatial, sections, warnings);
+            placements, embedded, detailCounts, spatial, sections, warnings);
     }
 
-    private static DiffInfographicCounts CountEntities(DiffReport report,
-        IReadOnlyList<(SpatialPosition? Position, DiffInfographicChangeKind Kind, string Label)> placements)
+    private static DiffInfographicCounts CountKinds(
+        IReadOnlyList<(SpatialPosition? Position, DiffInfographicChangeKind Kind, string Label)> changes)
     {
-        var added = placements.Count(x => x.Kind == DiffInfographicChangeKind.Added);
-        var removed = placements.Count(x => x.Kind == DiffInfographicChangeKind.Removed);
-        var changed = placements.Count(x => x.Kind == DiffInfographicChangeKind.Changed);
-        Count(report.Embedded, ref added, ref removed, ref changed);
+        var added = changes.Count(x => x.Kind == DiffInfographicChangeKind.Added);
+        var removed = changes.Count(x => x.Kind == DiffInfographicChangeKind.Removed);
+        var changed = changes.Count(x => x.Kind == DiffInfographicChangeKind.Changed);
         return new(added, removed, changed);
+    }
 
-        static void Count<T>(IEnumerable<ValueChange<T>> values, ref int added, ref int removed, ref int changed) where T : class
+    private static DiffInfographicCounts Count<T>(IEnumerable<ValueChange<T>> values) where T : class
+    {
+        var added = 0;
+        var removed = 0;
+        var changed = 0;
+        foreach (var value in values)
         {
-            foreach (var value in values)
-            {
-                if (value.Left is null) added++;
-                else if (value.Right is null) removed++;
-                else changed++;
-            }
+            if (value.Left is null) added++;
+            else if (value.Right is null) removed++;
+            else changed++;
         }
+        return new(added, removed, changed);
     }
 
     private static IEnumerable<(SpatialPosition? Position, DiffInfographicChangeKind Kind, string Label)> PlacementChanges(DiffReport report)

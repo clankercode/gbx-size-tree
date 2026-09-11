@@ -91,20 +91,34 @@ internal static class DiffInfographicPainter
 
     private static void DrawCounts(IImageProcessingContext c, DiffInfographicScene scene)
     {
-        c.DrawText(scene.CountScopeLabel, DiffInfographicFonts.Bold(14), Muted, new PointF(70, 378));
-        DrawCount(c, 70, 400, "+", scene.Counts.Added, "ADDED", Added);
-        DrawCount(c, 510, 400, "−", scene.Counts.Removed, "REMOVED", Removed);
-        DrawCount(c, 950, 400, "~", scene.Counts.Changed, "MODIFIED", Changed);
+        c.DrawText("EXACT CHANGE COUNTS", DiffInfographicFonts.Bold(14), Muted, new PointF(70, 378));
+        DrawCountGroup(c, 70, scene.Placements);
+        DrawCountGroup(c, 720, scene.Embedded);
+    }
+
+    private static void DrawCountGroup(IImageProcessingContext c, float x, DiffInfographicCountGroup group)
+    {
+        c.DrawText(group.Title.ToUpperInvariant(), DiffInfographicFonts.Bold(14), Muted, new PointF(x, 408));
+        DrawCount(c, x, 434, "+", group.Counts.Added, "ADDED", Added);
+        DrawCount(c, x + 207, 434, "−", group.Counts.Removed, "REMOVED", Removed);
+        DrawCount(c, x + 414, 434, "~", group.Counts.Changed, "MODIFIED", Changed);
     }
 
     private static void DrawCount(IImageProcessingContext c, float x, float y, string mark, int count, string label, Color color)
     {
-        c.Fill(Panel, Rounded(x, y, 380, 132, 22));
-        c.Draw(PanelEdge, 2, Rounded(x, y, 380, 132, 22));
-        c.Fill(color, new EllipsePolygon(x + 58, y + 65, 31));
-        c.DrawText(mark, DiffInfographicFonts.Bold(35), Background, new PointF(x + 47, y + 42));
-        c.DrawText(count.ToString("N0"), DiffInfographicFonts.MonoBold(48), Text, new PointF(x + 110, y + 23));
-        c.DrawText(label, DiffInfographicFonts.Bold(16), color, new PointF(x + 113, y + 80));
+        c.Fill(Panel, Rounded(x, y, 196, 112, 18));
+        c.Draw(PanelEdge, 2, Rounded(x, y, 196, 112, 18));
+        c.Fill(color, new EllipsePolygon(x + 44, y + 56, 24));
+        c.DrawText(mark, DiffInfographicFonts.Bold(26), Background, new PointF(x + 36, y + 41));
+        var countText = count.ToString("N0");
+        var countFont = DiffInfographicFonts.MonoBold(34);
+        var bounds = TextMeasurer.MeasureBounds(countText, new TextOptions(countFont));
+        if (bounds.X + bounds.Width > 108)
+        {
+            countFont = DiffInfographicFonts.MonoBold(Math.Max(14, 34 * 108 / (bounds.X + bounds.Width)));
+        }
+        c.DrawText(countText, countFont, Text, new PointF(x + 80, y + 22));
+        c.DrawText(label, DiffInfographicFonts.Bold(13), color, new PointF(x + 80, y + 68));
     }
 
     private static void DrawSpatial(IImageProcessingContext c, DiffInfographicScene scene)
