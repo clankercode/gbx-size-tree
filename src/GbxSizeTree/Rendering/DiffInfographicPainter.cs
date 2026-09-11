@@ -7,6 +7,14 @@ using SixLabors.ImageSharp.Processing;
 
 namespace GbxSizeTree.Cli.Rendering;
 
+internal readonly record struct InfographicAxisLabel(string Text, Font Font, PointF Origin);
+
+internal readonly record struct InfographicSpatialAxisLabels(
+    InfographicAxisLabel XMinimum,
+    InfographicAxisLabel XMaximum,
+    InfographicAxisLabel ZMinimum,
+    InfographicAxisLabel ZMaximum);
+
 internal static class DiffInfographicPainter
 {
     private static readonly Color Background = Color.ParseHex("09131D");
@@ -25,10 +33,14 @@ internal static class DiffInfographicPainter
     private const float TablePathInset = 64;
     private const float TableRightInset = 28;
     private const float TableColumnGap = 18;
+    private const float SpatialAxisGap = 14;
+    private const float SpatialXAxisLabelGap = 12;
     private const string ChangeMarkerHeader = "+/−";
     private const string SizeChangeHeader = "SIZE CHANGE";
     internal static Font TableFont(DiffInfographicTableDensity density) =>
         DiffInfographicFonts.Mono(density == DiffInfographicTableDensity.Compact ? 14 : 16);
+    internal static Font SpatialAxisFont => DiffInfographicFonts.Mono(14);
+    internal static RectangleF SpatialPlotBounds => new(220, 670, 480, 480);
     private static Font TableHeaderFont(DiffInfographicTableDensity density) =>
         DiffInfographicFonts.Bold(density == DiffInfographicTableDensity.Compact ? 12 : 13);
     internal static Color DetailAccent(string sectionId) =>
@@ -145,53 +157,168 @@ internal static class DiffInfographicPainter
         const float x = 70;
         const float y = 570;
         const float w = 1260;
-        const float h = 420;
+        const float h = 650;
         c.Fill(Panel, Rounded(x, y, w, h, 24));
         c.Draw(PanelEdge, 2, Rounded(x, y, w, h, 24));
         c.DrawText("XZ SPATIAL CONTEXT", DiffInfographicFonts.Bold(23), Text, new PointF(x + 30, y + 25));
-        c.DrawText("Where placement changes land", DiffInfographicFonts.Regular(18), Muted, new PointF(x + 287, y + 31));
+        c.DrawText("Padded viewport around finite placement changes", DiffInfographicFonts.Regular(18), Muted, new PointF(x + 287, y + 31));
         Legend(c, x + 880, y + 33, Added, "added"); Legend(c, x + 1000, y + 33, Removed, "removed"); Legend(c, x + 1140, y + 33, Changed, "modified");
 
-        const float px = x + 30;
-        const float py = y + 78;
-        const float pw = w - 60;
-        const float ph = h - 130;
-        c.Fill(Color.ParseHex("0B1822"), Rounded(px, py, pw, ph, 14));
+        var plot = SpatialPlotBounds;
+        c.Fill(Color.ParseHex("0B1822"), Rounded(plot.X, plot.Y, plot.Width, plot.Height, 14));
         for (var i = 1; i < 6; i++)
         {
-            var gx = px + pw * i / 6;
-            c.Draw(Color.FromRgba(157, 176, 188, 26), 1, new PathBuilder().AddLine(gx, py, gx, py + ph).Build());
-            var gy = py + ph * i / 6;
-            c.Draw(Color.FromRgba(157, 176, 188, 26), 1, new PathBuilder().AddLine(px, gy, px + pw, gy).Build());
+            var gx = plot.X + plot.Width * i / 6;
+            c.Draw(Color.FromRgba(157, 176, 188, 26), 1, new PathBuilder().AddLine(gx, plot.Y, gx, plot.Bottom).Build());
+            var gy = plot.Y + plot.Height * i / 6;
+            c.Draw(Color.FromRgba(157, 176, 188, 26), 1, new PathBuilder().AddLine(plot.X, gy, plot.Right, gy).Build());
         }
-        foreach (var point in scene.Spatial.Context)
-            c.Fill(Color.FromRgba(157, 176, 188, 35), new EllipsePolygon(px + point.X * pw, py + (1 - point.Z) * ph, 2.1f));
-        foreach (var point in scene.Spatial.Changes)
+
+        if (scene.Spatial.Viewport is { } viewport)
         {
-            var color = PointColor(point.Kind);
-            var cx = px + point.X * pw;
-            var cy = py + (1 - point.Z) * ph;
-            c.Fill(Color.FromRgba(color.ToPixel<Rgba32>().R, color.ToPixel<Rgba32>().G, color.ToPixel<Rgba32>().B, 35), new EllipsePolygon(cx, cy, 10));
-            if (point.Kind == DiffInfographicChangeKind.Removed)
+            DrawAxisLabels(c, viewport);
+            foreach (var point in scene.Spatial.Context)
+                DrawContextPoint(c, point, plot);
+            foreach (var point in scene.Spatial.Changes)
             {
-                c.Draw(color, 3, new PathBuilder().AddLine(cx - 5, cy - 5, cx + 5, cy + 5).Build());
-                c.Draw(color, 3, new PathBuilder().AddLine(cx + 5, cy - 5, cx - 5, cy + 5).Build());
+                var color = PointColor(point.Kind);
+                var cx = plot.X + point.X * plot.Width;
+                var cy = plot.Y + (1 - point.Z) * plot.Height;
+                c.Fill(Color.FromRgba(color.ToPixel<Rgba32>().R, color.ToPixel<Rgba32>().G, color.ToPixel<Rgba32>().B, 35), new EllipsePolygon(cx, cy, 10));
+                if (point.Kind == DiffInfographicChangeKind.Removed)
+                {
+                    c.Draw(color, 3, new PathBuilder().AddLine(cx - 5, cy - 5, cx + 5, cy + 5).Build());
+                    c.Draw(color, 3, new PathBuilder().AddLine(cx + 5, cy - 5, cx - 5, cy + 5).Build());
+                }
+                else c.Fill(color, new EllipsePolygon(cx, cy, point.Kind == DiffInfographicChangeKind.Added ? 4 : 5));
             }
-            else c.Fill(color, new EllipsePolygon(cx, cy, point.Kind == DiffInfographicChangeKind.Added ? 4 : 5));
         }
-            DrawInlineSpatialFooter(c, scene, px, py + ph + 17, pw);
+        else
+        {
+            c.DrawText("NO CHANGE VIEWPORT", DiffInfographicFonts.MonoBold(18), Muted, new PointF(plot.X + 119, plot.Y + 206));
+            c.DrawText("No finite positioned changes", DiffInfographicFonts.Regular(16), Muted, new PointF(plot.X + 127, plot.Y + 240));
+        }
+
+        DrawSpatialNotes(c, scene, 750, 684, 530);
     }
 
-    private static void DrawInlineSpatialFooter(IImageProcessingContext c, DiffInfographicScene scene, float x, float y, float width)
+    private static void DrawContextPoint(IImageProcessingContext c, DiffInfographicPoint point, RectangleF plot)
     {
+        var cx = plot.X + point.X * plot.Width;
+        var cy = plot.Y + (1 - point.Z) * plot.Height;
+        if (!point.EdgePinned)
+        {
+            c.Fill(Color.FromRgba(157, 176, 188, 35), new EllipsePolygon(cx, cy, 2.1f));
+            return;
+        }
+
+        // A point centred on an edge loses half its mark, and a corner loses three quarters.
+        // Pull pinned context just inside the plot and give it a ring so clipping stays visible.
+        const float markerRadius = 5;
+        cx = Math.Clamp(cx, plot.Left + markerRadius, plot.Right - markerRadius);
+        cy = Math.Clamp(cy, plot.Top + markerRadius, plot.Bottom - markerRadius);
+        c.Fill(Color.FromRgba(157, 176, 188, 48), new EllipsePolygon(cx, cy, markerRadius));
+        c.Draw(Color.FromRgba(157, 176, 188, 180), 1.5f, new EllipsePolygon(cx, cy, 3));
+    }
+
+    internal static InfographicSpatialAxisLabels MeasureSpatialAxisLabels(DiffInfographicViewport viewport)
+    {
+        var plot = SpatialPlotBounds;
+        var layout = CreateSpatialAxisLabels(viewport, plot, SpatialAxisFont);
+        if (SpatialAxisLabelsFit(layout, plot)) return layout;
+
+        var minimumSize = 1f;
+        var maximumSize = SpatialAxisFont.Size;
+        var fitted = CreateSpatialAxisLabels(viewport, plot, DiffInfographicFonts.Mono(minimumSize));
+        for (var attempt = 0; attempt < 14; attempt++)
+        {
+            var candidateSize = (minimumSize + maximumSize) / 2;
+            var candidate = CreateSpatialAxisLabels(viewport, plot, DiffInfographicFonts.Mono(candidateSize));
+            if (SpatialAxisLabelsFit(candidate, plot))
+            {
+                minimumSize = candidateSize;
+                fitted = candidate;
+            }
+            else
+            {
+                maximumSize = candidateSize;
+            }
+        }
+        return fitted;
+    }
+
+    private static InfographicSpatialAxisLabels CreateSpatialAxisLabels(
+        DiffInfographicViewport viewport, RectangleF plot, Font font)
+    {
+        var zRight = plot.X - SpatialAxisGap;
+        return new(
+            new(viewport.XMinimumLabel, font, new PointF(plot.X, plot.Bottom + SpatialAxisGap)),
+            RightAligned(viewport.XMaximumLabel, font, plot.Right, plot.Bottom + SpatialAxisGap),
+            RightAligned(viewport.ZMinimumLabel, font, zRight, plot.Bottom - 10),
+            RightAligned(viewport.ZMaximumLabel, font, zRight, plot.Y - 8));
+    }
+
+    private static bool SpatialAxisLabelsFit(InfographicSpatialAxisLabels labels, RectangleF plot)
+    {
+        var xMinimum = DrawBounds(labels.XMinimum);
+        var xMaximum = DrawBounds(labels.XMaximum);
+        var zMinimum = DrawBounds(labels.ZMinimum);
+        var zMaximum = DrawBounds(labels.ZMaximum);
+        return xMinimum.Left >= plot.Left && xMinimum.Right <= plot.Right &&
+               xMaximum.Left >= plot.Left && xMaximum.Right <= plot.Right &&
+               xMinimum.Right + SpatialXAxisLabelGap <= xMaximum.Left &&
+               zMinimum.Left >= 0 && zMinimum.Right <= plot.X - SpatialAxisGap &&
+               zMaximum.Left >= 0 && zMaximum.Right <= plot.X - SpatialAxisGap;
+    }
+
+    private static InfographicAxisLabel RightAligned(string text, Font font, float right, float y) =>
+        new(text, font, new PointF(right - TextWidth(text, font), y));
+
+    private static RectangleF DrawBounds(InfographicAxisLabel label)
+    {
+        var measured = TextMeasurer.MeasureBounds(label.Text, new TextOptions(label.Font));
+        return new(label.Origin.X + measured.X, label.Origin.Y + measured.Y, measured.Width, measured.Height);
+    }
+
+    private static void DrawAxisLabels(IImageProcessingContext c, DiffInfographicViewport viewport)
+    {
+        var labels = MeasureSpatialAxisLabels(viewport);
+        Draw(labels.XMinimum);
+        Draw(labels.XMaximum);
+        Draw(labels.ZMinimum);
+        Draw(labels.ZMaximum);
+
+        void Draw(InfographicAxisLabel label) => c.DrawText(label.Text, label.Font, Muted, label.Origin);
+    }
+
+    private static void DrawSpatialNotes(IImageProcessingContext c, DiffInfographicScene scene, float x, float y, float width)
+    {
+        c.DrawText("VIEWPORT", DiffInfographicFonts.Bold(13), Cyan, new PointF(x, y));
         var rangeFont = DiffInfographicFonts.Mono(15);
-        var coverageFont = DiffInfographicFonts.MonoBold(15);
-        var coverage = SpatialFooterLabel(scene);
-        var coverageWidth = TextMeasurer.MeasureAdvance(coverage, new TextOptions(coverageFont)).Width;
-        var maxRangeWidth = Math.Max(80, width - coverageWidth - 32);
-        var range = DiffInfographicText.Fit(scene.Spatial.RangeLabel, rangeFont, maxRangeWidth);
-        c.DrawText(range, rangeFont, Muted, new PointF(x, y));
-        c.DrawText(coverage, coverageFont, Changed, new PointF(x + width - coverageWidth, y));
+        foreach (var line in DiffInfographicText.Wrap(scene.Spatial.RangeLabel, rangeFont, width, 2))
+        {
+            y += 24;
+            c.DrawText(line, rangeFont, Text, new PointF(x, y));
+        }
+        y += 48;
+        c.DrawText("PLOT COVERAGE", DiffInfographicFonts.Bold(13), Cyan, new PointF(x, y));
+        foreach (var line in DiffInfographicText.Wrap(scene.Spatial.CoverageLabel, rangeFont, width, 4))
+        {
+            y += 24;
+            c.DrawText(line, rangeFont, Text, new PointF(x, y));
+        }
+        y += 48;
+        c.DrawText("CONTEXT", DiffInfographicFonts.Bold(13), Cyan, new PointF(x, y));
+        var contextNote = scene.Spatial.Viewport is null
+            ? "Context is not plotted without a finite changed-placement viewport."
+            : "Sampled map context outside this viewport is pinned to its nearest edge.";
+        foreach (var line in DiffInfographicText.Wrap(contextNote, DiffInfographicFonts.Regular(17), width, 3))
+        {
+            y += 26;
+            c.DrawText(line, DiffInfographicFonts.Regular(17), Muted, new PointF(x, y));
+        }
+        y += 54;
+        c.DrawText(SpatialFooterLabel(scene), DiffInfographicFonts.MonoBold(15), Changed, new PointF(x, y));
     }
 
     private static void Legend(IImageProcessingContext c, float x, float y, Color color, string text)
@@ -202,7 +329,7 @@ internal static class DiffInfographicPainter
 
     private static void DrawDetails(IImageProcessingContext c, DiffInfographicScene scene)
     {
-        var detailSections = scene.Sections.Where(x => x.Top >= 1000).ToArray();
+        var detailSections = scene.Sections.Where(x => x.Top >= 1250).ToArray();
         foreach (var section in detailSections)
         {
             var accent = DetailAccent(section.Id);

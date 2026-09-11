@@ -318,7 +318,7 @@ public sealed class DiffInfographicTests
         Assert.DoesNotContain(metadata.Lines.Select(x => x.Text), x => x.Contains("omitted", StringComparison.Ordinal));
         Assert.Contains("+ 5 more chunk observations omitted", Assert.Single(detailSections, x => x.Id == "chunks").Lines.Select(x => x.Text));
         Assert.Equal(scene.Warnings, coverage.Lines.Select(x => x.Text));
-        Assert.Equal("Coverage notes: 11 below", DiffInfographicPainter.SpatialFooterLabel(scene));
+        Assert.Equal("Coverage notes: 10 below", DiffInfographicPainter.SpatialFooterLabel(scene));
     }
 
     [Fact]
@@ -444,6 +444,170 @@ public sealed class DiffInfographicTests
     }
 
     [Fact]
+    public void BuildScene_ViewportUsesEveryFiniteChangeBeforeSamplingAndNeverContext()
+    {
+        var changes = Enumerable.Range(0, 430)
+            .Select(i => new ValueChange<ItemSnapshot>(null, Item($"change-{i}", i == 429 ? 10_000 : 100 + i % 21, 200 + i % 11)))
+            .ToArray();
+        var report = Empty() with
+        {
+            Items = changes,
+            LeftItemSnapshots = [Item("far-left-context", -50_000, -40_000), Item("far-right-context", 70_000, 80_000)],
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var viewport = Assert.IsType<DiffInfographicViewport>(scene.Spatial.Viewport);
+
+        Assert.Equal(400, scene.Spatial.PlottedChanges);
+        Assert.Equal(30, scene.Spatial.SampledOutChanges);
+        Assert.True(viewport.MaxX >= 10_000);
+        Assert.True(viewport.MinX > -50_000);
+        Assert.True(viewport.MaxZ < 80_000);
+        Assert.All(scene.Spatial.Changes, point =>
+        {
+            Assert.InRange(point.X, 0, 1);
+            Assert.InRange(point.Z, 0, 1);
+        });
+        Assert.Equal(2, scene.Spatial.EdgePinnedContext);
+        Assert.Equal(2, scene.Spatial.Context.Count(point => point.EdgePinned));
+        Assert.Contains(scene.Warnings, x => x.Contains("outside the padded change viewport", StringComparison.Ordinal));
+        Assert.DoesNotContain(scene.Warnings, x => x.Contains("percentile", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void BuildScene_ChangeViewportHasBoundedPaddingSquareMetreSpanAndExplicitTicks()
+    {
+        var scene = DiffInfographic.BuildScene(Empty() with
+        {
+            Items =
+            [
+                new(null, Item("south-west", 100, 200)),
+                new(null, Item("north-east", 120, 210)),
+            ],
+        }, "a", "b");
+        var viewport = Assert.IsType<DiffInfographicViewport>(scene.Spatial.Viewport);
+
+        Assert.Equal(92, viewport.MinX);
+        Assert.Equal(128, viewport.MaxX);
+        Assert.Equal(187, viewport.MinZ);
+        Assert.Equal(223, viewport.MaxZ);
+        Assert.Equal(viewport.MaxX - viewport.MinX, viewport.MaxZ - viewport.MinZ, 10);
+        Assert.Equal("X 92.0 m", viewport.XMinimumLabel);
+        Assert.Equal("X 128.0 m", viewport.XMaximumLabel);
+        Assert.Equal("Z 187.0 m", viewport.ZMinimumLabel);
+        Assert.Equal("Z 223.0 m", viewport.ZMaximumLabel);
+        Assert.Equal("JetBrains Mono", DiffInfographicPainter.SpatialAxisFont.Family.Name);
+        Assert.Equal(DiffInfographicPainter.SpatialPlotBounds.Width, DiffInfographicPainter.SpatialPlotBounds.Height);
+        var labels = DiffInfographicPainter.MeasureSpatialAxisLabels(viewport);
+        Assert.Equal(14, labels.XMinimum.Font.Size);
+        Assert.Equal(14, labels.XMaximum.Font.Size);
+        Assert.Equal(14, labels.ZMinimum.Font.Size);
+        Assert.Equal(14, labels.ZMaximum.Font.Size);
+    }
+
+    [Fact]
+    public void BuildScene_AsymmetricExtremeViewportKeepsEqualSafeHalfSpansAndContainsChanges()
+    {
+        var positions = new[]
+        {
+            (X: -double.MaxValue, Z: double.MaxValue / 2),
+            (X: 0d, Z: double.MaxValue),
+        };
+        var scene = DiffInfographic.BuildScene(Empty() with
+        {
+            Items = positions.Select((position, i) =>
+                new ValueChange<ItemSnapshot>(null, Item($"extreme-{i}", position.X, position.Z))).ToArray(),
+        }, "a", "b");
+        var viewport = Assert.IsType<DiffInfographicViewport>(scene.Spatial.Viewport);
+
+        var xHalfSpan = viewport.MaxX / 2 - viewport.MinX / 2;
+        var zHalfSpan = viewport.MaxZ / 2 - viewport.MinZ / 2;
+        Assert.Equal(xHalfSpan, zHalfSpan);
+        Assert.All(positions, position =>
+        {
+            Assert.InRange(position.X, viewport.MinX, viewport.MaxX);
+            Assert.InRange(position.Z, viewport.MinZ, viewport.MaxZ);
+        });
+        Assert.Equal(0, scene.Spatial.EdgePinnedChanges);
+    }
+
+    [Fact]
+    public void BuildScene_HighOffsetNarrowViewportHasDistinctBoundedEndpointLabels()
+    {
+        var scene = DiffInfographic.BuildScene(Empty() with
+        {
+            Items =
+            [
+                new(null, Item("south-west", 10_000_000_000, 20_000_000_000)),
+                new(null, Item("north-east", 10_000_000_020, 20_000_000_020)),
+            ],
+        }, "a", "b");
+        var viewport = Assert.IsType<DiffInfographicViewport>(scene.Spatial.Viewport);
+
+        Assert.NotEqual(viewport.MinX, viewport.MaxX);
+        Assert.NotEqual(viewport.MinZ, viewport.MaxZ);
+        Assert.NotEqual(viewport.XMinimumLabel, viewport.XMaximumLabel);
+        Assert.NotEqual(viewport.ZMinimumLabel, viewport.ZMaximumLabel);
+        Assert.All(new[]
+        {
+            viewport.XMinimumLabel,
+            viewport.XMaximumLabel,
+            viewport.ZMinimumLabel,
+            viewport.ZMaximumLabel,
+        }, label => Assert.InRange(label.Length, 1, 32));
+    }
+
+    [Fact]
+    public void SpatialAxisLabels_ExtremeOffsetDrawBoundsFitWithoutXOverlap()
+    {
+        var scene = DiffInfographic.BuildScene(Empty() with
+        {
+            Items = [new(null, Item("singleton", 1e300, -1e300))],
+        }, "a", "b");
+        var viewport = Assert.IsType<DiffInfographicViewport>(scene.Spatial.Viewport);
+        var labels = DiffInfographicPainter.MeasureSpatialAxisLabels(viewport);
+        var plot = DiffInfographicPainter.SpatialPlotBounds;
+
+        var xMinimum = DrawBounds(labels.XMinimum);
+        var xMaximum = DrawBounds(labels.XMaximum);
+        var zMinimum = DrawBounds(labels.ZMinimum);
+        var zMaximum = DrawBounds(labels.ZMaximum);
+        Assert.InRange(xMinimum.Left, plot.Left, plot.Right);
+        Assert.InRange(xMinimum.Right, plot.Left, plot.Right);
+        Assert.InRange(xMaximum.Left, plot.Left, plot.Right);
+        Assert.InRange(xMaximum.Right, plot.Left, plot.Right);
+        Assert.True(xMinimum.Right + 12 <= xMaximum.Left);
+        Assert.InRange(zMinimum.Left, 0, plot.X);
+        Assert.InRange(zMinimum.Right, 0, plot.X);
+        Assert.InRange(zMaximum.Left, 0, plot.X);
+        Assert.InRange(zMaximum.Right, 0, plot.X);
+        Assert.InRange(labels.XMinimum.Font.Size, 10, 14);
+    }
+
+    [Fact]
+    public void BuildScene_NoFinitePositionedChangesDoesNotFabricateViewportOrPlotContext()
+    {
+        var report = Empty() with
+        {
+            Items = [new(null, Item("invalid", double.NaN, 1))],
+            Blocks = [new(null, Block("unpositioned", 0, 0) with { PhysicalPosition = null })],
+            LeftItemSnapshots = [Item("context-a", 10, 20), Item("context-b", 30, 40)],
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+
+        Assert.Null(scene.Spatial.Viewport);
+        Assert.Empty(scene.Spatial.Changes);
+        Assert.Empty(scene.Spatial.Context);
+        Assert.Equal(0, scene.Spatial.PlottedContext);
+        Assert.Equal(2, scene.Spatial.ContextWithoutViewport);
+        Assert.Equal("No finite positioned changes · viewport unavailable", scene.Spatial.RangeLabel);
+        Assert.Contains(scene.Warnings, x => x.Contains("2 context points not plotted because no finite positioned change defines a viewport", StringComparison.Ordinal));
+        Assert.Contains(scene.Warnings, x => x.Contains("1 invalid change position", StringComparison.Ordinal));
+        Assert.Contains(scene.Warnings, x => x.Contains("1 unpositioned change", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void BuildScene_NormalizesExtremeAndEqualHugePositionsToFiniteUnitCoordinates()
     {
         var report = Empty() with
@@ -469,6 +633,12 @@ public sealed class DiffInfographicTests
             Assert.InRange(point.X, 0, 1);
             Assert.InRange(point.Z, 0, 1);
         });
+        var viewport = Assert.IsType<DiffInfographicViewport>(scene.Spatial.Viewport);
+        Assert.True(double.IsFinite(viewport.MinX));
+        Assert.True(double.IsFinite(viewport.MaxX));
+        Assert.True(double.IsFinite(viewport.MinZ));
+        Assert.True(double.IsFinite(viewport.MaxZ));
+        Assert.Equal(viewport.MaxX - viewport.MinX, viewport.MaxZ - viewport.MinZ);
     }
 
     [Fact]
@@ -492,6 +662,13 @@ public sealed class DiffInfographicTests
 
     private static float TextWidth(string text, SixLabors.Fonts.Font font) =>
         SixLabors.Fonts.TextMeasurer.MeasureAdvance(text, new SixLabors.Fonts.TextOptions(font)).Width;
+
+    private static RectangleF DrawBounds(InfographicAxisLabel label)
+    {
+        var measured = SixLabors.Fonts.TextMeasurer.MeasureBounds(
+            label.Text, new SixLabors.Fonts.TextOptions(label.Font));
+        return new(label.Origin.X + measured.X, label.Origin.Y + measured.Y, measured.Width, measured.Height);
+    }
 
     private static SixLabors.Fonts.Font MonoTestFont(float size, bool bold = false)
     {
@@ -680,6 +857,31 @@ public sealed class DiffInfographicTests
         };
         using (var image = DiffInfographic.Render(synthetic, "Night Circuit — draft.Map.Gbx", "Night Circuit — release.Map.Gbx"))
             image.SaveAsPng(Path.Combine(outputDirectory!, "diff-infographic-synthetic.png"));
+
+        var localizedWithFarContext = Empty() with
+        {
+            RightBytes = 1_012_800,
+            Items =
+            [
+                new(null, Item("Localized added", 1_004, 2_006)),
+                new(Item("Localized removed", 1_018, 2_011), null),
+                new(Item("Localized modified", 1_010, 2_018), Item("Localized modified", 1_014, 2_016)),
+            ],
+            LeftItemSnapshots = [Item("Far west context", -90_000, 70_000), Item("Near context", 1_000, 2_000)],
+            RightItemSnapshots = [Item("Far east context", 120_000, -80_000), Item("Near context", 1_024, 2_024)],
+        };
+        using (var image = DiffInfographic.Render(localizedWithFarContext, "Localized before.Map.Gbx", "Localized after.Map.Gbx"))
+            image.SaveAsPng(Path.Combine(outputDirectory!, "diff-infographic-localized-far-context.png"));
+
+        var noPositionedChanges = Empty() with
+        {
+            Blocks = [new(null, Block("Unpositioned block", 0, 0) with { PhysicalPosition = null })],
+            Items = [new(null, Item("Invalid item", double.NaN, double.PositiveInfinity))],
+            LeftItemSnapshots = [Item("Context only A", -500, 700)],
+            RightItemSnapshots = [Item("Context only B", 900, -1_100)],
+        };
+        using (var image = DiffInfographic.Render(noPositionedChanges, "No positions before.Map.Gbx", "No positions after.Map.Gbx"))
+            image.SaveAsPng(Path.Combine(outputDirectory!, "diff-infographic-no-positioned-changes.png"));
 
         var left = Environment.GetEnvironmentVariable("GBX_SIZE_TREE_INFOGRAPHIC_LEFT");
         var right = Environment.GetEnvironmentVariable("GBX_SIZE_TREE_INFOGRAPHIC_RIGHT");
