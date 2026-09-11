@@ -63,6 +63,8 @@ public static class DiffInfographic
         if (metadata.Count > 0) sectionContent.Add(("metadata", $"Metadata · {detailCounts.Metadata:N0}", metadata));
         var chunks = Chunks(report);
         if (chunks.Count > 0) sectionContent.Add(("chunks", $"Chunk observations · {detailCounts.Chunks:N0}", chunks));
+        var placementSummary = PlacementSummary(placementChanges);
+        if (placementSummary.Count > 0) sectionContent.Add(("placement-summary", $"Placement summary · {placementSummary.Count:N0} names", placementSummary));
 
         var sections = new List<DiffInfographicSection>
         {
@@ -288,6 +290,23 @@ public static class DiffInfographic
         }
         return rows;
     }
+
+    private static IReadOnlyList<DiffInfographicSectionLine> PlacementSummary(
+        IReadOnlyList<(SpatialPosition? Position, DiffInfographicChangeKind Kind, string Label)> changes)
+    {
+        return changes.GroupBy(x => (x.Kind, Label: DiffInfographicText.Clean(x.Label)))
+            .Select(g => (Count: g.Count(), g.Key.Kind, g.Key.Label))
+            .OrderByDescending(x => x.Count).ThenBy(x => x.Label, StringComparer.Ordinal)
+            .Select(x => new DiffInfographicSectionLine($"{KindMarker(x.Kind)} {x.Count:N0}x {x.Label}", Mono: true))
+            .ToArray();
+    }
+
+    private static char KindMarker(DiffInfographicChangeKind kind) => kind switch
+    {
+        DiffInfographicChangeKind.Added => '+',
+        DiffInfographicChangeKind.Removed => '−',
+        _ => '~',
+    };
 
     private static IReadOnlyList<DiffInfographicSectionLine> Chunks(DiffReport report)
     {

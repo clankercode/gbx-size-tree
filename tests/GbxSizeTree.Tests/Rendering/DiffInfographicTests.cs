@@ -361,6 +361,49 @@ public sealed class DiffInfographicTests
     }
 
     [Fact]
+    public void BuildScene_PlacementSummaryGroupsByKindAndNameAndSortsCountDescThenName()
+    {
+        var report = Empty() with
+        {
+            Blocks =
+            [
+                new(null, Block("PlatformTechInvisible", 0, 0)),
+                new(null, Block("PlatformTechInvisible", 32, 0)),
+                new(null, Block("PlatformTechInvisible", 64, 0)),
+                new(null, Block("PlatformTechInvisible", 96, 0)),
+                new(null, Block("PlatformTechInvisible", 128, 0)),
+                new(Block("Zed", 160, 0), null),
+                new(Block("Zed", 192, 0), null),
+                new(Block("Mood", 224, 0), Block("Mood", 256, 0)),
+                new(Block("Mood", 288, 0), Block("Mood", 320, 0)),
+                new(Block("Mood", 352, 0), Block("Mood", 384, 0)),
+            ],
+            Items =
+            [
+                new(null, Item("Items/BF2/speq/bf2 special.Item.Gbx", 0, 32)),
+                new(null, Item("Items/BF2/speq/bf2 special.Item.Gbx", 32, 32)),
+            ],
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var summary = Assert.Single(scene.Sections, x => x.Id == "placement-summary");
+
+        Assert.Equal(
+            ["+ 5x PlatformTechInvisible", "~ 3x Mood", "+ 2x Items/BF2/speq/bf2 special.Item.Gbx", "− 2x Zed"],
+            summary.Lines.Select(x => x.Text));
+        Assert.Equal("Placement summary · 4 names", summary.Title);
+        Assert.All(summary.Lines, x => Assert.True(x.Mono));
+    }
+
+    [Fact]
+    public void BuildScene_EmptyDiffHasNoPlacementSummarySection()
+    {
+        var scene = DiffInfographic.BuildScene(Empty(), "", "");
+
+        Assert.DoesNotContain(scene.Sections, x => x.Id == "placement-summary");
+    }
+
+    [Fact]
     public void BuildScene_DoesNotPairMarginalMeasurementsOrExposeScale()
     {
         var report = Empty() with
