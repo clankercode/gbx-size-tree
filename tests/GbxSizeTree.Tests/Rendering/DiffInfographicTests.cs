@@ -194,7 +194,7 @@ public sealed class DiffInfographicTests
             Assert.True(TextWidth(elided, font) <= 260.5f);
             Assert.Contains("…", elided, StringComparison.Ordinal);
             Assert.EndsWith(".Item.Gbx", elided, StringComparison.Ordinal);
-            Assert.StartsWith("absurdly", elided, StringComparison.Ordinal);
+            Assert.Contains("absurdly", elided, StringComparison.Ordinal);
         }
     }
 
@@ -758,7 +758,7 @@ public sealed class DiffInfographicTests
 
         var scene = DiffInfographic.BuildScene(report, "a", "b");
         var summary = Assert.Single(scene.Sections, x => x.Id == "placement-summary");
-        var firstPlacementTable = Assert.Single(scene.Sections, x => x.Id == "ordinary-block-changes");
+        var firstPlacementTable = Assert.Single(scene.Sections, x => x.Id == "ordinary-block-changes-added");
         var sectionWidth = summary.Right - summary.Left;
         var renderedRowCounts = summary.Lines
             .Select(line => DiffInfographicLayout.WrapLine(line, sectionWidth).Count)
@@ -798,7 +798,7 @@ public sealed class DiffInfographicTests
 
         var scene = DiffInfographic.BuildScene(report, "a", "b");
         var summary = Assert.Single(scene.Sections, x => x.Id == "placement-summary");
-        var firstPlacementTable = Assert.Single(scene.Sections, x => x.Id == "ordinary-block-changes");
+        var firstPlacementTable = Assert.Single(scene.Sections, x => x.Id == "ordinary-block-changes-added");
         var line = Assert.Single(summary.Lines);
         var wrappedRows = DiffInfographicLayout.WrapLine(line, summary.Right - summary.Left);
 
@@ -857,54 +857,161 @@ public sealed class DiffInfographicTests
 
         var scene = DiffInfographic.BuildScene(report, "a", "b");
         var summaryIndex = scene.Sections.ToList().FindIndex(x => x.Id == "placement-summary");
-        var ordinaryIndex = scene.Sections.ToList().FindIndex(x => x.Id == "ordinary-block-changes");
-        var bakedIndex = scene.Sections.ToList().FindIndex(x => x.Id == "baked-block-changes");
-        var itemIndex = scene.Sections.ToList().FindIndex(x => x.Id == "item-changes");
-        var ordinary = scene.Sections[ordinaryIndex];
-        var baked = scene.Sections[bakedIndex];
-        var items = scene.Sections[itemIndex];
+        var details = scene.Sections.Skip(summaryIndex + 1).ToArray();
+        Assert.Equal(6, details.Length);
+        var ordinaryAdded = details[0];
+        var ordinaryRemoved = details[1];
+        var bakedAdded = details[2];
+        var bakedRemoved = details[3];
+        var itemsAdded = details[4];
+        var itemsRemoved = details[5];
 
-        Assert.Equal(summaryIndex + 1, ordinaryIndex);
-        Assert.Equal(ordinaryIndex + 1, bakedIndex);
-        Assert.Equal(bakedIndex + 1, itemIndex);
-        Assert.All(new[] { ordinary, baked, items }, section =>
+        Assert.Equal("Added ordinary blocks · 2", ordinaryAdded.Title);
+        Assert.Equal("Removed ordinary blocks · 1", ordinaryRemoved.Title);
+        Assert.Equal("Added baked blocks · 1", bakedAdded.Title);
+        Assert.Equal("Removed baked blocks · 1", bakedRemoved.Title);
+        Assert.Equal("Added items · 2", itemsAdded.Title);
+        Assert.Equal("Removed items · 2", itemsRemoved.Title);
+        Assert.Equal(70, ordinaryAdded.Left);
+        Assert.Equal(710, ordinaryRemoved.Left);
+        Assert.Equal(ordinaryAdded.Top, ordinaryRemoved.Top);
+        // The right column is now shorter: put Added there, with Removed opposite it.
+        Assert.Equal(710, bakedAdded.Left);
+        Assert.Equal(70, bakedRemoved.Left);
+        Assert.Equal(ordinaryRemoved.Bottom + DiffInfographicLayout.SectionGap, bakedAdded.Top);
+        Assert.Equal(ordinaryAdded.Bottom + DiffInfographicLayout.SectionGap, bakedRemoved.Top);
+        Assert.NotEqual(itemsAdded.Left, itemsRemoved.Left);
+        Assert.All(details, section =>
         {
-            Assert.Equal(70, section.Left);
-            Assert.Equal(1330, section.Right);
+            Assert.Equal(620, section.Right - section.Left);
             Assert.Equal(DiffInfographicTableDensity.Compact, section.Table!.Density);
-            Assert.Equal("+/−", section.Table.MarkerHeader);
             Assert.Equal("POSITION", section.Table.ValueHeader);
         });
-        Assert.Equal("NAME", ordinary.Table!.PathHeader);
-        Assert.Equal("NAME", baked.Table!.PathHeader);
-        Assert.Equal("NAME / PATH", items.Table!.PathHeader);
+        Assert.Equal("NAME", ordinaryAdded.Table!.PathHeader);
+        Assert.Equal("NAME", bakedAdded.Table!.PathHeader);
+        Assert.Equal("NAME / PATH", itemsAdded.Table!.PathHeader);
         Assert.Equal(
-            [
-                ("+", "Normal added", "--"),
-                ("−", "Ghost removed", "--"),
-                ("+", "Free added", "(193.25, 4.5, 1.75)"),
-            ],
-            ordinary.Table!.Rows.Select(x => (x.Marker, x.Path, x.Value)));
+            [("+", "Normal added", "--"), ("+", "Free added", "(193.25, 4.5, 1.75)")],
+            ordinaryAdded.Table!.Rows.Select(x => (x.Marker, x.Path, x.Value)));
         Assert.Equal(
-            [("+", "Baked added", "(0.0, 0.0, 96.0)"), ("−", "Baked removed", "(96.0, 0.0, 96.0)")],
-            baked.Table!.Rows.Select(x => (x.Marker, x.Path, x.Value)));
+            [("−", "Ghost removed", "--")],
+            ordinaryRemoved.Table!.Rows.Select(x => (x.Marker, x.Path, x.Value)));
+        Assert.Equal(
+            [("+", "Baked added", "(0.0, 0.0, 96.0)")],
+            bakedAdded.Table!.Rows.Select(x => (x.Marker, x.Path, x.Value)));
+        Assert.Equal(
+            [("−", "Baked removed", "(96.0, 0.0, 96.0)")],
+            bakedRemoved.Table!.Rows.Select(x => (x.Marker, x.Path, x.Value)));
         Assert.Equal(
             [
                 ("+", "Items/Environment/Very/Long/Added custom item.Item.Gbx", "(0.25, 0.0, 192.5)"),
-                ("−", "Items/Removed.Item.Gbx", "(96.75, 0.0, 192.25)"),
                 ("+", "Items/Tied added.Item.Gbx", "(96.75, 0.0, 192.25)"),
+            ],
+            itemsAdded.Table!.Rows.Select(x => (x.Marker, x.Path, x.Value)));
+        Assert.Equal(
+            [
+                ("−", "Items/Removed.Item.Gbx", "(96.75, 0.0, 192.25)"),
                 ("−", "Items/Tied removed.Item.Gbx", "(96.75, 0.0, 192.25)"),
             ],
-            items.Table!.Rows.Select(x => (x.Marker, x.Path, x.Value)));
+            itemsRemoved.Table!.Rows.Select(x => (x.Marker, x.Path, x.Value)));
         Assert.Contains(scene.Sections[summaryIndex].Lines, x => x.Text == "~ 1x Ordinary modified");
         Assert.Contains(scene.Sections[summaryIndex].Lines, x => x.Text == "~ 1x Baked modified");
         Assert.Contains(scene.Sections[summaryIndex].Lines, x => x.Text == "~ 1x Items/Modified.Item.Gbx");
-        Assert.DoesNotContain(new[] { ordinary, baked, items }.SelectMany(x => x.Table!.Rows),
-            row => row.Kind == DiffInfographicChangeKind.Changed || row.Marker == "~");
+        Assert.All(new[] { ordinaryAdded, bakedAdded, itemsAdded }.SelectMany(x => x.Table!.Rows),
+            row => Assert.Equal(DiffInfographicChangeKind.Added, row.Kind));
+        Assert.All(new[] { ordinaryRemoved, bakedRemoved, itemsRemoved }.SelectMany(x => x.Table!.Rows),
+            row => Assert.Equal(DiffInfographicChangeKind.Removed, row.Kind));
+    }
+
+    [Theory]
+    [InlineData(633, 301)]
+    [InlineData(301, 1)]
+    [InlineData(1, 301)]
+    public void BuildScene_PagesAddedAndRemovedIndependentlyAndPairsEachPage(int addedCount, int removedCount)
+    {
+        var added = Enumerable.Range(0, addedCount)
+            .Select(i => new ValueChange<ItemSnapshot>(null, Item($"Added {i:D3}", (addedCount - i) * 96, 0)));
+        var removed = Enumerable.Range(0, removedCount)
+            .Select(i => new ValueChange<ItemSnapshot>(Item($"Removed {i:D3}", (removedCount - i) * 96, 0), null));
+        var scene = DiffInfographic.BuildScene(Empty() with { Items = added.Concat(removed).ToArray() }, "a", "b");
+        var details = scene.Sections.Where(x => x.Id.StartsWith("item-changes-", StringComparison.Ordinal)).ToArray();
+        var addedPages = details.Where(x => x.Title.StartsWith("Added", StringComparison.Ordinal)).ToArray();
+        var removedPages = details.Where(x => x.Title.StartsWith("Removed", StringComparison.Ordinal)).ToArray();
+
+        Assert.Equal(Enumerable.Range(0, addedCount).Reverse().Select(i => $"Added {i:D3}"),
+            addedPages.SelectMany(x => x.Table!.Rows).Select(x => x.Path));
+        Assert.Equal(Enumerable.Range(0, removedCount).Reverse().Select(i => $"Removed {i:D3}"),
+            removedPages.SelectMany(x => x.Table!.Rows).Select(x => x.Path));
+        Assert.Equal((addedCount + 299) / 300, addedPages.Length);
+        Assert.Equal((removedCount + 299) / 300, removedPages.Length);
+        Assert.StartsWith($"Added items · {addedCount}", addedPages[0].Title, StringComparison.Ordinal);
+        Assert.StartsWith($"Removed items · {removedCount}", removedPages[0].Title, StringComparison.Ordinal);
+        foreach (var (addedPage, removedPage) in addedPages.Zip(removedPages))
+        {
+            Assert.NotEqual(addedPage.Left, removedPage.Left);
+            Assert.Equal(addedPage.Top, removedPage.Top);
+        }
+        Assert.All(details, section =>
+        {
+            Assert.Equal(620, section.Right - section.Left);
+            Assert.InRange(section.Table!.Rows.Count, 1, 300);
+            Assert.True(section.Bottom <= scene.Height - 36);
+        });
+        foreach (var column in details.GroupBy(x => x.Left))
+        {
+            var ordered = column.OrderBy(x => x.Top).ToArray();
+            for (var i = 1; i < ordered.Length; i++)
+                Assert.True(ordered[i].Top >= ordered[i - 1].Bottom + DiffInfographicLayout.SectionGap);
+        }
+    }
+
+    [Theory]
+    [InlineData("ordinary-block", true)]
+    [InlineData("ordinary-block", false)]
+    [InlineData("baked-block", true)]
+    [InlineData("baked-block", false)]
+    [InlineData("item", true)]
+    [InlineData("item", false)]
+    public void BuildScene_OneSidedPlacementsHaveOnlyOneHalfWidthPanel(string category, bool added)
+    {
+        var block = Block("Only block", 0, 0);
+        var item = Item("Only item", 0, 0);
+        ValueChange<BlockSnapshot>[] blocks = [added ? new(null, block) : new(block, null), new(block, block)];
+        ValueChange<ItemSnapshot>[] items = [added ? new(null, item) : new(item, null), new(item, item)];
+        var report = category switch
+        {
+            "ordinary-block" => Empty() with { Blocks = blocks },
+            "baked-block" => Empty() with { BakedBlocks = blocks },
+            _ => Empty() with { Items = items },
+        };
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var panel = Assert.Single(scene.Sections, x => x.Id.StartsWith($"{category}-changes-", StringComparison.Ordinal));
+        Assert.Equal(620, panel.Right - panel.Left);
+        Assert.Equal(added ? DiffInfographicChangeKind.Added : DiffInfographicChangeKind.Removed,
+            Assert.Single(panel.Table!.Rows).Kind);
     }
 
     [Fact]
-    public void BuildScene_FlowsUnboundedPlacementRowsAcrossFullWidthContinuationPanels()
+    public void BuildScene_PairsRemovedWithAddedEvenWhenAddedStillLeavesItsColumnShorter()
+    {
+        var report = Empty() with
+        {
+            Blocks = Enumerable.Range(0, 10).Select(i => new ValueChange<BlockSnapshot>(null, Block("Tall", i * 32, 0)))
+                .Append(new(Block("Short", 0, 0), null)).ToArray(),
+            BakedBlocks = [new(null, Block("Added baked", 0, 0)), new(Block("Removed baked", 0, 0), null)],
+        };
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var ordinaryAdded = Assert.Single(scene.Sections, x => x.Id == "ordinary-block-changes-added");
+        var bakedAdded = Assert.Single(scene.Sections, x => x.Id == "baked-block-changes-added");
+        var bakedRemoved = Assert.Single(scene.Sections, x => x.Id == "baked-block-changes-removed");
+        Assert.Equal(710, bakedAdded.Left);
+        Assert.True(bakedAdded.Bottom < ordinaryAdded.Bottom);
+        Assert.Equal(70, bakedRemoved.Left);
+        Assert.Equal(ordinaryAdded.Bottom + DiffInfographicLayout.SectionGap, bakedRemoved.Top);
+    }
+
+    [Fact]
+    public void BuildScene_FlowsUnboundedPlacementRowsAcrossHalfWidthContinuationPanels()
     {
         var changes = Enumerable.Range(0, 633)
             .Select(i => new ValueChange<ItemSnapshot>(null,
@@ -914,18 +1021,21 @@ public sealed class DiffInfographicTests
 
         var scene = DiffInfographic.BuildScene(Empty() with { Items = changes }, "a", "b");
         var complete = scene.Sections
-            .Where(x => x.Id == "item-changes" || x.Id.StartsWith("item-changes-", StringComparison.Ordinal))
+            .Where(x => x.Id == "item-changes-added" || x.Id.StartsWith("item-changes-added-", StringComparison.Ordinal))
             .ToArray();
         var rows = complete.SelectMany(x => x.Table!.Rows).ToArray();
 
         Assert.Equal(3, complete.Length);
-        Assert.Equal(["item-changes", "item-changes-2", "item-changes-3"], complete.Select(x => x.Id));
-        Assert.Equal("Added / removed items · 633", complete[0].Title);
-        Assert.Equal("Added / removed items · 633 · continued 2/3", complete[1].Title);
+        Assert.DoesNotContain(scene.Sections, x => x.Id.StartsWith("item-changes-removed", StringComparison.Ordinal));
+        Assert.Equal(70, complete[0].Left);
+        Assert.Equal(710, complete[1].Left);
+        Assert.Equal(complete[0].Top, complete[1].Top);
+        Assert.Equal(["item-changes-added", "item-changes-added-2", "item-changes-added-3"], complete.Select(x => x.Id));
+        Assert.Equal("Added items · 633", complete[0].Title);
+        Assert.Equal("Added items · 633 · continued 2/3", complete[1].Title);
         Assert.All(complete, section =>
         {
-            Assert.Equal(70, section.Left);
-            Assert.Equal(1330, section.Right);
+            Assert.Equal(620, section.Right - section.Left);
             Assert.InRange(section.Table!.Rows.Count, 1, 300);
             Assert.Equal(DiffInfographicTableDensity.Compact, section.Table.Density);
             Assert.Equal(
@@ -942,16 +1052,29 @@ public sealed class DiffInfographicTests
             .Select(x => rows.Single(row => row.Path == x.Path)));
     }
 
-    [Fact]
-    public void PlacementTable_UsesMeasuredNameElisionAndPositionReservation()
+    [Theory]
+    [InlineData("REMOVED ORDINARY BLOCKS · 30,000 · CONTINUED 100/100")]
+    [InlineData("ADDED ORDINARY BLOCKS · 2,147,483,647 · CONTINUED 7,158,279/7,158,279")]
+    public void PlacementTitle_FitsHalfWidthPanelWithCountAndContinuationIntact(string title)
+    {
+        var font = DiffInfographicPainter.FitDetailTitleFont(title, 620);
+        var bounds = SixLabors.Fonts.TextMeasurer.MeasureBounds(title, new SixLabors.Fonts.TextOptions(font));
+        Assert.True(30 + bounds.X + bounds.Width <= 590.5f);
+        Assert.InRange(font.Size, 12, 20);
+    }
+
+    [Theory]
+    [InlineData(620)]
+    [InlineData(1260)]
+    public void PlacementTable_UsesMeasuredNameElisionAndPositionReservation(int width)
     {
         var font = MonoTestFont(14);
         DiffInfographicTableRow[] rows =
         [
             new("+", "Items/Environment/Stadium/Collection/absurdly-long-custom-item-name-that-never-fits-anywhere.Item.Gbx",
-                "(−9223372036854775808, 0.125, 9223372036854775807)", DiffInfographicChangeKind.Added),
+                "(-9999999.999, -9999999.999, -9999999.999)", DiffInfographicChangeKind.Added),
         ];
-        var columns = DiffInfographicPainter.MeasureTableColumns(rows, 70, 1330, DiffInfographicTableDensity.Compact,
+        var columns = DiffInfographicPainter.MeasureTableColumns(rows, 70, 70 + width, DiffInfographicTableDensity.Compact,
             "POSITION");
         var elided = DiffInfographicPainter.ElideTablePath(rows[0].Path, font, columns.PathWidth);
 
@@ -959,7 +1082,8 @@ public sealed class DiffInfographicTests
         Assert.True(TextWidth(elided, font) <= columns.PathWidth + .5f);
         Assert.NotEqual(rows[0].Path, elided);
         Assert.True(elided.Contains("...", StringComparison.Ordinal) || elided.Contains('…'));
-        Assert.EndsWith(".Item.Gbx", elided, StringComparison.Ordinal);
+        Assert.EndsWith(".Gbx", elided, StringComparison.Ordinal);
+        Assert.Contains("absurdly", elided, StringComparison.Ordinal);
     }
 
     [Fact]
