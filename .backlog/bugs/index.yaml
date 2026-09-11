@@ -72,3 +72,4 @@ bugs:
     - file: B071-metadata-delta-show-all-main-i.todo
     - file: B072-use-monospace-typography-for-n.todo
     - file: B073-infographic-grouped-per-name-s.todo
+    - file: B074-infographic-complete-lists-of.todo
