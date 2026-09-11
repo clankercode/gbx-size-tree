@@ -19,3 +19,5 @@ updated_at: "2026-09-11T08:04:41Z"
 In addition to the embedded highlights table, add a complete list of ALL embedded changes on the infographic, rendered at a slightly smaller font so everything fits. This complements B069 (highlights) - the highlights draw attention, the full list guarantees nothing is hidden behind 'N more omitted'. Keep rows compact; same +/-/path/size-change conventions as the highlights table.
 
 Lane plan (2026-09-11): serial infographic-rendering lane after B069, before B068/B074; shared scene/layout/painter/tests make parallel work unsafe. Decision: add an unbounded compact embedded-changes table containing every embedded add/remove/modify row, sorted by path, using the same marker/path/signed-size conventions as B069. Canvas height grows rather than omitting rows.
+
+Visual review (2026-09-11): direct full-raster/crop inspection plus ccc -y @cx-reviewer review/fix. Found continuation panels inherited the generic red accent; fixed them to retain cyan embedded-list hierarchy. Final 1400x2074 render contains all 24 representative rows with aligned marker/path/value columns; focused/full tests passed.
