@@ -83,17 +83,19 @@ public static class DiffMode
         Action<DiffProgress>? progress = null)
     {
         progress = BestEffort(progress);
+        progress?.Invoke(new(DiffProgressStage.ReadingOld, Path.GetFileName(left)));
+        progress?.Invoke(new(DiffProgressStage.ReadingNew, Path.GetFileName(right)));
+        // Each side's file is re-read per phase so no phase pins another's buffers (B065); a map
+        // changed on disk mid-diff can therefore yield a mixed view of that file.
         IReadOnlyDictionary<string, string> leftContent = new Dictionary<string, string>();
         IReadOnlyDictionary<string, string> rightContent = new Dictionary<string, string>();
         long leftLength = 0, rightLength = 0;
         if (all)
         {
-            leftContent = CaptureContent(left, DiffProgressStage.ParsingOld, progress);
+            (leftContent, leftLength) = CaptureContent(left, DiffProgressStage.ParsingOld, progress);
             ReleaseTransientMemory();
-            rightContent = CaptureContent(right, DiffProgressStage.ParsingNew, progress);
+            (rightContent, rightLength) = CaptureContent(right, DiffProgressStage.ParsingNew, progress);
             ReleaseTransientMemory();
-            leftLength = new FileInfo(left).Length;
-            rightLength = new FileInfo(right).Length;
         }
         DiffReport report;
         // Frame-scoped phases keep file bytes, parsed maps, and snapshots out of later phases (B065).
@@ -101,7 +103,7 @@ public static class DiffMode
         {
             report = ParseAndCompare(left, right, leftContent, rightContent, all, progress);
         }
-        catch (Exception ex) when (all && ex is not OperationCanceledException and not OutOfMemoryException)
+        catch (Exception ex) when (all && IsParseFailure(ex))
         {
             progress?.Invoke(new(DiffProgressStage.Comparing));
             return ContentOnlyReport(leftLength, rightLength, leftContent, rightContent);
@@ -110,30 +112,36 @@ public static class DiffMode
         return WithContributions(report, left, right, contributionOptions, progress);
     }
 
+    // The content-only fallback covers semantic parse failures, not losing the file mid-diff.
+    private static bool IsParseFailure(Exception ex) =>
+        ex is not OperationCanceledException and not OutOfMemoryException
+            and not UnauthorizedAccessException and not FileNotFoundException
+            and not DirectoryNotFoundException and not PathTooLongException and not DriveNotFoundException;
+
     private static DiffReport ParseAndCompare(string left, string right,
         IReadOnlyDictionary<string, string> leftContent, IReadOnlyDictionary<string, string> rightContent,
         bool all, Action<DiffProgress>? progress)
     {
-        var leftSnapshot = ParseSide(left, DiffProgressStage.ReadingOld, DiffProgressStage.ParsingOld, leftContent, progress);
+        var leftSnapshot = ParseSide(left, DiffProgressStage.ParsingOld, leftContent, progress);
         ReleaseTransientMemory();
-        var rightSnapshot = ParseSide(right, DiffProgressStage.ReadingNew, DiffProgressStage.ParsingNew, rightContent, progress);
+        var rightSnapshot = ParseSide(right, DiffProgressStage.ParsingNew, rightContent, progress);
         ReleaseTransientMemory();
         progress?.Invoke(new(DiffProgressStage.Comparing));
         return Compare(leftSnapshot, rightSnapshot, all, progress);
     }
 
-    private static IReadOnlyDictionary<string, string> CaptureContent(string path, DiffProgressStage stage,
-        Action<DiffProgress>? progress)
+    private static (IReadOnlyDictionary<string, string> Content, long Length) CaptureContent(
+        string path, DiffProgressStage stage, Action<DiffProgress>? progress)
     {
         progress?.Invoke(new(stage, Path.GetFileName(path)));
-        return MapContentComparison.Capture(File.ReadAllBytes(path));
+        var bytes = File.ReadAllBytes(path);
+        return (MapContentComparison.Capture(bytes), bytes.LongLength);
     }
 
     // File bytes die with this frame; the returned snapshot keeps only extracted data.
-    private static Snapshot ParseSide(string path, DiffProgressStage readStage, DiffProgressStage parseStage,
+    private static Snapshot ParseSide(string path, DiffProgressStage parseStage,
         IReadOnlyDictionary<string, string> content, Action<DiffProgress>? progress)
     {
-        progress?.Invoke(new(readStage, Path.GetFileName(path)));
         var bytes = File.ReadAllBytes(path);
         progress?.Invoke(new(parseStage, Path.GetFileName(path)));
         return ReadBytes(bytes, content);
@@ -204,7 +212,18 @@ public static class DiffMode
             DiffProgressStage stage)
         {
             if (entries.Length == 0) return new(null, [], null);
-            var bytes = path is null ? null : File.ReadAllBytes(path);
+            byte[]? bytes;
+            try
+            {
+                bytes = path is null ? null : File.ReadAllBytes(path);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Master measured bytes already held in memory; a mid-diff file loss degrades to
+                // unavailable contributions rather than failing the whole report.
+                return new(null, entries.Select(e => new EmbeddedFileContribution(e.Path, e.Compressed,
+                    e.Uncompressed, null, ex.Message)).ToArray(), ex.Message);
+            }
             string? unavailable = null;
             try
             {

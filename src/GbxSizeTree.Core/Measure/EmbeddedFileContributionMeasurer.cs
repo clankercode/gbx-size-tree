@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Runtime;
 using System.Runtime.CompilerServices;
 using GbxSizeTree.Container;
@@ -103,7 +102,7 @@ public sealed class EmbeddedFileContributionMeasurer
         var trialBuffer = pooled ? new byte[plan.BodyLength] : null;
         var outputBuffer = pooled ? new byte[OutputBound(plan.BodyLength)] : null;
         var workMemory = pooled ? new byte[Lzo.WorkMemorySize] : null;
-    var results = new List<EmbeddedFileContribution>(paths.Length);
+        var results = new List<EmbeddedFileContribution>(paths.Length);
         long? baseline = null;
         string? baselineFailure = null;
         var trials = 0;

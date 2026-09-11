@@ -369,6 +369,31 @@ public sealed class DiffModeTests
         if (!styled) Assert.DoesNotContain(" style=", html, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task Run_JsonStreamsSameDocumentAsRenderJson()
+    {
+        var left = Path.GetTempFileName();
+        var right = Path.GetTempFileName();
+        try
+        {
+            SaveEmbeddedMap(MapWithEmbeds(("asset.bin", "same")), left);
+            SaveEmbeddedMap(MapWithEmbeds(("asset.bin", "same")), right);
+            var start = new System.Diagnostics.ProcessStartInfo("dotnet")
+            {
+                RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false,
+            };
+            foreach (var arg in new[] { typeof(DiffMode).Assembly.Location, "diff", "--json", left, right })
+                start.ArgumentList.Add(arg);
+            using var process = System.Diagnostics.Process.Start(start)!;
+            var stdout = process.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
+            var stderr = process.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
+            await process.WaitForExitAsync(TestContext.Current.CancellationToken);
+            Assert.True(process.ExitCode == 0, await stderr);
+            Assert.Equal(DiffMode.RenderJson(DiffMode.CompareFiles(left, right)) + Environment.NewLine, await stdout);
+        }
+        finally { File.Delete(left); File.Delete(right); }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

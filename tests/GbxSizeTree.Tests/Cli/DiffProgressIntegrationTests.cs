@@ -40,7 +40,58 @@ public sealed class DiffProgressIntegrationTests
 
         Assert.Throws<FileNotFoundException>(() => DiffMode.CompareFiles(path, path, progress: seen.Add));
 
-        Assert.Equal(DiffProgressStage.ReadingOld, Assert.Single(seen).Stage);
+        Assert.Equal([DiffProgressStage.ReadingOld, DiffProgressStage.ReadingNew],
+            seen.Select(value => value.Stage).ToArray());
+    }
+
+    [Fact]
+    public void CompareFiles_SyntheticMapsReportStagesInOrder()
+    {
+        var left = TempMap();
+        var right = TempMap();
+        try
+        {
+            var seen = new List<DiffProgress>();
+            DiffMode.CompareFiles(left, right, progress: seen.Add);
+            Assert.Equal(
+            [
+                DiffProgressStage.ReadingOld,
+                DiffProgressStage.ReadingNew,
+                DiffProgressStage.ParsingOld,
+                DiffProgressStage.ParsingNew,
+                DiffProgressStage.Comparing,
+                DiffProgressStage.EmbeddedDeepComparison,
+            ], seen.Select(value => value.Stage).ToArray());
+
+            seen.Clear();
+            DiffMode.CompareFiles(left, right, all: true, progress: seen.Add);
+            Assert.Equal(
+            [
+                DiffProgressStage.ReadingOld,
+                DiffProgressStage.ReadingNew,
+                DiffProgressStage.ParsingOld,
+                DiffProgressStage.ParsingNew,
+                DiffProgressStage.ParsingOld,
+                DiffProgressStage.ParsingNew,
+                DiffProgressStage.Comparing,
+                DiffProgressStage.EmbeddedDeepComparison,
+            ], seen.Select(value => value.Stage).ToArray());
+        }
+        finally
+        {
+            File.Delete(left);
+            File.Delete(right);
+        }
+    }
+
+    private static string TempMap()
+    {
+        GBX.NET.Gbx.LZO = new GBX.NET.LZO.Lzo();
+        var map = new GBX.NET.Engines.Game.CGameCtnChallenge();
+        map.Chunks.Create<GBX.NET.Engines.Game.CGameCtnChallenge.Chunk03043054>().Version = 1;
+        var path = Path.Combine(Path.GetTempPath(), $"stages-{Guid.NewGuid():N}.Map.Gbx");
+        new GBX.NET.Gbx<GBX.NET.Engines.Game.CGameCtnChallenge>(map).Save(path);
+        return path;
     }
 
     [Fact]
