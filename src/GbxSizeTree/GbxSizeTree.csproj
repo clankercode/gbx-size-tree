@@ -29,6 +29,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Resources/Fonts/*.ttf" />
     <EmbeddedResource Include="Resources/Licenses/AtkinsonHyperlegibleNext-OFL.txt" />
+    <EmbeddedResource Include="Resources/Licenses/JetBrainsMono-OFL.txt" />
   </ItemGroup>
 
 </Project>

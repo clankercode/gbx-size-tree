@@ -13,12 +13,10 @@ public static class DiffInfographic
 {
     public const int Width = 1400;
     public const int MinimumHeight = 900;
-    public const int MaximumHeight = 2200;
     private const int MaxSpatialChanges = 400;
     private const int MaxSpatialContext = 900;
     private const int MaxHighlightLines = 5;
     private const int MaxPropertyLines = 5;
-    private const int MaxMetadataLines = 5;
     private const int MaxChunkLines = 4;
 
     public static Image<Rgba32> Render(DiffReport report, string oldPath, string newPath)
@@ -32,7 +30,8 @@ public static class DiffInfographic
     {
         ArgumentNullException.ThrowIfNull(report);
         var placementChanges = PlacementChanges(report).ToArray();
-        var counts = CountEntities(report, placementChanges);
+        var placements = new DiffInfographicCountGroup("Placements", CountKinds(placementChanges));
+        var embedded = new DiffInfographicCountGroup("Embedded", Count(report.Embedded));
         var detailCounts = new DiffInfographicDetailCounts(
             MetadataEntries(report).Count,
             report.EmbeddedPropertyChanges.Sum(x => x.Properties.Changes.Count),
@@ -53,17 +52,19 @@ public static class DiffInfographic
             finiteChanges.Length - plotted.Length, invalidChanges, unpositionedChanges,
             finiteContext.Length - sampledContext.Length, invalidContext);
 
-        var sectionContent = new List<(string Id, string Title, IReadOnlyList<string> Lines)>();
+        var sectionContent = new List<(string Id, string Title, IReadOnlyList<DiffInfographicSectionLine> Lines)>();
         var highlights = Highlights(report);
         if (highlights.Count > 0) sectionContent.Add(("embedded-highlights", "Embedded highlights", highlights));
         var properties = Properties(report);
         if (properties.Count > 0) sectionContent.Add(("deep-properties", $"Deep properties · {detailCounts.DeepProperties:N0}", properties));
         var warnings = Warnings(report, spatial).ToArray();
-        if (warnings.Length > 0) sectionContent.Add(("coverage", "Coverage notes", warnings));
+        if (warnings.Length > 0) sectionContent.Add(("coverage", "Coverage notes", warnings.Select(x => new DiffInfographicSectionLine(x)).ToArray()));
         var metadata = Metadata(report);
         if (metadata.Count > 0) sectionContent.Add(("metadata", $"Metadata · {detailCounts.Metadata:N0}", metadata));
         var chunks = Chunks(report);
         if (chunks.Count > 0) sectionContent.Add(("chunks", $"Chunk observations · {detailCounts.Chunks:N0}", chunks));
+        var placementSummary = PlacementSummary(placementChanges);
+        if (placementSummary.Count > 0) sectionContent.Add(("placement-summary", $"Placement summary · {placementSummary.Count:N0} names", placementSummary));
 
         var sections = new List<DiffInfographicSection>
         {
@@ -76,36 +77,39 @@ public static class DiffInfographic
         {
             var column = columnTops[0] <= columnTops[1] ? 0 : 1;
             var left = column == 0 ? 70 : 710;
-            var requestedBottom = columnTops[column] + 88 + Math.Max(1, content.Lines.Count) * 57;
+            var requestedBottom = columnTops[column] + 88 + Math.Max(1, content.Lines.Count) * 58;
             sections.Add(new(content.Id, content.Title, content.Lines, left, columnTops[column], left + 620, requestedBottom));
             columnTops[column] = requestedBottom + 22;
         }
-        var height = Math.Clamp(Math.Max(columnTops[0], columnTops[1]) + 24, MinimumHeight, MaximumHeight);
+        var height = Math.Max(Math.Max(columnTops[0], columnTops[1]) + 24, MinimumHeight);
 
         return new DiffInfographicScene(Width, height,
             DiffInfographicText.FileName(oldPath), DiffInfographicText.FileName(newPath),
             report.LeftBytes, report.RightBytes, SaturatingSubtract(report.RightBytes, report.LeftBytes),
-            counts, "PLACEMENTS + EMBEDDED", detailCounts, spatial, sections, warnings);
+            placements, embedded, detailCounts, spatial, sections, warnings);
     }
 
-    private static DiffInfographicCounts CountEntities(DiffReport report,
-        IReadOnlyList<(SpatialPosition? Position, DiffInfographicChangeKind Kind, string Label)> placements)
+    private static DiffInfographicCounts CountKinds(
+        IReadOnlyList<(SpatialPosition? Position, DiffInfographicChangeKind Kind, string Label)> changes)
     {
-        var added = placements.Count(x => x.Kind == DiffInfographicChangeKind.Added);
-        var removed = placements.Count(x => x.Kind == DiffInfographicChangeKind.Removed);
-        var changed = placements.Count(x => x.Kind == DiffInfographicChangeKind.Changed);
-        Count(report.Embedded, ref added, ref removed, ref changed);
+        var added = changes.Count(x => x.Kind == DiffInfographicChangeKind.Added);
+        var removed = changes.Count(x => x.Kind == DiffInfographicChangeKind.Removed);
+        var changed = changes.Count(x => x.Kind == DiffInfographicChangeKind.Changed);
         return new(added, removed, changed);
+    }
 
-        static void Count<T>(IEnumerable<ValueChange<T>> values, ref int added, ref int removed, ref int changed) where T : class
+    private static DiffInfographicCounts Count<T>(IEnumerable<ValueChange<T>> values) where T : class
+    {
+        var added = 0;
+        var removed = 0;
+        var changed = 0;
+        foreach (var value in values)
         {
-            foreach (var value in values)
-            {
-                if (value.Left is null) added++;
-                else if (value.Right is null) removed++;
-                else changed++;
-            }
+            if (value.Left is null) added++;
+            else if (value.Right is null) removed++;
+            else changed++;
         }
+        return new(added, removed, changed);
     }
 
     private static IEnumerable<(SpatialPosition? Position, DiffInfographicChangeKind Kind, string Label)> PlacementChanges(DiffReport report)
@@ -195,9 +199,9 @@ public static class DiffInfographic
         }
     }
 
-    private static IReadOnlyList<string> Highlights(DiffReport report)
+    private static IReadOnlyList<DiffInfographicSectionLine> Highlights(DiffReport report)
     {
-        var lines = new List<string>();
+        var lines = new List<DiffInfographicSectionLine>();
         var ranked = report.Embedded.Select(c =>
         {
             var value = c.Right ?? c.Left!;
@@ -208,7 +212,7 @@ public static class DiffInfographic
                 : $"ZIP {DiffInfographicText.Bytes(value.Compressed)}";
             return (Rank: Math.Abs((double)delta), Text: $"{kind} {value.Path}  ·  {detail}");
         }).OrderByDescending(x => x.Rank).ThenBy(x => x.Text, StringComparer.Ordinal).ToArray();
-        lines.AddRange(ranked.Select(x => x.Text));
+        lines.AddRange(ranked.Select(x => new DiffInfographicSectionLine(x.Text)));
 
         var highlightedPaths = new HashSet<string>(report.Embedded.Select(x => (x.Right ?? x.Left)!.Path), StringComparer.Ordinal);
         foreach (var contribution in report.EmbeddedContributions)
@@ -238,10 +242,10 @@ public static class DiffInfographic
         return LimitLines(lines, MaxHighlightLines, "embedded highlight", note);
     }
 
-    private static IReadOnlyList<string> Properties(DiffReport report)
+    private static IReadOnlyList<DiffInfographicSectionLine> Properties(DiffReport report)
     {
         var rows = report.EmbeddedPropertyChanges.SelectMany(entry => entry.Properties.Changes.Select(change =>
-            $"{entry.Path} › {change.Path}: {Property(change.Left)} to {Property(change.Right)}")).ToList();
+            new DiffInfographicSectionLine($"{entry.Path} › {change.Path}: {Property(change.Left)} to {Property(change.Right)}"))).ToList();
         var issues = report.EmbeddedPropertyChanges.Sum(x => x.Properties.LeftIssues.Count + x.Properties.RightIssues.Count);
         var note = issues > 0
             ? $"WARNING · {issues:N0} opaque or partial-coverage diagnostic{(issues == 1 ? "" : "s")}; content hashes still prove the entries changed."
@@ -266,29 +270,56 @@ public static class DiffInfographic
         }
     }
 
-    private static IReadOnlyList<string> Metadata(DiffReport report)
+    private static IReadOnlyList<DiffInfographicSectionLine> Metadata(DiffReport report)
     {
-        var rows = MetadataEntries(report).Select(row =>
+        var rows = new List<DiffInfographicSectionLine>();
+        foreach (var row in MetadataEntries(report))
         {
-            var marker = row.Left is null ? "+" : row.Right is null ? "−" : "~";
-            var value = row.Left is null ? row.Right! : row.Right is null ? row.Left : $"{row.Left} to {row.Right}";
-            return $"{marker} {row.Label}: {value}";
-        }).ToArray();
-        return LimitLines(rows, MaxMetadataLines, "metadata change");
+            if (row.Left is not null && row.Right is not null)
+            {
+                rows.Add($"~ {row.Label}");
+                rows.Add(new DiffInfographicSectionLine($"− {row.Left}", Mono: true));
+                rows.Add(new DiffInfographicSectionLine($"+ {row.Right}", Mono: true));
+            }
+            else
+            {
+                var marker = row.Left is null ? "+" : "−";
+                var value = row.Left is null ? row.Right! : row.Left;
+                rows.Add(new DiffInfographicSectionLine($"{marker} {row.Label}: {value}", Mono: true));
+            }
+        }
+        return rows;
     }
 
-    private static IReadOnlyList<string> Chunks(DiffReport report)
+    private static IReadOnlyList<DiffInfographicSectionLine> PlacementSummary(
+        IReadOnlyList<(SpatialPosition? Position, DiffInfographicChangeKind Kind, string Label)> changes)
+    {
+        return changes.GroupBy(x => (x.Kind, Label: DiffInfographicText.Clean(x.Label)))
+            .Select(g => (Count: g.Count(), g.Key.Kind, g.Key.Label))
+            .OrderByDescending(x => x.Count).ThenBy(x => x.Label, StringComparer.Ordinal)
+            .Select(x => new DiffInfographicSectionLine($"{KindMarker(x.Kind)} {x.Count:N0}x {x.Label}", Mono: true))
+            .ToArray();
+    }
+
+    private static char KindMarker(DiffInfographicChangeKind kind) => kind switch
+    {
+        DiffInfographicChangeKind.Added => '+',
+        DiffInfographicChangeKind.Removed => '−',
+        _ => '~',
+    };
+
+    private static IReadOnlyList<DiffInfographicSectionLine> Chunks(DiffReport report)
     {
         var rows = report.Chunks.Select(chunk =>
         {
             var marker = chunk.Left is null ? "+" : chunk.Right is null ? "−" : "~";
             var value = chunk.Left is null ? chunk.Right! : chunk.Right is null ? chunk.Left : $"{chunk.Left} to {chunk.Right}";
-            return $"{marker} {chunk.Key ?? "chunk"}: {value}";
+            return new DiffInfographicSectionLine($"{marker} {chunk.Key ?? "chunk"}: {value}");
         }).ToArray();
         return LimitLines(rows, MaxChunkLines, "chunk observation");
     }
 
-    private static IReadOnlyList<string> LimitLines(IReadOnlyList<string> details, int limit, string description, string? finalNote = null)
+    private static IReadOnlyList<DiffInfographicSectionLine> LimitLines(IReadOnlyList<DiffInfographicSectionLine> details, int limit, string description, string? finalNote = null)
     {
         var detailLimit = limit - (finalNote is null ? 0 : 1);
         var visible = details.Take(detailLimit).ToList();

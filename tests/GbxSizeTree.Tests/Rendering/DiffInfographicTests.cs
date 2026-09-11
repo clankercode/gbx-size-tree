@@ -31,8 +31,9 @@ public sealed class DiffInfographicTests
         var scene = DiffInfographic.BuildScene(report, "old.Map.Gbx", "new.Map.Gbx");
 
         Assert.Equal(1400, scene.Width);
-        Assert.InRange(scene.Height, 900, 2200);
-        Assert.Equal(new DiffInfographicCounts(216, 216, 1), scene.Counts);
+        Assert.True(scene.Height >= DiffInfographic.MinimumHeight);
+        Assert.Equal(new DiffInfographicCounts(215, 215, 0), scene.Placements.Counts);
+        Assert.Equal(new DiffInfographicCounts(1, 1, 1), scene.Embedded.Counts);
         Assert.Equal(new DiffInfographicDetailCounts(1, 0, 0), scene.DetailCounts);
         Assert.Equal(400, scene.Spatial.PlottedChanges);
         Assert.Equal(30, scene.Spatial.SampledOutChanges);
@@ -73,8 +74,8 @@ public sealed class DiffInfographicTests
         var highlights = Assert.Single(scene.Sections, x => x.Id == "embedded-highlights");
 
         Assert.Equal(5, highlights.Lines.Count);
-        Assert.Equal("+ 19 more embedded highlights omitted", highlights.Lines[^2]);
-        Assert.Equal("Marginal measurements are non-additive; 22 unavailable contribution sides: unavailable-0", highlights.Lines[^1]);
+        Assert.Equal("+ 19 more embedded highlights omitted", highlights.Lines[^2].Text);
+        Assert.Equal("Marginal measurements are non-additive; 22 unavailable contribution sides: unavailable-0", highlights.Lines[^1].Text);
     }
 
     [Fact]
@@ -87,8 +88,8 @@ public sealed class DiffInfographicTests
         var highlights = Assert.Single(scene.Sections, x => x.Id == "embedded-highlights");
 
         Assert.Equal(5, highlights.Lines.Count);
-        Assert.Equal("+ 2 more embedded highlights omitted", highlights.Lines[^2]);
-        Assert.Equal("Marginal measurements are non-additive; 2 unavailable contribution sides: left unavailable", highlights.Lines[^1]);
+        Assert.Equal("+ 2 more embedded highlights omitted", highlights.Lines[^2].Text);
+        Assert.Equal("Marginal measurements are non-additive; 2 unavailable contribution sides: left unavailable", highlights.Lines[^1].Text);
     }
 
     [Fact]
@@ -105,12 +106,12 @@ public sealed class DiffInfographicTests
         var properties = Assert.Single(scene.Sections, x => x.Id == "deep-properties");
 
         Assert.Equal(5, properties.Lines.Count);
-        Assert.Equal("+ 3 more deep-property details omitted", properties.Lines[^2]);
-        Assert.Equal("WARNING · 2 opaque or partial-coverage diagnostics; content hashes still prove the entries changed.", properties.Lines[^1]);
+        Assert.Equal("+ 3 more deep-property details omitted", properties.Lines[^2].Text);
+        Assert.Equal("WARNING · 2 opaque or partial-coverage diagnostics; content hashes still prove the entries changed.", properties.Lines[^1].Text);
     }
 
     [Fact]
-    public void BuildScene_GlobalHeightCapKeepsAllSectionLinesRenderableAndCoverageVisible()
+    public void BuildScene_GrownCanvasKeepsAllSectionLinesRenderableAndCoverageVisible()
     {
         var notices = Enumerable.Range(0, 405).Select(i => new ValueChange<ItemSnapshot>(null, Item($"notice-{i}", i, i))).ToList();
         notices.Add(new(null, Item("invalid", double.NaN, double.PositiveInfinity)));
@@ -133,14 +134,16 @@ public sealed class DiffInfographicTests
         var detailSections = scene.Sections.Where(x => x.Top >= 1000).ToArray();
         var coverage = Assert.Single(detailSections, x => x.Id == "coverage");
 
-        Assert.InRange(scene.Height, 2100, DiffInfographic.MaximumHeight);
+        Assert.True(scene.Height >= 2100);
         Assert.All(detailSections, section => Assert.True(section.Top + 66 + section.Lines.Count * 57 <= section.Bottom));
         Assert.All(detailSections, section => Assert.True(section.Bottom <= scene.Height - 36));
-        Assert.Contains("+ 4 more embedded highlights omitted", Assert.Single(detailSections, x => x.Id == "embedded-highlights").Lines);
-        Assert.Contains("+ 5 more deep-property details omitted", Assert.Single(detailSections, x => x.Id == "deep-properties").Lines);
-        Assert.Contains("+ 4 more metadata changes omitted", Assert.Single(detailSections, x => x.Id == "metadata").Lines);
-        Assert.Contains("+ 5 more chunk observations omitted", Assert.Single(detailSections, x => x.Id == "chunks").Lines);
-        Assert.Equal(scene.Warnings, coverage.Lines);
+        Assert.Contains("+ 4 more embedded highlights omitted", Assert.Single(detailSections, x => x.Id == "embedded-highlights").Lines.Select(x => x.Text));
+        Assert.Contains("+ 5 more deep-property details omitted", Assert.Single(detailSections, x => x.Id == "deep-properties").Lines.Select(x => x.Text));
+        var metadata = Assert.Single(detailSections, x => x.Id == "metadata");
+        Assert.Equal(24, metadata.Lines.Count);
+        Assert.DoesNotContain(metadata.Lines.Select(x => x.Text), x => x.Contains("omitted", StringComparison.Ordinal));
+        Assert.Contains("+ 5 more chunk observations omitted", Assert.Single(detailSections, x => x.Id == "chunks").Lines.Select(x => x.Text));
+        Assert.Equal(scene.Warnings, coverage.Lines.Select(x => x.Text));
         Assert.Equal("Coverage notes: 11 below", DiffInfographicPainter.SpatialFooterLabel(scene));
     }
 
@@ -177,7 +180,7 @@ public sealed class DiffInfographicTests
         second.SaveAsPng(secondOutput);
 
         Assert.Equal(1400, image.Width);
-        Assert.InRange(image.Height, 900, 2200);
+        Assert.True(image.Height >= DiffInfographic.MinimumHeight);
         Assert.True(output.Length > 20_000);
         var encoded = output.ToArray();
         Assert.Equal(encoded, secondOutput.ToArray());
@@ -200,11 +203,13 @@ public sealed class DiffInfographicTests
 
         var scene = DiffInfographic.BuildScene(report, "a", "b");
 
-        Assert.Equal(new DiffInfographicCounts(1, 0, 1), scene.Counts);
+        Assert.Equal(new DiffInfographicCounts(1, 0, 0), scene.Placements.Counts);
+        Assert.Equal(new DiffInfographicCounts(0, 0, 1), scene.Embedded.Counts);
         Assert.Equal(new DiffInfographicDetailCounts(2, 2, 1), scene.DetailCounts);
         Assert.Equal(1, scene.Spatial.UnpositionedChanges);
         Assert.Equal(0, scene.Spatial.PlottedChanges);
-        Assert.Equal("PLACEMENTS + EMBEDDED", scene.CountScopeLabel);
+        Assert.Equal("Placements", scene.Placements.Title);
+        Assert.Equal("Embedded", scene.Embedded.Title);
     }
 
     [Fact]
@@ -223,11 +228,15 @@ public sealed class DiffInfographicTests
         var scene = DiffInfographic.BuildScene(report, "a", "b");
         var metadata = Assert.Single(scene.Sections, x => x.Id == "metadata");
 
-        Assert.Equal(new DiffInfographicCounts(0, 0, 0), scene.Counts);
+        Assert.Equal(new DiffInfographicCounts(0, 0, 0), scene.Placements.Counts);
+        Assert.Equal(new DiffInfographicCounts(0, 0, 0), scene.Embedded.Counts);
         Assert.Equal(3, scene.DetailCounts.Metadata);
-        Assert.Contains(metadata.Lines, x => x == "+ custom.added: yes");
-        Assert.Contains(metadata.Lines, x => x == "− custom.removed: yes");
-        Assert.Contains(metadata.Lines, x => x == "~ Password present: False to True");
+        Assert.Contains(metadata.Lines.Select(x => x.Text), x => x == "+ custom.added: yes");
+        Assert.Contains(metadata.Lines.Select(x => x.Text), x => x == "− custom.removed: yes");
+        Assert.Contains(metadata.Lines.Select(x => x.Text), x => x == "~ Password present");
+        Assert.Contains(metadata.Lines.Select(x => x.Text), x => x == "− False");
+        Assert.Contains(metadata.Lines.Select(x => x.Text), x => x == "+ True");
+        Assert.All(metadata.Lines, x => Assert.Equal(x.Text.StartsWith('~'), !x.Mono));
     }
 
     [Fact]
@@ -297,8 +306,8 @@ public sealed class DiffInfographicTests
         };
 
         var scene = DiffInfographic.BuildScene(report, "a", "b");
-        var rangeFont = TestFont(15);
-        var coverageFont = TestFont(15, bold: true);
+        var rangeFont = MonoTestFont(15);
+        var coverageFont = MonoTestFont(15, bold: true);
         var fittedCoverage = DiffInfographicText.Fit(scene.Spatial.CoverageLabel, coverageFont, 440);
         var coverageWidth = SixLabors.Fonts.TextMeasurer.MeasureAdvance(fittedCoverage, new SixLabors.Fonts.TextOptions(coverageFont)).Width;
         var fittedRange = DiffInfographicText.Fit(scene.Spatial.RangeLabel, rangeFont, 1200 - coverageWidth - 32);
@@ -307,12 +316,91 @@ public sealed class DiffInfographicTests
         Assert.True(rangeWidth + coverageWidth + 32 <= 1200.5f);
     }
 
-    private static SixLabors.Fonts.Font TestFont(float size, bool bold = false)
+    private static SixLabors.Fonts.Font MonoTestFont(float size, bool bold = false)
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "GbxSizeTree", "Resources", "Fonts", bold
-            ? "AtkinsonHyperlegibleNext-Bold.ttf" : "AtkinsonHyperlegibleNext-Regular.ttf");
+            ? "JetBrainsMono-Bold.ttf" : "JetBrainsMono-Regular.ttf");
         var collection = new SixLabors.Fonts.FontCollection();
         return collection.Add(path).CreateFont(size);
+    }
+
+    [Fact]
+    public void MonoFontResources_AreEmbeddedJetBrainsMono()
+    {
+        Assert.Equal("JetBrains Mono", DiffInfographicFonts.Mono(15).Family.Name);
+        Assert.Equal("JetBrains Mono", DiffInfographicFonts.MonoBold(15).Family.Name);
+    }
+
+    [Fact]
+    public void BuildScene_MetadataLinesAreRenderedMonospace()
+    {
+        var report = Empty() with
+        {
+            MapUid = new("u5byRl2QnqZ6a1e_YumY._6plk", "36ROAOA.O5tyi7744S_L9xyQ1k"),
+            MetadataChanges = [new("editor.version", new(Integer: 100), new(Integer: 101))],
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var metadata = Assert.Single(scene.Sections, x => x.Id == "metadata");
+
+        Assert.Equal(
+            ["~ Map UID", "− u5byRl2QnqZ6a1e_YumY._6plk", "+ 36ROAOA.O5tyi7744S_L9xyQ1k", "~ editor.version", "− 100", "+ 101"],
+            metadata.Lines.Select(x => x.Text));
+        Assert.False(metadata.Lines[0].Mono);
+        Assert.True(metadata.Lines[1].Mono);
+        Assert.True(metadata.Lines[2].Mono);
+    }
+
+    [Fact]
+    public void BuildScene_ProseSectionLinesAreNotMarkedMonospace()
+    {
+        var scene = DiffInfographic.BuildScene(Empty() with { Chunks = [new("old", "new", "chunk")] }, "a", "b");
+        var chunks = Assert.Single(scene.Sections, x => x.Id == "chunks");
+
+        Assert.All(chunks.Lines, x => Assert.False(x.Mono));
+    }
+
+    [Fact]
+    public void BuildScene_PlacementSummaryGroupsByKindAndNameAndSortsCountDescThenName()
+    {
+        var report = Empty() with
+        {
+            Blocks =
+            [
+                new(null, Block("PlatformTechInvisible", 0, 0)),
+                new(null, Block("PlatformTechInvisible", 32, 0)),
+                new(null, Block("PlatformTechInvisible", 64, 0)),
+                new(null, Block("PlatformTechInvisible", 96, 0)),
+                new(null, Block("PlatformTechInvisible", 128, 0)),
+                new(Block("Zed", 160, 0), null),
+                new(Block("Zed", 192, 0), null),
+                new(Block("Mood", 224, 0), Block("Mood", 256, 0)),
+                new(Block("Mood", 288, 0), Block("Mood", 320, 0)),
+                new(Block("Mood", 352, 0), Block("Mood", 384, 0)),
+            ],
+            Items =
+            [
+                new(null, Item("Items/BF2/speq/bf2 special.Item.Gbx", 0, 32)),
+                new(null, Item("Items/BF2/speq/bf2 special.Item.Gbx", 32, 32)),
+            ],
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var summary = Assert.Single(scene.Sections, x => x.Id == "placement-summary");
+
+        Assert.Equal(
+            ["+ 5x PlatformTechInvisible", "~ 3x Mood", "+ 2x Items/BF2/speq/bf2 special.Item.Gbx", "− 2x Zed"],
+            summary.Lines.Select(x => x.Text));
+        Assert.Equal("Placement summary · 4 names", summary.Title);
+        Assert.All(summary.Lines, x => Assert.True(x.Mono));
+    }
+
+    [Fact]
+    public void BuildScene_EmptyDiffHasNoPlacementSummarySection()
+    {
+        var scene = DiffInfographic.BuildScene(Empty(), "", "");
+
+        Assert.DoesNotContain(scene.Sections, x => x.Id == "placement-summary");
     }
 
     [Fact]
@@ -329,14 +417,14 @@ public sealed class DiffInfographicTests
         };
 
         var scene = DiffInfographic.BuildScene(report, "a", "b");
-        var allText = string.Join('\n', scene.Sections.SelectMany(x => x.Lines));
+        var allText = string.Join('\n', scene.Sections.SelectMany(x => x.Lines.Select(line => line.Text)));
 
         Assert.DoesNotContain("Scale", allText, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("13", allText);
         Assert.Contains("non-additive", allText, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("trial budget exhausted", allText);
-        Assert.Equal(1, scene.Counts.Added);
-        Assert.Equal(1, scene.Counts.Removed);
+        Assert.Equal(1, scene.Placements.Counts.Added);
+        Assert.Equal(1, scene.Placements.Counts.Removed);
     }
 
     [Fact]
@@ -344,8 +432,9 @@ public sealed class DiffInfographicTests
     {
         var scene = DiffInfographic.BuildScene(Empty(), "", "");
 
-        Assert.InRange(scene.Height, DiffInfographic.MinimumHeight, DiffInfographic.MaximumHeight);
-        Assert.Equal(new DiffInfographicCounts(0, 0, 0), scene.Counts);
+        Assert.InRange(scene.Height, DiffInfographic.MinimumHeight, int.MaxValue);
+        Assert.Equal(new DiffInfographicCounts(0, 0, 0), scene.Placements.Counts);
+        Assert.Equal(new DiffInfographicCounts(0, 0, 0), scene.Embedded.Counts);
         Assert.Equal(0, scene.Spatial.PlottedChanges);
         Assert.Equal(["hero", "change-counts", "spatial-context"], scene.Sections.Select(x => x.Id));
     }
@@ -359,7 +448,7 @@ public sealed class DiffInfographicTests
         var metadata = Assert.Single(scene.Sections, x => x.Id == "metadata");
 
         Assert.Equal(1, scene.DetailCounts.Metadata);
-        Assert.Equal("~ map.name: Before to After", Assert.Single(metadata.Lines));
+        Assert.Equal(["~ map.name", "− Before", "+ After"], metadata.Lines.Select(x => x.Text));
     }
 
     [Fact]
@@ -375,9 +464,10 @@ public sealed class DiffInfographicTests
         var metadata = Assert.Single(scene.Sections, x => x.Id == "metadata");
 
         Assert.Equal(2, scene.DetailCounts.Metadata);
-        Assert.Equal(new DiffInfographicCounts(0, 0, 0), scene.Counts);
-        Assert.Equal(2, metadata.Lines.Count);
-        Assert.Single(metadata.Lines, x => x.StartsWith("~ Map name:", StringComparison.Ordinal));
+        Assert.Equal(new DiffInfographicCounts(0, 0, 0), scene.Placements.Counts);
+        Assert.Equal(new DiffInfographicCounts(0, 0, 0), scene.Embedded.Counts);
+        Assert.Equal(6, metadata.Lines.Count);
+        Assert.Single(metadata.Lines, x => x.Text.StartsWith("~ Map name", StringComparison.Ordinal));
     }
 
     [Fact]

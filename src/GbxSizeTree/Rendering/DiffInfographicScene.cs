@@ -2,6 +2,8 @@ namespace GbxSizeTree.Cli.Rendering;
 
 public sealed record DiffInfographicCounts(int Added, int Removed, int Changed);
 
+public sealed record DiffInfographicCountGroup(string Title, DiffInfographicCounts Counts);
+
 public sealed record DiffInfographicDetailCounts(int Metadata, int DeepProperties, int Chunks);
 
 public sealed record DiffInfographicPoint(float X, float Z, DiffInfographicChangeKind Kind, string Label);
@@ -28,7 +30,12 @@ public sealed record DiffInfographicSpatialScene(
     string RangeLabel,
     string CoverageLabel);
 
-public sealed record DiffInfographicSection(string Id, string Title, IReadOnlyList<string> Lines, int Left, int Top, int Right, int Bottom);
+public sealed record DiffInfographicSectionLine(string Text, bool Mono = false)
+{
+    public static implicit operator DiffInfographicSectionLine(string text) => new(text);
+}
+
+public sealed record DiffInfographicSection(string Id, string Title, IReadOnlyList<DiffInfographicSectionLine> Lines, int Left, int Top, int Right, int Bottom);
 
 public sealed record DiffInfographicScene(
     int Width,
@@ -38,8 +45,8 @@ public sealed record DiffInfographicScene(
     long LeftBytes,
     long RightBytes,
     long DeltaBytes,
-    DiffInfographicCounts Counts,
-    string CountScopeLabel,
+    DiffInfographicCountGroup Placements,
+    DiffInfographicCountGroup Embedded,
     DiffInfographicDetailCounts DetailCounts,
     DiffInfographicSpatialScene Spatial,
     IReadOnlyList<DiffInfographicSection> Sections,
