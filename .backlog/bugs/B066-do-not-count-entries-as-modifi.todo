@@ -19,3 +19,5 @@ Diff logic currently treats an entry as modified/changed when its compressed siz
 Lane plan: runs first in a serial lane with B065 (shared diff-path files). See B065 for details.
 
 Decision (2026-09-11): the v206->v207 pair named in this ticket does not exist on disk (~/Downloads has no Sweet maps; /home/xertrov/tm-docs/Maps/SB2 goes up to v206). Substitute verification: (1) the established SB2 pair v205 -> v206 for spurious modified entries, (2) ~/Downloads 'Sweet 2 Burger v180 (Ultra2).Map.gbx' vs '..._recompressed.Map.gbx' as the recompression-only case.
+
+Result (2026-09-11): EmbeddedDiff now compares content SHA-256 only; compressed-size-only deltas no longer surface as modified. Regression test: CompareMaps_CompressedSizeOnlyDeltaIsNotModified (RED before fix, GREEN after). Real pairs v205->v206 and v180->recompressed: no same-hash entries existed, and diff JSON is byte-identical before/after (no functional change on these maps).
