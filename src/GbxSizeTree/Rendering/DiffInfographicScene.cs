@@ -67,7 +67,10 @@ public enum DiffInfographicTableDensity
 
 public sealed record DiffInfographicTable(
     IReadOnlyList<DiffInfographicTableRow> Rows,
-    DiffInfographicTableDensity Density = DiffInfographicTableDensity.Standard);
+    DiffInfographicTableDensity Density = DiffInfographicTableDensity.Standard,
+    string MarkerHeader = "+/−",
+    string PathHeader = "PATH",
+    string ValueHeader = "SIZE CHANGE");
 
 public sealed record DiffInfographicSection(
     string Id,
