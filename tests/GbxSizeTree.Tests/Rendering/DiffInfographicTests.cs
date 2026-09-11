@@ -161,6 +161,8 @@ public sealed class DiffInfographicTests
         Assert.Equal(changes.Length, rows.Select(x => x.Path).Distinct(StringComparer.Ordinal).Count());
         Assert.Equal(rows.Select(x => x.Path).Order(StringComparer.Ordinal), rows.Select(x => x.Path));
         Assert.All(complete, x => Assert.Equal(DiffInfographicTableDensity.Compact, x.Table!.Density));
+        var embeddedAccent = DiffInfographicPainter.DetailAccent("embedded-changes").ToPixel<Rgba32>();
+        Assert.All(complete, x => Assert.Equal(embeddedAccent, DiffInfographicPainter.DetailAccent(x.Id).ToPixel<Rgba32>()));
         Assert.True(scene.Height <= 16_383);
         Assert.All(complete, x => Assert.True(x.Bottom <= scene.Height - 36));
     }

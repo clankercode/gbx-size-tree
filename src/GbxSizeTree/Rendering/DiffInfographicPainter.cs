@@ -31,6 +31,15 @@ internal static class DiffInfographicPainter
         DiffInfographicFonts.Mono(density == DiffInfographicTableDensity.Compact ? 14 : 16);
     private static Font TableHeaderFont(DiffInfographicTableDensity density) =>
         DiffInfographicFonts.Bold(density == DiffInfographicTableDensity.Compact ? 12 : 13);
+    internal static Color DetailAccent(string sectionId) =>
+        sectionId == "embedded-highlights" || sectionId.StartsWith("embedded-changes", StringComparison.Ordinal)
+            ? Cyan
+            : sectionId switch
+            {
+                "deep-properties" or "chunks" => Changed,
+                "metadata" => Added,
+                _ => Removed,
+            };
 
     public static Image<Rgba32> Paint(DiffInfographicScene scene)
     {
@@ -196,7 +205,7 @@ internal static class DiffInfographicPainter
         var detailSections = scene.Sections.Where(x => x.Top >= 1000).ToArray();
         foreach (var section in detailSections)
         {
-            var accent = section.Id switch { "embedded-highlights" or "embedded-changes" => Cyan, "deep-properties" or "chunks" => Changed, "metadata" => Added, _ => Removed };
+            var accent = DetailAccent(section.Id);
             c.Fill(Panel, Rounded(section.Left, section.Top, section.Right - section.Left, section.Bottom - section.Top, 22));
             c.Draw(PanelEdge, 2, Rounded(section.Left, section.Top, section.Right - section.Left, section.Bottom - section.Top, 22));
             c.Fill(accent, Rounded(section.Left, section.Top, 8, section.Bottom - section.Top, 4));
