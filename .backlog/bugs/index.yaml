@@ -67,3 +67,4 @@ bugs:
     - file: B066-do-not-count-entries-as-modifi.todo
     - file: B067-infographic-split-placements-e.todo
     - file: B068-xz-spatial-context-zoom-to-pad.todo
+    - file: B069-embedded-highlights-real-highl.todo
