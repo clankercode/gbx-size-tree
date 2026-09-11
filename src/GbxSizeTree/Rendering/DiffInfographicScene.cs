@@ -6,7 +6,12 @@ public sealed record DiffInfographicCountGroup(string Title, DiffInfographicCoun
 
 public sealed record DiffInfographicDetailCounts(int Metadata, int DeepProperties, int Chunks);
 
-public sealed record DiffInfographicPoint(float X, float Z, DiffInfographicChangeKind Kind, string Label);
+public sealed record DiffInfographicPoint(
+    float X,
+    float Z,
+    DiffInfographicChangeKind Kind,
+    string Label,
+    bool EdgePinned = false);
 
 public sealed record DiffInfographicViewport(double MinX, double MaxX, double MinZ, double MaxZ)
 {

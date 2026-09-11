@@ -469,6 +469,7 @@ public sealed class DiffInfographicTests
             Assert.InRange(point.Z, 0, 1);
         });
         Assert.Equal(2, scene.Spatial.EdgePinnedContext);
+        Assert.Equal(2, scene.Spatial.Context.Count(point => point.EdgePinned));
         Assert.Contains(scene.Warnings, x => x.Contains("outside the padded change viewport", StringComparison.Ordinal));
         Assert.DoesNotContain(scene.Warnings, x => x.Contains("percentile", StringComparison.OrdinalIgnoreCase));
     }
@@ -575,7 +576,7 @@ public sealed class DiffInfographicTests
         Assert.InRange(xMinimum.Right, plot.Left, plot.Right);
         Assert.InRange(xMaximum.Left, plot.Left, plot.Right);
         Assert.InRange(xMaximum.Right, plot.Left, plot.Right);
-        Assert.True(xMinimum.Right <= xMaximum.Left);
+        Assert.True(xMinimum.Right + 12 <= xMaximum.Left);
         Assert.InRange(zMinimum.Left, 0, plot.X);
         Assert.InRange(zMinimum.Right, 0, plot.X);
         Assert.InRange(zMaximum.Left, 0, plot.X);

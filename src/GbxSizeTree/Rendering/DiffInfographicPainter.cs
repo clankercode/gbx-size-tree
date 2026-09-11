@@ -178,7 +178,7 @@ internal static class DiffInfographicPainter
         {
             DrawAxisLabels(c, viewport);
             foreach (var point in scene.Spatial.Context)
-                c.Fill(Color.FromRgba(157, 176, 188, 35), new EllipsePolygon(plot.X + point.X * plot.Width, plot.Y + (1 - point.Z) * plot.Height, 2.1f));
+                DrawContextPoint(c, point, plot);
             foreach (var point in scene.Spatial.Changes)
             {
                 var color = PointColor(point.Kind);
@@ -200,6 +200,25 @@ internal static class DiffInfographicPainter
         }
 
         DrawSpatialNotes(c, scene, 750, 684, 530);
+    }
+
+    private static void DrawContextPoint(IImageProcessingContext c, DiffInfographicPoint point, RectangleF plot)
+    {
+        var cx = plot.X + point.X * plot.Width;
+        var cy = plot.Y + (1 - point.Z) * plot.Height;
+        if (!point.EdgePinned)
+        {
+            c.Fill(Color.FromRgba(157, 176, 188, 35), new EllipsePolygon(cx, cy, 2.1f));
+            return;
+        }
+
+        // A point centred on an edge loses half its mark, and a corner loses three quarters.
+        // Pull pinned context just inside the plot and give it a ring so clipping stays visible.
+        const float markerRadius = 5;
+        cx = Math.Clamp(cx, plot.Left + markerRadius, plot.Right - markerRadius);
+        cy = Math.Clamp(cy, plot.Top + markerRadius, plot.Bottom - markerRadius);
+        c.Fill(Color.FromRgba(157, 176, 188, 48), new EllipsePolygon(cx, cy, markerRadius));
+        c.Draw(Color.FromRgba(157, 176, 188, 180), 1.5f, new EllipsePolygon(cx, cy, 3));
     }
 
     internal static InfographicSpatialAxisLabels MeasureSpatialAxisLabels(DiffInfographicViewport viewport)

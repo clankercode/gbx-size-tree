@@ -187,7 +187,8 @@ public static class DiffInfographic
         var edgePinnedChanges = changePositions.Count(p => Outside(p, viewport));
         var edgePinnedContext = context.Count(x => Outside(x.Position, viewport));
         DiffInfographicPoint N(SpatialPosition p, DiffInfographicChangeKind kind, string label) => new(
-            NormalizeAxis(p.X, minX, maxX), NormalizeAxis(p.Z, minZ, maxZ), kind, DiffInfographicText.Clean(label));
+            NormalizeAxis(p.X, minX, maxX), NormalizeAxis(p.Z, minZ, maxZ), kind,
+            DiffInfographicText.Clean(label), Outside(p, viewport));
         var normalizedChanges = changes.Select(x => N(x.Position!.Value, x.Kind, x.Label)).ToArray();
         var normalizedContext = context.Select(x => N(x.Position, x.Kind, x.Label)).ToArray();
         var xRange = DiffInfographicText.PositionPair(minX, maxX);
