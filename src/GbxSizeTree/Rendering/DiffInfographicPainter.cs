@@ -25,6 +25,7 @@ internal static class DiffInfographicPainter
     private const float TablePathInset = 64;
     private const float TableRightInset = 28;
     private const float TableColumnGap = 18;
+    private const string ChangeMarkerHeader = "+/−";
     private const string SizeChangeHeader = "SIZE CHANGE";
     internal static Font TableFont(DiffInfographicTableDensity density) =>
         DiffInfographicFonts.Mono(density == DiffInfographicTableDensity.Compact ? 14 : 16);
@@ -247,6 +248,7 @@ internal static class DiffInfographicPainter
         var font = TableFont(table.Density);
         var headerFont = TableHeaderFont(table.Density);
         var columns = MeasureTableColumns(table.Rows, section.Left, section.Right, table.Density);
+        c.DrawText(ChangeMarkerHeader, headerFont, Muted, new PointF(columns.MarkerX, top));
         c.DrawText("PATH", headerFont, Muted, new PointF(columns.PathX, top));
         c.DrawText(SizeChangeHeader, headerFont, Muted, new PointF(columns.ValueLeft, top));
         top += DiffInfographicLayout.TableHeaderHeight;
