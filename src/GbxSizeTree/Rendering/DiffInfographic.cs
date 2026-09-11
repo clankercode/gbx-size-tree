@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using GbxSizeTree.Cli.Modes;
 using GbxSizeTree.Measure;
 using GbxSizeTree.Semantics;
@@ -56,25 +57,25 @@ public static class DiffInfographic
             finiteChanges.Length == 0 ? 0 : finiteContext.Length - sampledContext.Length, invalidContext,
             finiteChanges.Length == 0 ? finiteContext.Length : 0);
 
-        var sectionContent = new List<(string Id, string Title, IReadOnlyList<DiffInfographicSectionLine> Lines, DiffInfographicTable? Table)>();
+        var sectionContent = new List<(string Id, string Title, IReadOnlyList<DiffInfographicSectionLine> Lines, DiffInfographicTable? Table, IReadOnlyList<DiffInfographicMetadataItem>? Items)>();
         var embeddedRows = EmbeddedRows(report);
         var highlights = Highlights(report, embeddedRows);
         if (highlights.Rows.Count > 0 || highlights.Notes.Count > 0)
-            sectionContent.Add(("embedded-highlights", "Embedded highlights", highlights.Notes, new(highlights.Rows)));
+            sectionContent.Add(("embedded-highlights", "Embedded highlights", highlights.Notes, new(highlights.Rows), null));
         if (embeddedRows.Count > 0)
             AddCompactTables(sectionContent, "embedded-changes", "All embedded changes", embeddedRows.Select(x => x.Row).ToArray());
         var properties = Properties(report);
-        if (properties.Count > 0) sectionContent.Add(("deep-properties", $"Deep properties · {detailCounts.DeepProperties:N0}", properties, null));
+        if (properties.Count > 0) sectionContent.Add(("deep-properties", $"Deep properties · {detailCounts.DeepProperties:N0}", properties, null, null));
         var warnings = Warnings(report, spatial).ToArray();
-        if (warnings.Length > 0) sectionContent.Add(("coverage", "Coverage notes", warnings.Select(x => new DiffInfographicSectionLine(x)).ToArray(), null));
+        if (warnings.Length > 0) sectionContent.Add(("coverage", "Coverage notes", warnings.Select(x => new DiffInfographicSectionLine(x)).ToArray(), null, null));
         var metadata = Metadata(report);
-        if (metadata.Count > 0) sectionContent.Add(("metadata", $"Metadata · {detailCounts.Metadata:N0}", metadata, null));
+        if (metadata.Count > 0) sectionContent.Add(("metadata", $"Metadata · {detailCounts.Metadata:N0}", [], null, metadata));
         var chunks = Chunks(report);
-        if (chunks.Count > 0) sectionContent.Add(("chunks", $"Chunk observations · {detailCounts.Chunks:N0}", chunks, null));
+        if (chunks.Count > 0) sectionContent.Add(("chunks", $"Chunk observations · {detailCounts.Chunks:N0}", chunks, null, null));
         var placementSummary = PlacementSummary(placementChanges);
         if (placementSummary.Count > 0)
         {
-            sectionContent.Add(("placement-summary", $"Placement summary · {placementSummary.Count:N0} names", placementSummary, null));
+            sectionContent.Add(("placement-summary", $"Placement summary · {placementSummary.Count:N0} names", placementSummary, null, null));
             AddPlacementTables(sectionContent, report);
         }
 
@@ -92,8 +93,10 @@ public static class DiffInfographic
             var top = fullWidth ? Math.Max(columnTops[0], columnTops[1]) : columnTops[column];
             var left = fullWidth ? 70 : column == 0 ? 70 : 710;
             var right = fullWidth ? 1330 : left + 620;
-            var requestedBottom = top + DiffInfographicLayout.SectionHeight(content.Lines, content.Table, right - left);
-            sections.Add(new(content.Id, content.Title, content.Lines, left, top, right, requestedBottom, content.Table));
+            var requestedBottom = top + (content.Items is { Count: > 0 }
+                ? DiffInfographicLayout.SectionHeight(0, content.Table, content.Items)
+                : DiffInfographicLayout.SectionHeight(content.Lines, content.Table, right - left));
+            sections.Add(new(content.Id, content.Title, content.Lines, left, top, right, requestedBottom, content.Table, content.Items));
             if (fullWidth)
                 columnTops[0] = columnTops[1] = requestedBottom + DiffInfographicLayout.SectionGap;
             else
@@ -114,7 +117,7 @@ public static class DiffInfographic
         id.StartsWith("item-changes", StringComparison.Ordinal);
 
     private static void AddPlacementTables(
-        List<(string Id, string Title, IReadOnlyList<DiffInfographicSectionLine> Lines, DiffInfographicTable? Table)> sections,
+        List<(string Id, string Title, IReadOnlyList<DiffInfographicSectionLine> Lines, DiffInfographicTable? Table, IReadOnlyList<DiffInfographicMetadataItem>? Items)> sections,
         DiffReport report)
     {
         AddPlacementTable(sections, "ordinary-block-changes", "Added / removed ordinary blocks", report.Blocks,
@@ -126,7 +129,7 @@ public static class DiffInfographic
     }
 
     private static void AddPlacementTable<T>(
-        List<(string Id, string Title, IReadOnlyList<DiffInfographicSectionLine> Lines, DiffInfographicTable? Table)> sections,
+        List<(string Id, string Title, IReadOnlyList<DiffInfographicSectionLine> Lines, DiffInfographicTable? Table, IReadOnlyList<DiffInfographicMetadataItem>? Items)> sections,
         string id,
         string title,
         IReadOnlyList<ValueChange<T>> changes,
@@ -160,7 +163,7 @@ public static class DiffInfographic
     }
 
     private static void AddCompactTables(
-        List<(string Id, string Title, IReadOnlyList<DiffInfographicSectionLine> Lines, DiffInfographicTable? Table)> sections,
+        List<(string Id, string Title, IReadOnlyList<DiffInfographicSectionLine> Lines, DiffInfographicTable? Table, IReadOnlyList<DiffInfographicMetadataItem>? Items)> sections,
         string id,
         string title,
         IReadOnlyList<DiffInfographicTableRow> rows,
@@ -175,7 +178,7 @@ public static class DiffInfographic
             var pageId = page == 0 ? id : $"{id}-{page + 1}";
             var continuation = page == 0 ? "" : $" · continued {page + 1:N0}/{pageCount:N0}";
             sections.Add((pageId, $"{title} · {rows.Count:N0}{continuation}", [],
-                new(pageRows, DiffInfographicTableDensity.Compact, PathHeader: pathHeader, ValueHeader: valueHeader)));
+                new(pageRows, DiffInfographicTableDensity.Compact, PathHeader: pathHeader, ValueHeader: valueHeader), null));
         }
     }
 
@@ -471,25 +474,199 @@ public static class DiffInfographic
         }
     }
 
-    private static IReadOnlyList<DiffInfographicSectionLine> Metadata(DiffReport report)
+    private static IReadOnlyList<DiffInfographicMetadataItem> Metadata(DiffReport report)
     {
-        var rows = new List<DiffInfographicSectionLine>();
+        var items = new List<DiffInfographicMetadataItem>();
         foreach (var row in MetadataEntries(report))
         {
+            var label = EncodeMetadataText(row.Label);
             if (row.Left is not null && row.Right is not null)
             {
-                rows.Add($"~ {row.Label}");
-                rows.Add(new DiffInfographicSectionLine($"− {row.Left}", Mono: true));
-                rows.Add(new DiffInfographicSectionLine($"+ {row.Right}", Mono: true));
+                var prefix = $"~ {label}: ";
+                var left = EncodeMetadataText(row.Left);
+                var right = EncodeMetadataText(row.Right);
+                var candidate = new DiffInfographicMetadataLine(
+                [
+                    new(prefix + "− "),
+                    new(left, Mono: true),
+                    new("  + "),
+                    new(right, Mono: true),
+                ]);
+                if (DiffInfographicPainter.MetadataLineWidth(candidate) <= DiffInfographicLayout.MetadataTextWidth)
+                {
+                    items.Add(new([candidate]));
+                    continue;
+                }
+
+                var minimumLeftWidth = MinimumFittedValueWidth(left);
+                var minimumRightWidth = MinimumFittedValueWidth(right);
+                var fittedLabel = FitMetadataText(label, candidateLabel => Math.Max(
+                    DiffInfographicPainter.MetadataRunWidth($"~ {candidateLabel}: − ") + minimumLeftWidth,
+                    DiffInfographicPainter.MetadataRunWidth($"~ {candidateLabel}: ") +
+                        DiffInfographicPainter.MetadataRunWidth("+ ") + minimumRightWidth) <=
+                    DiffInfographicLayout.MetadataTextWidth);
+                var fittedPrefix = $"~ {fittedLabel}: ";
+                var prefixWidth = DiffInfographicPainter.MetadataRunWidth(fittedPrefix);
+                items.Add(new(
+                [
+                    MetadataValueLine(fittedPrefix + "− ", left),
+                    MetadataValueLine("+ ", right, prefixWidth),
+                ]));
             }
             else
             {
                 var marker = row.Left is null ? "+" : "−";
-                var value = row.Left is null ? row.Right! : row.Left;
-                rows.Add(new DiffInfographicSectionLine($"{marker} {row.Label}: {value}", Mono: true));
+                var value = EncodeMetadataText(row.Left is null ? row.Right! : row.Left);
+                var minimumValueWidth = MinimumFittedValueWidth(value);
+                var fittedLabel = FitMetadataText(label, candidateLabel =>
+                    DiffInfographicPainter.MetadataRunWidth($"{marker} {candidateLabel}: ") + minimumValueWidth <=
+                    DiffInfographicLayout.MetadataTextWidth);
+                items.Add(new([MetadataValueLine($"{marker} {fittedLabel}: ", value)]));
             }
         }
-        return rows;
+        return items;
+
+        static string EncodeMetadataText(string value)
+        {
+            if (value.Length == 0) return "\"\"";
+            const int maximumLength = 4096;
+            const int maximumPayloadLength = maximumLength - 2;
+            var escaped = new StringBuilder(Math.Min(value.Length, maximumPayloadLength));
+            var truncated = false;
+            var allInvisible = true;
+            for (var index = 0; index < value.Length;)
+            {
+                var (visible, consumed, invisible) = MetadataTextToken(value, index);
+                allInvisible &= invisible;
+                if (!truncated && escaped.Length + visible.Length + 1 <= maximumPayloadLength)
+                {
+                    escaped.Append(visible);
+                }
+                else
+                {
+                    truncated = true;
+                }
+                index += consumed;
+                if (truncated && !allInvisible) break;
+            }
+            if (truncated) escaped.Append('…');
+            return allInvisible ? $"\"{escaped}\"" : escaped.ToString();
+
+            static (string Visible, int Consumed, bool Invisible) MetadataTextToken(string source, int index)
+            {
+                var character = source[index];
+                if (char.IsSurrogate(character))
+                {
+                    if (!char.IsHighSurrogate(character) || index + 1 >= source.Length ||
+                        !char.IsLowSurrogate(source[index + 1]))
+                        return ($"\\u{(int)character:X4}", 1, true);
+
+                    var rune = new Rune(character, source[index + 1]);
+                    return EncodeRune(rune, consumed: 2, source, index);
+                }
+                return EncodeRune(new Rune(character), consumed: 1, source, index);
+            }
+
+            static (string Visible, int Consumed, bool Invisible) EncodeRune(
+                Rune rune,
+                int consumed,
+                string source,
+                int index)
+            {
+                var invisible = Rune.IsWhiteSpace(rune) || Rune.GetUnicodeCategory(rune) is
+                    UnicodeCategory.Control or UnicodeCategory.Format;
+                var visible = rune.Value switch
+                {
+                    '\\' => "\\\\",
+                    '"' => "\\\"",
+                    ' ' when index == 0 || index + 1 == source.Length ||
+                        !IsVisibleNeighbor(source[index - 1]) || !IsVisibleNeighbor(source[index + 1]) => "\\s",
+                    ' ' => " ",
+                    '\t' => "\\t",
+                    '\r' => "\\r",
+                    '\n' => "\\n",
+                    '\0' => "\\0",
+                    _ when invisible => rune.Value <= char.MaxValue
+                        ? $"\\u{rune.Value:X4}"
+                        : $"\\U{rune.Value:X8}",
+                    _ => rune.ToString(),
+                };
+                return (visible, consumed, invisible);
+            }
+
+            static bool IsVisibleNeighbor(char character) =>
+                !char.IsWhiteSpace(character) &&
+                !char.IsControl(character) &&
+                !char.IsSurrogate(character) &&
+                char.GetUnicodeCategory(character) != UnicodeCategory.Format;
+        }
+
+        static float MinimumFittedValueWidth(string value)
+        {
+            var valueWidth = DiffInfographicPainter.MetadataRunWidth(value, mono: true);
+            return value == "\"\""
+                ? valueWidth
+                : Math.Min(valueWidth, DiffInfographicPainter.MetadataRunWidth(
+                    IsQuotedMetadataText(value) ? "\"…\"" : "…", mono: true));
+        }
+
+        static bool IsQuotedMetadataText(string value) =>
+            value.Length >= 2 && value[0] == '"' && value[^1] == '"';
+
+        static string FitMetadataText(string value, Func<string, bool> fits)
+        {
+            if (fits(value)) return value;
+
+            var quoted = IsQuotedMetadataText(value);
+            var start = quoted ? 1 : 0;
+            var end = quoted ? value.Length - 1 : value.Length;
+            var tokens = new List<string>();
+            for (var index = start; index < end;)
+            {
+                var length = MetadataTextTokenLength(value, index, end);
+                tokens.Add(value.Substring(index, length));
+                index += length;
+            }
+
+            var prefix = quoted ? "\"" : "";
+            var suffix = quoted ? "…\"" : "…";
+            if (!fits(prefix + suffix)) return "";
+            var low = 0;
+            var high = tokens.Count;
+            while (low < high)
+            {
+                var middle = (low + high + 1) / 2;
+                var candidate = prefix + string.Concat(tokens.Take(middle)) + suffix;
+                if (fits(candidate)) low = middle;
+                else high = middle - 1;
+            }
+            return prefix + string.Concat(tokens.Take(low)) + suffix;
+
+            static int MetadataTextTokenLength(string encoded, int index, int end)
+            {
+                if (encoded[index] == '\\' && index + 1 < end)
+                {
+                    if (encoded[index + 1] == 'u' && index + 6 <= end) return 6;
+                    if (encoded[index + 1] == 'U' && index + 10 <= end) return 10;
+                    return 2;
+                }
+                return char.IsHighSurrogate(encoded[index]) && index + 1 < end &&
+                    char.IsLowSurrogate(encoded[index + 1]) ? 2 : 1;
+            }
+        }
+
+        static DiffInfographicMetadataLine MetadataValueLine(string prefix, string value, float indent = 0)
+        {
+            var available = Math.Max(0, DiffInfographicLayout.MetadataTextWidth - indent -
+                DiffInfographicPainter.MetadataRunWidth(prefix));
+            var fittedValue = FitMetadataText(value, candidate =>
+                DiffInfographicPainter.MetadataRunWidth(candidate, mono: true) <= available);
+            return new(
+            [
+                new(prefix),
+                new(fittedValue, Mono: true),
+            ], indent);
+        }
     }
 
     private static IReadOnlyList<DiffInfographicSectionLine> PlacementSummary(

@@ -55,6 +55,17 @@ public sealed record DiffInfographicSectionLine(string Text, bool Mono = false)
     public static implicit operator DiffInfographicSectionLine(string text) => new(text);
 }
 
+public sealed record DiffInfographicTextRun(string Text, bool Mono = false);
+
+public sealed record DiffInfographicMetadataLine(
+    IReadOnlyList<DiffInfographicTextRun> Runs,
+    float Indent = 0)
+{
+    public string Text => string.Concat(Runs.Select(x => x.Text));
+}
+
+public sealed record DiffInfographicMetadataItem(IReadOnlyList<DiffInfographicMetadataLine> Lines);
+
 public sealed record DiffInfographicTableRow(
     string Marker,
     string Path,
@@ -82,7 +93,11 @@ public sealed record DiffInfographicSection(
     int Top,
     int Right,
     int Bottom,
-    DiffInfographicTable? Table = null);
+    DiffInfographicTable? Table = null,
+    IReadOnlyList<DiffInfographicMetadataItem>? MetadataItems = null)
+{
+    public IReadOnlyList<DiffInfographicMetadataItem> Items => MetadataItems ?? [];
+}
 
 internal readonly record struct InfographicTableColumns(
     float MarkerX,
@@ -107,6 +122,9 @@ internal static class DiffInfographicLayout
     public const int TableRowHeight = 30;
     public const int CompactTableRowHeight = 24;
     public const int TableBottomGap = 12;
+    public const int MetadataLineHeight = 23;
+    public const int MetadataItemGap = 9;
+    public const float MetadataTextWidth = 520;
 
     public static int TableHeight(DiffInfographicTable? table) => table is null || table.Rows.Count == 0
         ? 0
@@ -138,6 +156,27 @@ internal static class DiffInfographicLayout
             : lines.Sum(line => LineBlockHeight(line, sectionWidth));
         return SectionHeader + tableHeight + linesHeight + SectionBottomPadding;
     }
+
+    public static int SectionHeight(int lineCount, DiffInfographicTable? table)
+    {
+        var tableHeight = TableHeight(table);
+        var linesHeight = Math.Max(lineCount, tableHeight == 0 ? 1 : 0) * EmptySectionContentHeight;
+        return SectionHeader + tableHeight + linesHeight + SectionBottomPadding;
+    }
+
+    public static int SectionHeight(
+        int lineCount,
+        DiffInfographicTable? table,
+        IReadOnlyList<DiffInfographicMetadataItem>? items) => items is { Count: > 0 }
+        ? SectionHeader + MetadataHeight(items) + SectionBottomPadding
+        : SectionHeight(lineCount, table);
+
+    public static int SectionHeight(DiffInfographicSection section) =>
+        SectionHeight(section.Lines.Count, section.Table, section.Items);
+
+    public static int MetadataHeight(IReadOnlyList<DiffInfographicMetadataItem> items) =>
+        items.Sum(item => item.Lines.Count * MetadataLineHeight) +
+        Math.Max(0, items.Count - 1) * MetadataItemGap;
 }
 
 public sealed record DiffInfographicScene(

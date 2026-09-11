@@ -301,19 +301,21 @@ public sealed class DiffInfographicTests
         var coverage = Assert.Single(detailSections, x => x.Id == "coverage");
 
         Assert.True(scene.Height >= 2100);
-        // The shared layout mirrors the painter's measured wrapping and table consumption.
+        // The shared layout mirrors the painter's measured wrapping, table, and metadata consumption.
         Assert.All(detailSections, section =>
         {
-            var expectedHeight = DiffInfographicLayout.SectionHeight(
-                section.Lines, section.Table, section.Right - section.Left);
+            var expectedHeight = section.Items.Count > 0
+                ? DiffInfographicLayout.SectionHeight(section)
+                : DiffInfographicLayout.SectionHeight(section.Lines, section.Table, section.Right - section.Left);
             Assert.Equal(expectedHeight, section.Bottom - section.Top);
         });
         Assert.All(detailSections, section => Assert.True(section.Bottom <= scene.Height - 36));
         Assert.Equal(5, Assert.Single(detailSections, x => x.Id == "embedded-highlights").Table!.Rows.Count);
         Assert.Contains("+ 5 more deep-property details omitted", Assert.Single(detailSections, x => x.Id == "deep-properties").Lines.Select(x => x.Text));
         var metadata = Assert.Single(detailSections, x => x.Id == "metadata");
-        Assert.Equal(24, metadata.Lines.Count);
-        Assert.DoesNotContain(metadata.Lines.Select(x => x.Text), x => x.Contains("omitted", StringComparison.Ordinal));
+        Assert.Equal(8, metadata.Items.Count);
+        Assert.All(metadata.Items, item => Assert.Single(item.Lines));
+        Assert.DoesNotContain(metadata.Items.SelectMany(x => x.Lines).Select(x => x.Text), x => x.Contains("omitted", StringComparison.Ordinal));
         Assert.Contains("+ 5 more chunk observations omitted", Assert.Single(detailSections, x => x.Id == "chunks").Lines.Select(x => x.Text));
         Assert.Equal(scene.Warnings, coverage.Lines.Select(x => x.Text));
         Assert.Equal("Coverage notes: 10 below", DiffInfographicPainter.SpatialFooterLabel(scene));
@@ -403,12 +405,15 @@ public sealed class DiffInfographicTests
         Assert.Equal(new DiffInfographicCounts(0, 0, 0), scene.Placements.Counts);
         Assert.Equal(new DiffInfographicCounts(0, 0, 0), scene.Embedded.Counts);
         Assert.Equal(3, scene.DetailCounts.Metadata);
-        Assert.Contains(metadata.Lines.Select(x => x.Text), x => x == "+ custom.added: yes");
-        Assert.Contains(metadata.Lines.Select(x => x.Text), x => x == "− custom.removed: yes");
-        Assert.Contains(metadata.Lines.Select(x => x.Text), x => x == "~ Password present");
-        Assert.Contains(metadata.Lines.Select(x => x.Text), x => x == "− False");
-        Assert.Contains(metadata.Lines.Select(x => x.Text), x => x == "+ True");
-        Assert.All(metadata.Lines, x => Assert.Equal(x.Text.StartsWith('~'), !x.Mono));
+        Assert.Contains(metadata.Items.SelectMany(x => x.Lines).Select(x => x.Text), x => x == "+ custom.added: yes");
+        Assert.Contains(metadata.Items.SelectMany(x => x.Lines).Select(x => x.Text), x => x == "− custom.removed: yes");
+        Assert.Contains(metadata.Items.SelectMany(x => x.Lines).Select(x => x.Text), x => x == "~ Password present: − False  + True");
+        Assert.All(metadata.Items, item => Assert.Single(item.Lines));
+        Assert.All(metadata.Items.SelectMany(x => x.Lines), line =>
+        {
+            Assert.Contains(line.Runs, run => !run.Mono);
+            Assert.Contains(line.Runs, run => run.Mono);
+        });
     }
 
     [Fact]
@@ -684,23 +689,331 @@ public sealed class DiffInfographicTests
     }
 
     [Fact]
-    public void BuildScene_MetadataLinesAreRenderedMonospace()
+    public void BuildScene_MetadataItemsUseOneLineWhenTheUnelidedCandidateFits()
     {
         var report = Empty() with
         {
-            MapUid = new("u5byRl2QnqZ6a1e_YumY._6plk", "36ROAOA.O5tyi7744S_L9xyQ1k"),
+            MapUid = new("short-old", "short-new"),
             MetadataChanges = [new("editor.version", new(Integer: 100), new(Integer: 101))],
         };
 
         var scene = DiffInfographic.BuildScene(report, "a", "b");
         var metadata = Assert.Single(scene.Sections, x => x.Id == "metadata");
 
+        Assert.Equal(2, metadata.Items.Count);
         Assert.Equal(
-            ["~ Map UID", "− u5byRl2QnqZ6a1e_YumY._6plk", "+ 36ROAOA.O5tyi7744S_L9xyQ1k", "~ editor.version", "− 100", "+ 101"],
-            metadata.Lines.Select(x => x.Text));
-        Assert.False(metadata.Lines[0].Mono);
-        Assert.True(metadata.Lines[1].Mono);
-        Assert.True(metadata.Lines[2].Mono);
+            ["~ Map UID: − short-old  + short-new", "~ editor.version: − 100  + 101"],
+            metadata.Items.Select(x => Assert.Single(x.Lines).Text));
+        Assert.All(metadata.Items.SelectMany(x => x.Lines), line =>
+        {
+            Assert.Contains(line.Runs, run => !run.Mono);
+            Assert.Equal(2, line.Runs.Count(run => run.Mono));
+        });
+    }
+
+    [Fact]
+    public void BuildScene_MetadataItemsUseExactlyTwoAlignedLinesWhenTheCandidateDoesNotFit()
+    {
+        var oldValue = new string('a', 80);
+        var newValue = new string('b', 80);
+        var report = Empty() with { MetadataChanges = [new("long.field", new(oldValue), new(newValue))] };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var metadata = Assert.Single(scene.Sections, x => x.Id == "metadata");
+        var item = Assert.Single(metadata.Items);
+
+        Assert.Equal(2, item.Lines.Count);
+        Assert.StartsWith("~ long.field: − ", item.Lines[0].Text, StringComparison.Ordinal);
+        Assert.StartsWith("+ ", item.Lines[1].Text, StringComparison.Ordinal);
+        var expectedIndent = DiffInfographicPainter.MetadataRunWidth("~ long.field: ");
+        Assert.InRange(item.Lines[1].Indent, expectedIndent - .01f, expectedIndent + .01f);
+        Assert.EndsWith("…", item.Lines[0].Text, StringComparison.Ordinal);
+        Assert.EndsWith("…", item.Lines[1].Text, StringComparison.Ordinal);
+        Assert.All(item.Lines, line => Assert.True(DiffInfographicPainter.MetadataLineWidth(line) <= DiffInfographicLayout.MetadataTextWidth));
+    }
+
+    [Fact]
+    public void BuildScene_MetadataEmptyWhitespaceAndControlsRemainVisiblyDistinct()
+    {
+        var report = Empty() with
+        {
+            MetadataChanges =
+            [
+                new("empty.added", null, new(Text: "")),
+                new("empty.removed", new(Text: ""), null),
+                new("empty.to.space", new(Text: ""), new(Text: " ")),
+                new("space.to.tab", new(Text: " "), new(Text: "\t")),
+                new("carriage-return.to-line-feed", new(Text: "\r"), new(Text: "\n")),
+                new("nul.added", null, new(Text: "\0")),
+            ],
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var metadata = Assert.Single(scene.Sections, x => x.Id == "metadata");
+
+        Assert.Equal(
+            [
+                "+ empty.added: \"\"",
+                "− empty.removed: \"\"",
+                "~ empty.to.space: − \"\"  + \"\\s\"",
+                "~ space.to.tab: − \"\\s\"  + \"\\t\"",
+                "~ carriage-return.to-line-feed: − \"\\r\"  + \"\\n\"",
+                "+ nul.added: \"\\0\"",
+            ],
+            metadata.Items.Select(item => Assert.Single(item.Lines).Text));
+        Assert.DoesNotContain(metadata.Items.SelectMany(x => x.Lines),
+            line => line.Text.Contains("Untitled", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void BuildScene_MetadataMixedEscapesRemainDistinctWhileOrdinarySpacesStayReadable()
+    {
+        var report = Empty() with
+        {
+            MetadataChanges =
+            [
+                new("mixed.tab", new(Text: "A B"), new(Text: "A\tB")),
+                new("mixed.nul", new(Text: "A B"), new(Text: "A\0B")),
+                new("mixed.line-ending", new(Text: "A\rB"), new(Text: "A\nB")),
+                new("literal.escape", new(Text: "A\\tB"), new(Text: "A\tB")),
+                new("literal.quote", new(Text: "A\"B"), new(Text: "A\\\"B")),
+                new("edge.spaces", new(Text: " A"), new(Text: "A  B ")),
+                new("unsafe.unicode", new(Text: "A\u00A0B"), new(Text: "A\u202EB")),
+                new("readable", null, new(Text: "Night Circuit")),
+            ],
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var metadata = Assert.Single(scene.Sections, x => x.Id == "metadata");
+
+        Assert.Equal(
+            [
+                "~ mixed.tab: − A B  + A\\tB",
+                "~ mixed.nul: − A B  + A\\0B",
+                "~ mixed.line-ending: − A\\rB  + A\\nB",
+                "~ literal.escape: − A\\\\tB  + A\\tB",
+                "~ literal.quote: − A\\\"B  + A\\\\\\\"B",
+                "~ edge.spaces: − \\sA  + A\\s\\sB\\s",
+                "~ unsafe.unicode: − A\\u00A0B  + A\\u202EB",
+                "+ readable: Night Circuit",
+            ],
+            metadata.Items.Select(item => Assert.Single(item.Lines).Text));
+        Assert.All(metadata.Items.SelectMany(x => x.Lines), line =>
+            Assert.True(DiffInfographicPainter.MetadataLineWidth(line) <= DiffInfographicLayout.MetadataTextWidth));
+    }
+
+    [Fact]
+    public void BuildScene_MetadataLabelsUseCollisionResistantEscapesAndReadableSpaces()
+    {
+        var report = Empty() with
+        {
+            MetadataChanges =
+            [
+                new("label name", null, new("value")),
+                new("label\tname", null, new("value")),
+                new("label\0name", null, new("value")),
+                new("label\rname", null, new("value")),
+                new("label\nname", null, new("value")),
+                new("label\\tname", null, new("value")),
+                new("label\"name", null, new("value")),
+                new(" label", null, new("value")),
+                new("label  name ", null, new("value")),
+                new("label\u00A0name", null, new("value")),
+                new("label\u202Ename", null, new("value")),
+            ],
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var metadata = Assert.Single(scene.Sections, x => x.Id == "metadata");
+
+        Assert.Equal(
+            [
+                "+ label name: value",
+                "+ label\\tname: value",
+                "+ label\\0name: value",
+                "+ label\\rname: value",
+                "+ label\\nname: value",
+                "+ label\\\\tname: value",
+                "+ label\\\"name: value",
+                "+ \\slabel: value",
+                "+ label\\s\\sname\\s: value",
+                "+ label\\u00A0name: value",
+                "+ label\\u202Ename: value",
+            ],
+            metadata.Items.Select(item => Assert.Single(item.Lines).Text));
+        Assert.All(metadata.Items.SelectMany(x => x.Lines), line =>
+            Assert.True(DiffInfographicPainter.MetadataLineWidth(line) <= DiffInfographicLayout.MetadataTextWidth));
+    }
+
+    [Fact]
+    public void BuildScene_MetadataLongHostileLabelsFitForOneAndTwoSidedChanges()
+    {
+        var hostileLabel = "\0bad\ud800 / 世界 / " + string.Concat(Enumerable.Repeat("very-long-label-", 300));
+        var report = Empty() with
+        {
+            MetadataChanges =
+            [
+                new(hostileLabel + ".modified", new("old"), new("new")),
+                new(hostileLabel + ".added", null, new("value")),
+            ],
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var metadata = Assert.Single(scene.Sections, x => x.Id == "metadata");
+
+        Assert.Equal([2, 1], metadata.Items.Select(x => x.Lines.Count));
+        Assert.Contains(": − ", metadata.Items[0].Lines[0].Text, StringComparison.Ordinal);
+        Assert.StartsWith("+ ", metadata.Items[0].Lines[1].Text, StringComparison.Ordinal);
+        Assert.Contains(": ", metadata.Items[1].Lines[0].Text, StringComparison.Ordinal);
+        Assert.All(metadata.Items.SelectMany(x => x.Lines), line =>
+        {
+            Assert.DoesNotContain('\0', line.Text);
+            Assert.DoesNotContain('\ud800', line.Text);
+            Assert.NotEmpty(Assert.Single(line.Runs, run => run.Mono).Text);
+            Assert.True(DiffInfographicPainter.MetadataLineWidth(line) <= DiffInfographicLayout.MetadataTextWidth);
+        });
+    }
+
+    [Fact]
+    public void BuildScene_MetadataLongEncodedLabelTruncatesOnlyAtTokenBoundaries()
+    {
+        var label = string.Concat(Enumerable.Repeat("\t\u202E\ud800😀", 1_000));
+        var quotedLabel = string.Concat(Enumerable.Repeat(" \t", 2_000));
+        var report = Empty() with
+        {
+            MetadataChanges = [new(label, new("old"), new("new")), new(quotedLabel, null, new("value"))],
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var metadata = Assert.Single(scene.Sections, x => x.Id == "metadata");
+        Assert.Equal(2, metadata.Items.Count);
+        var item = metadata.Items[0];
+
+        Assert.Equal(2, item.Lines.Count);
+        var regularRun = item.Lines[0].Runs[0].Text;
+        Assert.StartsWith("~ ", regularRun, StringComparison.Ordinal);
+        Assert.EndsWith(": − ", regularRun, StringComparison.Ordinal);
+        var fittedLabel = regularRun[2..^4];
+        Assert.EndsWith("…", fittedLabel, StringComparison.Ordinal);
+        Assert.DoesNotContain('\t', fittedLabel);
+        Assert.DoesNotContain('\u202E', fittedLabel);
+        Assert.DoesNotContain('\ud800', fittedLabel);
+
+        var encoded = fittedLabel[..^1];
+        for (var index = 0; index < encoded.Length;)
+        {
+            if (encoded.AsSpan(index).StartsWith("\\t")) index += 2;
+            else if (encoded.AsSpan(index).StartsWith("\\u202E")) index += 6;
+            else if (encoded.AsSpan(index).StartsWith("\\uD800")) index += 6;
+            else if (encoded.AsSpan(index).StartsWith("😀")) index += 2;
+            else Assert.Fail($"partial or unexpected encoded label token at offset {index}: {encoded[index..]}");
+        }
+        Assert.All(item.Lines, line =>
+            Assert.True(DiffInfographicPainter.MetadataLineWidth(line) <= DiffInfographicLayout.MetadataTextWidth));
+
+        var quotedRun = Assert.Single(metadata.Items[1].Lines).Runs[0].Text;
+        Assert.StartsWith("+ \"", quotedRun, StringComparison.Ordinal);
+        Assert.EndsWith("…\": ", quotedRun, StringComparison.Ordinal);
+        var quotedEncoding = quotedRun[3..^4];
+        for (var index = 0; index < quotedEncoding.Length;)
+        {
+            if (quotedEncoding.AsSpan(index).StartsWith("\\s") ||
+                quotedEncoding.AsSpan(index).StartsWith("\\t")) index += 2;
+            else Assert.Fail($"partial or unexpected quoted label token at offset {index}: {quotedEncoding[index..]}");
+        }
+        Assert.True(DiffInfographicPainter.MetadataLineWidth(metadata.Items[1].Lines[0]) <=
+            DiffInfographicLayout.MetadataTextWidth);
+    }
+
+    [Fact]
+    public void BuildScene_MetadataHostileWhitespaceAndControlsAreBoundedAndFitted()
+    {
+        var hostile = string.Concat(Enumerable.Repeat(" \t\r\n\0", 10_000));
+        var report = Empty() with { MetadataChanges = [new("hostile.whitespace", null, new(Text: hostile))] };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var metadata = Assert.Single(scene.Sections, x => x.Id == "metadata");
+        var line = Assert.Single(Assert.Single(metadata.Items).Lines);
+        var value = Assert.Single(line.Runs, run => run.Mono).Text;
+
+        Assert.StartsWith("\"\\s\\t\\r\\n\\0", value, StringComparison.Ordinal);
+        Assert.EndsWith("…\"", value, StringComparison.Ordinal);
+        Assert.DoesNotContain('\t', value);
+        Assert.DoesNotContain('\r', value);
+        Assert.DoesNotContain('\n', value);
+        Assert.DoesNotContain('\0', value);
+        var payload = value[1..^2];
+        Assert.Equal(0, payload.Length % 2);
+        for (var index = 0; index < payload.Length; index += 2)
+        {
+            Assert.Equal('\\', payload[index]);
+            Assert.Contains(payload[index + 1], "strn0");
+        }
+        Assert.InRange(value.Length, 1, 4096);
+        Assert.True(DiffInfographicPainter.MetadataLineWidth(line) <= DiffInfographicLayout.MetadataTextWidth);
+    }
+
+    [Fact]
+    public void Render_MetadataHostileValuesFitDeterministicallyWithoutClipping()
+    {
+        var hostile = "\0bad\ud800 / 世界 / e\u0301 / " + string.Concat(Enumerable.Repeat("very-long-value-", 300));
+        var report = Empty() with
+        {
+            MetadataChanges =
+            [
+                new("hostile.modified", new(hostile), new(hostile + "new")),
+                new("hostile.added", null, new(hostile)),
+                new("hostile.removed", new(hostile), null),
+            ],
+        };
+
+        var first = DiffInfographic.BuildScene(report, "a", "b");
+        var second = DiffInfographic.BuildScene(report, "a", "b");
+        var metadata = Assert.Single(first.Sections, x => x.Id == "metadata");
+        var secondMetadata = Assert.Single(second.Sections, x => x.Id == "metadata");
+
+        Assert.Equal(
+            metadata.Items.Select(item => item.Lines.Select(line =>
+                (line.Text, line.Indent, Runs: line.Runs.Select(run => (run.Text, run.Mono)).ToArray())).ToArray()),
+            secondMetadata.Items.Select(item => item.Lines.Select(line =>
+                (line.Text, line.Indent, Runs: line.Runs.Select(run => (run.Text, run.Mono)).ToArray())).ToArray()));
+        Assert.Equal([2, 1, 1], metadata.Items.Select(x => x.Lines.Count));
+        Assert.All(metadata.Items.SelectMany(x => x.Lines), line =>
+        {
+            Assert.DoesNotContain('\0', line.Text);
+            Assert.DoesNotContain('\ud800', line.Text);
+            Assert.True(DiffInfographicPainter.MetadataLineWidth(line) <= DiffInfographicLayout.MetadataTextWidth);
+        });
+        Assert.Equal(DiffInfographicLayout.SectionHeight(metadata), metadata.Bottom - metadata.Top);
+
+        using Image<Rgba32> image = DiffInfographic.Render(report, hostile, "");
+        using var output = new MemoryStream();
+        image.SaveAsPng(output);
+        Assert.Equal(1400, image.Width);
+        Assert.True(output.Length > 20_000);
+        Assert.Equal("PNG", System.Text.Encoding.ASCII.GetString(output.ToArray(), 1, 3));
+    }
+
+    [Fact]
+    public void BuildScene_MetadataHeightUsesCompactLineAndItemGeometry()
+    {
+        var longValue = new string('x', 80);
+        var report = Empty() with
+        {
+            MetadataChanges =
+            [
+                new("short", new("old"), new("new")),
+                new("long", new(longValue), new(longValue + "new")),
+                new("added", null, new("value")),
+            ],
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var metadata = Assert.Single(scene.Sections, x => x.Id == "metadata");
+
+        Assert.Equal([1, 2, 1], metadata.Items.Select(x => x.Lines.Count));
+        Assert.Equal(DiffInfographicLayout.SectionHeight(metadata), metadata.Bottom - metadata.Top);
+        Assert.True(metadata.Bottom - metadata.Top < DiffInfographicLayout.SectionHeight(4, null));
     }
 
     [Fact]
@@ -1022,7 +1335,8 @@ public sealed class DiffInfographicTests
         var metadata = Assert.Single(scene.Sections, x => x.Id == "metadata");
 
         Assert.Equal(1, scene.DetailCounts.Metadata);
-        Assert.Equal(["~ map.name", "− Before", "+ After"], metadata.Lines.Select(x => x.Text));
+        var item = Assert.Single(metadata.Items);
+        Assert.Equal("~ map.name: − Before  + After", Assert.Single(item.Lines).Text);
     }
 
     [Fact]
@@ -1040,8 +1354,8 @@ public sealed class DiffInfographicTests
         Assert.Equal(2, scene.DetailCounts.Metadata);
         Assert.Equal(new DiffInfographicCounts(0, 0, 0), scene.Placements.Counts);
         Assert.Equal(new DiffInfographicCounts(0, 0, 0), scene.Embedded.Counts);
-        Assert.Equal(6, metadata.Lines.Count);
-        Assert.Single(metadata.Lines, x => x.Text.StartsWith("~ Map name", StringComparison.Ordinal));
+        Assert.Equal(2, metadata.Items.Count);
+        Assert.Single(metadata.Items, item => item.Lines[0].Text.StartsWith("~ Map name:", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -1091,6 +1405,12 @@ public sealed class DiffInfographicTests
                     new($"Embedded/Items/Stadium/{i:D2}-Grandstand.Item.Gbx", "new", 510_000 + i, 1_020_000 + i)),
             }).ToArray(),
             MapName = new("Night Circuit v1", "Night Circuit v2"),
+            MetadataChanges =
+            [
+                new("editor.version", new(Integer: 100), new(Integer: 101)),
+                new("environment.decorations.renderProfile", new(Text: "Legacy dusk lighting with compact stadium signage"),
+                    new(Text: "Tournament broadcast night lighting with animated grandstand signage and extended sponsor treatment")),
+            ],
             EmbeddedPropertyChanges = [new("Grandstand.Item.Gbx", "old", "new", new(
                 [new("Item > EntityModel > Prefab > Ent#2 > Solid2Model > Material#1 > Name", new("Concrete"), new("Carbon"))], true, [], []))],
             Warnings = ["One custom chunk remained opaque; file-level change detection is still complete."],

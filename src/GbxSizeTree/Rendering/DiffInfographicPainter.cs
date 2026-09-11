@@ -39,6 +39,8 @@ internal static class DiffInfographicPainter
     private const string SizeChangeHeader = "SIZE CHANGE";
     internal static Font TableFont(DiffInfographicTableDensity density) =>
         DiffInfographicFonts.Mono(density == DiffInfographicTableDensity.Compact ? 14 : 16);
+    internal static Font MetadataRegularFont => DiffInfographicFonts.Regular(17);
+    internal static Font MetadataMonoFont => DiffInfographicFonts.Mono(16);
     internal static Font SpatialAxisFont => DiffInfographicFonts.Mono(14);
     internal static RectangleF SpatialPlotBounds => new(220, 670, 480, 480);
     private static Font TableHeaderFont(DiffInfographicTableDensity density) =>
@@ -345,6 +347,11 @@ internal static class DiffInfographicPainter
             c.DrawText(section.Title.ToUpperInvariant(), DiffInfographicFonts.Bold(20), accent, new PointF(section.Left + 30, section.Top + 24));
             float top = section.Top + DiffInfographicLayout.SectionHeader;
             if (section.Table is { Rows.Count: > 0 } table) top = DrawTable(c, section, table, top);
+            if (section.Items is { Count: > 0 } items)
+            {
+                DrawMetadata(c, section, items, top);
+                continue;
+            }
             foreach (var line in section.Lines)
             {
                 var wrapped = DiffInfographicLayout.WrapLine(line, section.Right - section.Left);
@@ -360,6 +367,37 @@ internal static class DiffInfographicPainter
                 }
                 top += DiffInfographicLayout.LineBottomGap;
             }
+        }
+    }
+
+    internal static float MetadataRunWidth(string text, bool mono = false) =>
+        TextWidth(text, mono ? MetadataMonoFont : MetadataRegularFont);
+
+    internal static float MetadataLineWidth(DiffInfographicMetadataLine line) =>
+        line.Indent + line.Runs.Sum(run => MetadataRunWidth(run.Text, run.Mono));
+
+    private static void DrawMetadata(
+        IImageProcessingContext c,
+        DiffInfographicSection section,
+        IReadOnlyList<DiffInfographicMetadataItem> items,
+        float top)
+    {
+        for (var itemIndex = 0; itemIndex < items.Count; itemIndex++)
+        {
+            var item = items[itemIndex];
+            c.Fill(Text, new EllipsePolygon(section.Left + 41, top + 10, 3));
+            foreach (var line in item.Lines)
+            {
+                var x = section.Left + 60 + line.Indent;
+                foreach (var run in line.Runs)
+                {
+                    var font = run.Mono ? MetadataMonoFont : MetadataRegularFont;
+                    c.DrawText(run.Text, font, Text, new PointF(x, top));
+                    x += TextWidth(run.Text, font);
+                }
+                top += DiffInfographicLayout.MetadataLineHeight;
+            }
+            if (itemIndex < items.Count - 1) top += DiffInfographicLayout.MetadataItemGap;
         }
     }
 
