@@ -8,6 +8,14 @@ public sealed record DiffInfographicDetailCounts(int Metadata, int DeepPropertie
 
 public sealed record DiffInfographicPoint(float X, float Z, DiffInfographicChangeKind Kind, string Label);
 
+public sealed record DiffInfographicViewport(double MinX, double MaxX, double MinZ, double MaxZ)
+{
+    public string XMinimumLabel => $"X {DiffInfographicText.Position(MinX)} m";
+    public string XMaximumLabel => $"X {DiffInfographicText.Position(MaxX)} m";
+    public string ZMinimumLabel => $"Z {DiffInfographicText.Position(MinZ)} m";
+    public string ZMaximumLabel => $"Z {DiffInfographicText.Position(MaxZ)} m";
+}
+
 public enum DiffInfographicChangeKind
 {
     Added,
@@ -18,6 +26,7 @@ public enum DiffInfographicChangeKind
 public sealed record DiffInfographicSpatialScene(
     IReadOnlyList<DiffInfographicPoint> Context,
     IReadOnlyList<DiffInfographicPoint> Changes,
+    DiffInfographicViewport? Viewport,
     int PlottedChanges,
     int SampledOutChanges,
     int InvalidChangePositions,
@@ -25,6 +34,7 @@ public sealed record DiffInfographicSpatialScene(
     int PlottedContext,
     int SampledOutContext,
     int InvalidContextPositions,
+    int ContextWithoutViewport,
     int EdgePinnedChanges,
     int EdgePinnedContext,
     string RangeLabel,

@@ -46,12 +46,15 @@ public static class DiffInfographic
         var finiteContext = rawContext.Where(IsFinite).ToArray();
         var invalidContext = rawContext.Length - finiteContext.Length;
         var plotted = Sample(finiteChanges, MaxSpatialChanges).ToArray();
-        var sampledContext = Sample(finiteContext, MaxSpatialContext)
-            .Select(x => (Position: x, Kind: DiffInfographicChangeKind.Changed, Label: "context"))
-            .ToArray();
-        var spatial = Normalize(plotted, sampledContext,
+        var sampledContext = finiteChanges.Length == 0
+            ? []
+            : Sample(finiteContext, MaxSpatialContext)
+                .Select(x => (Position: x, Kind: DiffInfographicChangeKind.Changed, Label: "context"))
+                .ToArray();
+        var spatial = Normalize(finiteChanges.Select(x => x.Position!.Value).ToArray(), plotted, sampledContext,
             finiteChanges.Length - plotted.Length, invalidChanges, unpositionedChanges,
-            finiteContext.Length - sampledContext.Length, invalidContext);
+            finiteChanges.Length == 0 ? 0 : finiteContext.Length - sampledContext.Length, invalidContext,
+            finiteChanges.Length == 0 ? finiteContext.Length : 0);
 
         var sectionContent = new List<(string Id, string Title, IReadOnlyList<DiffInfographicSectionLine> Lines, DiffInfographicTable? Table)>();
         var embeddedRows = EmbeddedRows(report);
@@ -88,9 +91,9 @@ public static class DiffInfographic
         {
             new("hero", "Map size", [], 0, 0, Width, 380),
             new("change-counts", "Exact change counts", [], 70, 380, 1330, 550),
-            new("spatial-context", "XZ spatial context", [], 70, 570, 1330, 1010),
+            new("spatial-context", "XZ spatial context", [], 70, 570, 1330, 1220),
         };
-        var columnTops = new[] { 1040, 1040 };
+        var columnTops = new[] { 1250, 1250 };
         foreach (var content in sectionContent)
         {
             var column = columnTops[0] <= columnTops[1] ? 0 : 1;
@@ -154,23 +157,35 @@ public static class DiffInfographic
             .OfType<SpatialPosition>();
 
     private static DiffInfographicSpatialScene Normalize(
+        IReadOnlyList<SpatialPosition> viewportChanges,
         IReadOnlyList<(SpatialPosition? Position, DiffInfographicChangeKind Kind, string Label)> changes,
         IReadOnlyList<(SpatialPosition Position, DiffInfographicChangeKind Kind, string Label)> context,
         int sampledOutChanges, int invalidChanges, int unpositionedChanges,
-        int sampledOutContext, int invalidContext)
+        int sampledOutContext, int invalidContext, int contextWithoutViewport)
     {
+        if (viewportChanges.Count == 0)
+        {
+            var emptyCoverage = "0 changes plotted · 0 context";
+            if (unpositionedChanges > 0) emptyCoverage += $" · {unpositionedChanges:N0} unpositioned";
+            if (invalidChanges > 0) emptyCoverage += $" · {invalidChanges:N0} invalid";
+            if (contextWithoutViewport > 0) emptyCoverage += $" · {contextWithoutViewport:N0} context without viewport";
+            return new([], [], null, 0, sampledOutChanges, invalidChanges, unpositionedChanges,
+                0, sampledOutContext, invalidContext, contextWithoutViewport, 0, 0,
+                "No finite positioned changes · viewport unavailable", emptyCoverage);
+        }
+
+        var minX = viewportChanges.Min(x => x.X);
+        var maxX = viewportChanges.Max(x => x.X);
+        var minZ = viewportChanges.Min(x => x.Z);
+        var maxZ = viewportChanges.Max(x => x.Z);
+        PadAxis(ref minX, ref maxX);
+        PadAxis(ref minZ, ref maxZ);
+        SquareRanges(ref minX, ref maxX, ref minZ, ref maxZ);
+        var viewport = new DiffInfographicViewport(minX, maxX, minZ, maxZ);
+
         var changePositions = changes.Select(x => x.Position!.Value).ToArray();
-        var points = changePositions.Concat(context.Select(x => x.Position)).ToArray();
-        var xs = points.Select(x => x.X).Order().ToArray();
-        var zs = points.Select(x => x.Z).Order().ToArray();
-        var minX = Quantile(xs, .01);
-        var maxX = Quantile(xs, .99);
-        var minZ = Quantile(zs, .01);
-        var maxZ = Quantile(zs, .99);
-        ExpandEqualRange(ref minX, ref maxX);
-        ExpandEqualRange(ref minZ, ref maxZ);
-        var edgePinnedChanges = changePositions.Count(p => p.X < minX || p.X > maxX || p.Z < minZ || p.Z > maxZ);
-        var edgePinnedContext = context.Count(x => x.Position.X < minX || x.Position.X > maxX || x.Position.Z < minZ || x.Position.Z > maxZ);
+        var edgePinnedChanges = changePositions.Count(p => Outside(p, viewport));
+        var edgePinnedContext = context.Count(x => Outside(x.Position, viewport));
         DiffInfographicPoint N(SpatialPosition p, DiffInfographicChangeKind kind, string label) => new(
             NormalizeAxis(p.X, minX, maxX), NormalizeAxis(p.Z, minZ, maxZ), kind, DiffInfographicText.Clean(label));
         var normalizedChanges = changes.Select(x => N(x.Position!.Value, x.Kind, x.Label)).ToArray();
@@ -182,27 +197,51 @@ public static class DiffInfographic
         if (invalidChanges > 0) coverage += $" · {invalidChanges:N0} invalid";
         coverage += $" · {normalizedContext.Length:N0} context";
         if (sampledOutContext > 0) coverage += $" · {sampledOutContext:N0} context sampled out";
-        return new(normalizedContext, normalizedChanges, normalizedChanges.Length,
+        if (edgePinnedContext > 0) coverage += $" · {edgePinnedContext:N0} context pinned";
+        return new(normalizedContext, normalizedChanges, viewport, normalizedChanges.Length,
             sampledOutChanges, invalidChanges, unpositionedChanges,
-            normalizedContext.Length, sampledOutContext, invalidContext,
+            normalizedContext.Length, sampledOutContext, invalidContext, contextWithoutViewport,
             edgePinnedChanges, edgePinnedContext, range, coverage);
 
-        static double Quantile(double[] values, double fraction)
+        static bool Outside(SpatialPosition position, DiffInfographicViewport bounds) =>
+            position.X < bounds.MinX || position.X > bounds.MaxX ||
+            position.Z < bounds.MinZ || position.Z > bounds.MaxZ;
+
+        static void PadAxis(ref double minimum, ref double maximum)
         {
-            if (values.Length == 0) return fraction == 0 ? 0 : 1;
-            return values[(int)Math.Round((values.Length - 1) * fraction, MidpointRounding.AwayFromZero)];
+            var halfRange = HalfRange(minimum, maximum);
+            var padding = halfRange > 640 ? 128 : Math.Clamp(halfRange * .2, 8, 128);
+            minimum = SaturatingAdd(minimum, -padding);
+            maximum = SaturatingAdd(maximum, padding);
+            if (maximum <= minimum)
+            {
+                if (minimum > 0) minimum = Math.BitDecrement(minimum);
+                else if (maximum < 0) maximum = Math.BitIncrement(maximum);
+                else { minimum = -1; maximum = 1; }
+            }
         }
 
-        static void ExpandEqualRange(ref double minimum, ref double maximum)
+        static void SquareRanges(ref double minX, ref double maxX, ref double minZ, ref double maxZ)
         {
-            if (maximum > minimum) return;
-            if (minimum == 0) { maximum = 1; return; }
-            var delta = Math.Abs(minimum) * 1e-12;
-            if (!double.IsFinite(delta) || delta == 0) delta = 1;
-            minimum = Math.Max(-double.MaxValue, minimum - delta);
-            maximum = Math.Min(double.MaxValue, maximum + delta);
-            if (maximum <= minimum) minimum = Math.BitDecrement(minimum);
-            if (maximum <= minimum) maximum = Math.BitIncrement(maximum);
+            var halfRange = Math.Max(HalfRange(minX, maxX), HalfRange(minZ, maxZ));
+            ExpandAroundCenter(ref minX, ref maxX, halfRange);
+            ExpandAroundCenter(ref minZ, ref maxZ, halfRange);
+        }
+
+        static void ExpandAroundCenter(ref double minimum, ref double maximum, double halfRange)
+        {
+            var center = minimum / 2 + maximum / 2;
+            minimum = SaturatingAdd(center, -halfRange);
+            maximum = SaturatingAdd(center, halfRange);
+        }
+
+        static double HalfRange(double minimum, double maximum) => maximum / 2 - minimum / 2;
+
+        static double SaturatingAdd(double value, double delta)
+        {
+            var result = value + delta;
+            if (double.IsFinite(result)) return result;
+            return delta < 0 ? -double.MaxValue : double.MaxValue;
         }
 
         static float NormalizeAxis(double value, double minimum, double maximum)
@@ -210,7 +249,7 @@ public static class DiffInfographic
             if (value <= minimum) return 0;
             if (value >= maximum) return 1;
             var midpoint = minimum / 2 + maximum / 2;
-            var halfRange = maximum / 2 - minimum / 2;
+            var halfRange = HalfRange(minimum, maximum);
             var normalized = halfRange > 0 && double.IsFinite(halfRange)
                 ? .5 + (value / 2 - midpoint / 2) / halfRange
                 : .5;
@@ -371,8 +410,9 @@ public static class DiffInfographic
         if (spatial.UnpositionedChanges > 0) yield return $"NOTE · {spatial.UnpositionedChanges:N0} unpositioned change{(spatial.UnpositionedChanges == 1 ? "" : "s")} included in hero counts but not the plot.";
         if (spatial.SampledOutContext > 0) yield return $"NOTE · {spatial.SampledOutContext:N0} context points sampled out of the plot.";
         if (spatial.InvalidContextPositions > 0) yield return $"NOTE · {spatial.InvalidContextPositions:N0} invalid context position{(spatial.InvalidContextPositions == 1 ? "" : "s")} could not be plotted.";
-        if (spatial.EdgePinnedChanges > 0) yield return $"NOTE · {spatial.EdgePinnedChanges:N0} plotted change{(spatial.EdgePinnedChanges == 1 ? "" : "s")} outside the 1st–99th percentile range pinned to the plot edge.";
-        if (spatial.EdgePinnedContext > 0) yield return $"NOTE · {spatial.EdgePinnedContext:N0} plotted context point{(spatial.EdgePinnedContext == 1 ? "" : "s")} outside the 1st–99th percentile range pinned to the plot edge.";
+        if (spatial.ContextWithoutViewport > 0) yield return $"NOTE · {spatial.ContextWithoutViewport:N0} context point{(spatial.ContextWithoutViewport == 1 ? "" : "s")} not plotted because no finite positioned change defines a viewport.";
+        if (spatial.EdgePinnedChanges > 0) yield return $"NOTE · {spatial.EdgePinnedChanges:N0} plotted change{(spatial.EdgePinnedChanges == 1 ? "" : "s")} outside the padded change viewport pinned to the plot edge.";
+        if (spatial.EdgePinnedContext > 0) yield return $"NOTE · {spatial.EdgePinnedContext:N0} sampled context point{(spatial.EdgePinnedContext == 1 ? "" : "s")} outside the padded change viewport pinned to the plot edge.";
     }
 
     private static string Property(EmbeddedPropertyValue? value) => value switch

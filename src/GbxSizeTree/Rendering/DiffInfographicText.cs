@@ -82,7 +82,9 @@ internal static class DiffInfographicText
     }
 
     public static string Position(double value) => double.IsFinite(value)
-        ? value.ToString("0.0##", CultureInfo.InvariantCulture)
+        ? Math.Abs(value) >= 10_000_000
+            ? value.ToString("0.###E+0", CultureInfo.InvariantCulture)
+            : value.ToString("0.0##", CultureInfo.InvariantCulture)
         : "—";
 
     private static float Width(string text, Font font) => TextMeasurer.MeasureAdvance(text, new TextOptions(font)).Width;
