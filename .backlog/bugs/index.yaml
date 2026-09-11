@@ -70,3 +70,4 @@ bugs:
     - file: B069-embedded-highlights-real-highl.todo
     - file: B070-embedded-changes-full-list-sec.todo
     - file: B071-metadata-delta-show-all-main-i.todo
+    - file: B072-use-monospace-typography-for-n.todo
