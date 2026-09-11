@@ -35,7 +35,7 @@ internal static class DiffInfographicPainter
     private const float TableColumnGap = 18;
     private const float SpatialAxisGap = 14;
     private const float SpatialXAxisLabelGap = 12;
-    private const string ChangeMarkerHeader = "+/−";
+    internal const string FooterLabel = "gbx-size-tree  ·  exact counts, complete placement detail";
     private const string SizeChangeHeader = "SIZE CHANGE";
     internal static Font TableFont(DiffInfographicTableDensity density) =>
         DiffInfographicFonts.Mono(density == DiffInfographicTableDensity.Compact ? 14 : 16);
@@ -46,7 +46,13 @@ internal static class DiffInfographicPainter
     internal static Color DetailAccent(string sectionId) =>
         sectionId == "embedded-highlights" || sectionId.StartsWith("embedded-changes", StringComparison.Ordinal)
             ? Cyan
-            : sectionId switch
+            : sectionId.StartsWith("ordinary-block-changes", StringComparison.Ordinal)
+                ? Added
+                : sectionId.StartsWith("baked-block-changes", StringComparison.Ordinal)
+                    ? Changed
+                    : sectionId.StartsWith("item-changes", StringComparison.Ordinal)
+                        ? Cyan
+                        : sectionId switch
             {
                 "deep-properties" or "chunks" => Changed,
                 "metadata" => Added,
@@ -341,17 +347,18 @@ internal static class DiffInfographicPainter
             if (section.Table is { Rows.Count: > 0 } table) top = DrawTable(c, section, table, top);
             foreach (var line in section.Lines)
             {
-                if (top + DiffInfographicLayout.LineHeight > section.Bottom) break;
+                var wrapped = DiffInfographicLayout.WrapLine(line, section.Right - section.Left);
+                var lineHeight = DiffInfographicLayout.LineBlockHeight(wrapped.Count);
+                if (top + lineHeight > section.Bottom - DiffInfographicLayout.SectionBottomPadding) break;
                 var markerColor = line.Text.StartsWith('+') ? Added : line.Text.StartsWith('−') ? Removed : line.Text.StartsWith("WARNING", StringComparison.Ordinal) ? Changed : Text;
-                var font = line.Mono ? DiffInfographicFonts.Mono(17) : DiffInfographicFonts.Regular(18);
+                var font = DiffInfographicLayout.LineFont(line);
                 c.Fill(markerColor, new EllipsePolygon(section.Left + 41, top + 10, 3));
-                var wrapped = DiffInfographicText.Wrap(line.Text, font, section.Right - section.Left - 100, 2);
                 foreach (var row in wrapped)
                 {
                     c.DrawText(row, font, Text, new PointF(section.Left + 60, top));
-                    top += 23;
+                    top += DiffInfographicLayout.WrappedRowHeight;
                 }
-                top += 12;
+                top += DiffInfographicLayout.LineBottomGap;
             }
         }
     }
@@ -362,14 +369,15 @@ internal static class DiffInfographicPainter
         IReadOnlyList<DiffInfographicTableRow> rows,
         float left,
         float right,
-        DiffInfographicTableDensity density = DiffInfographicTableDensity.Standard)
+        DiffInfographicTableDensity density = DiffInfographicTableDensity.Standard,
+        string valueHeader = SizeChangeHeader)
     {
         var font = TableFont(density);
         var headerFont = TableHeaderFont(density);
         var valueRight = right - TableRightInset;
         var pathX = left + TablePathInset;
         var valueWidth = Math.Max(
-            TextWidth(SizeChangeHeader, headerFont),
+            TextWidth(valueHeader, headerFont),
             rows.Count == 0 ? 0 : rows.Max(row => TextWidth(row.Value, font)));
         var valueLeft = valueRight - valueWidth;
         return new(left + TableMarkerInset, pathX, Math.Max(0, valueLeft - TableColumnGap - pathX), valueLeft, valueRight);
@@ -383,10 +391,10 @@ internal static class DiffInfographicPainter
     {
         var font = TableFont(table.Density);
         var headerFont = TableHeaderFont(table.Density);
-        var columns = MeasureTableColumns(table.Rows, section.Left, section.Right, table.Density);
-        c.DrawText(ChangeMarkerHeader, headerFont, Muted, new PointF(columns.MarkerX, top));
-        c.DrawText("PATH", headerFont, Muted, new PointF(columns.PathX, top));
-        c.DrawText(SizeChangeHeader, headerFont, Muted, new PointF(columns.ValueLeft, top));
+        var columns = MeasureTableColumns(table.Rows, section.Left, section.Right, table.Density, table.ValueHeader);
+        c.DrawText(table.MarkerHeader, headerFont, Muted, new PointF(columns.MarkerX, top));
+        c.DrawText(table.PathHeader, headerFont, Muted, new PointF(columns.PathX, top));
+        c.DrawText(table.ValueHeader, headerFont, Muted, new PointF(columns.ValueLeft, top));
         top += DiffInfographicLayout.TableHeaderHeight;
         var rowHeight = DiffInfographicLayout.RowHeight(table.Density);
         foreach (var row in table.Rows)
@@ -444,7 +452,7 @@ internal static class DiffInfographicPainter
 
     private static void DrawFooter(IImageProcessingContext c, DiffInfographicScene scene)
     {
-        c.DrawText("gbx-size-tree  ·  exact counts, bounded visual detail", DiffInfographicFonts.Regular(15), Muted, new PointF(70, scene.Height - 26));
+        c.DrawText(FooterLabel, DiffInfographicFonts.Regular(15), Muted, new PointF(70, scene.Height - 26));
         c.DrawText("Positions in metres", DiffInfographicFonts.Regular(15), Muted, new PointF(1190, scene.Height - 26));
     }
 

@@ -1,3 +1,5 @@
+using SixLabors.Fonts;
+
 namespace GbxSizeTree.Cli.Rendering;
 
 public sealed record DiffInfographicCounts(int Added, int Removed, int Changed);
@@ -67,7 +69,10 @@ public enum DiffInfographicTableDensity
 
 public sealed record DiffInfographicTable(
     IReadOnlyList<DiffInfographicTableRow> Rows,
-    DiffInfographicTableDensity Density = DiffInfographicTableDensity.Standard);
+    DiffInfographicTableDensity Density = DiffInfographicTableDensity.Standard,
+    string MarkerHeader = "+/−",
+    string PathHeader = "PATH",
+    string ValueHeader = "SIZE CHANGE");
 
 public sealed record DiffInfographicSection(
     string Id,
@@ -92,7 +97,12 @@ internal static class DiffInfographicLayout
 {
     public const int SectionHeader = 66;
     public const int SectionBottomPadding = 22;
-    public const int LineHeight = 58;
+    public const int SectionGap = 22;
+    public const int WrappedRowHeight = 23;
+    public const int LineBottomGap = 12;
+    public const int MaxWrappedRows = 2;
+    public const int LineHorizontalInsets = 100;
+    private const int EmptySectionContentHeight = 58;
     public const int TableHeaderHeight = 28;
     public const int TableRowHeight = 30;
     public const int CompactTableRowHeight = 24;
@@ -105,11 +115,28 @@ internal static class DiffInfographicLayout
     public static int RowHeight(DiffInfographicTableDensity density) =>
         density == DiffInfographicTableDensity.Compact ? CompactTableRowHeight : TableRowHeight;
 
-    public static int SectionHeight(int lineCount, DiffInfographicTable? table)
+    public static Font LineFont(DiffInfographicSectionLine line) =>
+        line.Mono ? DiffInfographicFonts.Mono(17) : DiffInfographicFonts.Regular(18);
+
+    public static IReadOnlyList<string> WrapLine(DiffInfographicSectionLine line, int sectionWidth) =>
+        DiffInfographicText.Wrap(line.Text, LineFont(line), Math.Max(1, sectionWidth - LineHorizontalInsets), MaxWrappedRows);
+
+    public static int LineBlockHeight(int wrappedRowCount) =>
+        (wrappedRowCount * WrappedRowHeight) + LineBottomGap;
+
+    public static int LineBlockHeight(DiffInfographicSectionLine line, int sectionWidth) =>
+        LineBlockHeight(WrapLine(line, sectionWidth).Count);
+
+    public static int SectionHeight(
+        IReadOnlyList<DiffInfographicSectionLine> lines,
+        DiffInfographicTable? table,
+        int sectionWidth)
     {
         var tableHeight = TableHeight(table);
-        var lines = Math.Max(lineCount, tableHeight == 0 ? 1 : 0) * LineHeight;
-        return SectionHeader + tableHeight + lines + SectionBottomPadding;
+        var linesHeight = lines.Count == 0 && tableHeight == 0
+            ? EmptySectionContentHeight
+            : lines.Sum(line => LineBlockHeight(line, sectionWidth));
+        return SectionHeader + tableHeight + linesHeight + SectionBottomPadding;
     }
 }
 

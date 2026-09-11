@@ -16,7 +16,7 @@ public static class DiffInfographic
     private const int MaxSpatialChanges = 400;
     private const int MaxSpatialContext = 900;
     private const int MaxHighlightLines = 5;
-    private const int MaxEmbeddedRowsPerSection = 300;
+    private const int MaxCompactRowsPerSection = 300;
     private const int MaxPropertyLines = 5;
     private const int MaxChunkLines = 4;
 
@@ -62,20 +62,7 @@ public static class DiffInfographic
         if (highlights.Rows.Count > 0 || highlights.Notes.Count > 0)
             sectionContent.Add(("embedded-highlights", "Embedded highlights", highlights.Notes, new(highlights.Rows)));
         if (embeddedRows.Count > 0)
-        {
-            var pageCount = (embeddedRows.Count + MaxEmbeddedRowsPerSection - 1) / MaxEmbeddedRowsPerSection;
-            for (var page = 0; page < pageCount; page++)
-            {
-                var pageRows = embeddedRows.Skip(page * MaxEmbeddedRowsPerSection)
-                    .Take(MaxEmbeddedRowsPerSection)
-                    .Select(x => x.Row)
-                    .ToArray();
-                var id = page == 0 ? "embedded-changes" : $"embedded-changes-{page + 1}";
-                var continuation = page == 0 ? "" : $" · continued {page + 1:N0}/{pageCount:N0}";
-                sectionContent.Add((id, $"All embedded changes · {embeddedRows.Count:N0}{continuation}", [],
-                    new(pageRows, DiffInfographicTableDensity.Compact)));
-            }
-        }
+            AddCompactTables(sectionContent, "embedded-changes", "All embedded changes", embeddedRows.Select(x => x.Row).ToArray());
         var properties = Properties(report);
         if (properties.Count > 0) sectionContent.Add(("deep-properties", $"Deep properties · {detailCounts.DeepProperties:N0}", properties, null));
         var warnings = Warnings(report, spatial).ToArray();
@@ -85,7 +72,11 @@ public static class DiffInfographic
         var chunks = Chunks(report);
         if (chunks.Count > 0) sectionContent.Add(("chunks", $"Chunk observations · {detailCounts.Chunks:N0}", chunks, null));
         var placementSummary = PlacementSummary(placementChanges);
-        if (placementSummary.Count > 0) sectionContent.Add(("placement-summary", $"Placement summary · {placementSummary.Count:N0} names", placementSummary, null));
+        if (placementSummary.Count > 0)
+        {
+            sectionContent.Add(("placement-summary", $"Placement summary · {placementSummary.Count:N0} names", placementSummary, null));
+            AddPlacementTables(sectionContent, report);
+        }
 
         var sections = new List<DiffInfographicSection>
         {
@@ -96,12 +87,17 @@ public static class DiffInfographic
         var columnTops = new[] { 1250, 1250 };
         foreach (var content in sectionContent)
         {
+            var fullWidth = IsPlacementDetail(content.Id);
             var column = columnTops[0] <= columnTops[1] ? 0 : 1;
-            var left = column == 0 ? 70 : 710;
-            var requestedBottom = columnTops[column]
-                + DiffInfographicLayout.SectionHeight(content.Lines.Count, content.Table);
-            sections.Add(new(content.Id, content.Title, content.Lines, left, columnTops[column], left + 620, requestedBottom, content.Table));
-            columnTops[column] = requestedBottom + 22;
+            var top = fullWidth ? Math.Max(columnTops[0], columnTops[1]) : columnTops[column];
+            var left = fullWidth ? 70 : column == 0 ? 70 : 710;
+            var right = fullWidth ? 1330 : left + 620;
+            var requestedBottom = top + DiffInfographicLayout.SectionHeight(content.Lines, content.Table, right - left);
+            sections.Add(new(content.Id, content.Title, content.Lines, left, top, right, requestedBottom, content.Table));
+            if (fullWidth)
+                columnTops[0] = columnTops[1] = requestedBottom + DiffInfographicLayout.SectionGap;
+            else
+                columnTops[column] = requestedBottom + DiffInfographicLayout.SectionGap;
         }
         var height = Math.Max(Math.Max(columnTops[0], columnTops[1]) + 24, MinimumHeight);
 
@@ -110,6 +106,82 @@ public static class DiffInfographic
             report.LeftBytes, report.RightBytes, SaturatingSubtract(report.RightBytes, report.LeftBytes),
             placements, embedded, detailCounts, spatial, sections, warnings);
     }
+
+    private static bool IsPlacementDetail(string id) =>
+        id == "placement-summary" ||
+        id.StartsWith("ordinary-block-changes", StringComparison.Ordinal) ||
+        id.StartsWith("baked-block-changes", StringComparison.Ordinal) ||
+        id.StartsWith("item-changes", StringComparison.Ordinal);
+
+    private static void AddPlacementTables(
+        List<(string Id, string Title, IReadOnlyList<DiffInfographicSectionLine> Lines, DiffInfographicTable? Table)> sections,
+        DiffReport report)
+    {
+        AddPlacementTable(sections, "ordinary-block-changes", "Added / removed ordinary blocks", report.Blocks,
+            x => DiffInfographicText.Clean(x.Name), x => x.Key, x => x.IsFree ? DisplayPosition(x.PhysicalPosition) : "--", "NAME");
+        AddPlacementTable(sections, "baked-block-changes", "Added / removed baked blocks", report.BakedBlocks,
+            x => DiffInfographicText.Clean(x.Name), x => x.Key, x => DisplayPosition(x.PhysicalPosition), "NAME");
+        AddPlacementTable(sections, "item-changes", "Added / removed items", report.Items,
+            x => DiffInfographicText.CleanPath(x.Path), x => x.Key, x => DisplayPosition(x.PhysicalPosition), "NAME / PATH");
+    }
+
+    private static void AddPlacementTable<T>(
+        List<(string Id, string Title, IReadOnlyList<DiffInfographicSectionLine> Lines, DiffInfographicTable? Table)> sections,
+        string id,
+        string title,
+        IReadOnlyList<ValueChange<T>> changes,
+        Func<T, string> name,
+        Func<T, string> key,
+        Func<T, string> displayedPosition,
+        string nameHeader) where T : class
+    {
+        var rows = DiffSpatialGroups.Order(changes, PlacementPosition, key)
+            .Where(x => x.Change.Left is null || x.Change.Right is null)
+            .Select(x =>
+            {
+                var change = x.Change;
+                var value = change.Right ?? change.Left!;
+                var kind = Kind(change.Left, change.Right);
+                return new DiffInfographicTableRow(
+                    KindMarker(kind).ToString(),
+                    name(value),
+                    displayedPosition(value),
+                    kind);
+            })
+            .ToArray();
+        AddCompactTables(sections, id, title, rows, nameHeader, "POSITION");
+
+        static SpatialPosition? PlacementPosition(T value) => value switch
+        {
+            BlockSnapshot block => block.PhysicalPosition,
+            ItemSnapshot item => item.PhysicalPosition,
+            _ => null,
+        };
+    }
+
+    private static void AddCompactTables(
+        List<(string Id, string Title, IReadOnlyList<DiffInfographicSectionLine> Lines, DiffInfographicTable? Table)> sections,
+        string id,
+        string title,
+        IReadOnlyList<DiffInfographicTableRow> rows,
+        string pathHeader = "PATH",
+        string valueHeader = "SIZE CHANGE")
+    {
+        if (rows.Count == 0) return;
+        var pageCount = (rows.Count + MaxCompactRowsPerSection - 1) / MaxCompactRowsPerSection;
+        for (var page = 0; page < pageCount; page++)
+        {
+            var pageRows = rows.Skip(page * MaxCompactRowsPerSection).Take(MaxCompactRowsPerSection).ToArray();
+            var pageId = page == 0 ? id : $"{id}-{page + 1}";
+            var continuation = page == 0 ? "" : $" · continued {page + 1:N0}/{pageCount:N0}";
+            sections.Add((pageId, $"{title} · {rows.Count:N0}{continuation}", [],
+                new(pageRows, DiffInfographicTableDensity.Compact, PathHeader: pathHeader, ValueHeader: valueHeader)));
+        }
+    }
+
+    private static string DisplayPosition(SpatialPosition? position) => position is { } value
+        ? $"({DiffInfographicText.Position(value.X)}, {DiffInfographicText.Position(value.Y)}, {DiffInfographicText.Position(value.Z)})"
+        : "--";
 
     private static DiffInfographicCounts CountKinds(
         IReadOnlyList<(SpatialPosition? Position, DiffInfographicChangeKind Kind, string Label)> changes)

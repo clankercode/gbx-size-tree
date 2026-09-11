@@ -134,7 +134,7 @@ public sealed class DiffInfographicTests
         Assert.DoesNotContain("omitted", complete.Title, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(complete.Lines, x => x.Text.Contains("omitted", StringComparison.OrdinalIgnoreCase));
         Assert.Equal(
-            DiffInfographicLayout.SectionHeight(0, complete.Table),
+            DiffInfographicLayout.SectionHeight(complete.Lines, complete.Table, complete.Right - complete.Left),
             complete.Bottom - complete.Top);
         Assert.True(complete.Bottom <= scene.Height - 36);
     }
@@ -301,14 +301,12 @@ public sealed class DiffInfographicTests
         var coverage = Assert.Single(detailSections, x => x.Id == "coverage");
 
         Assert.True(scene.Height >= 2100);
-        // Mirrors what the painter consumes: title block, optional table header + 30px rows + gap, 58px per line.
+        // The shared layout mirrors the painter's measured wrapping and table consumption.
         Assert.All(detailSections, section =>
         {
-            var table = section.Table;
-            var consumed = 66 + (table is null ? 0 : 28 + (table.Rows.Count * (table.Density == DiffInfographicTableDensity.Compact ? 24 : 30)) + 12)
-                + (section.Lines.Count * 58);
-            Assert.True(section.Top + consumed <= section.Bottom, $"{section.Id} content does not fit");
-            Assert.Equal(consumed + 22, section.Bottom - section.Top);
+            var expectedHeight = DiffInfographicLayout.SectionHeight(
+                section.Lines, section.Table, section.Right - section.Left);
+            Assert.Equal(expectedHeight, section.Bottom - section.Top);
         });
         Assert.All(detailSections, section => Assert.True(section.Bottom <= scene.Height - 36));
         Assert.Equal(5, Assert.Single(detailSections, x => x.Id == "embedded-highlights").Table!.Rows.Count);
@@ -750,6 +748,228 @@ public sealed class DiffInfographicTests
     }
 
     [Fact]
+    public void BuildScene_CompactsPlacementSummaryToRenderedRowsBeforeFirstPlacementTable()
+    {
+        var names = Enumerable.Range(0, 21).Select(i => $"Placement {i:D2}").ToArray();
+        var report = Empty() with
+        {
+            Blocks = names.Select((name, i) => new ValueChange<BlockSnapshot>(null, Block(name, i * 32, 0))).ToArray(),
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var summary = Assert.Single(scene.Sections, x => x.Id == "placement-summary");
+        var firstPlacementTable = Assert.Single(scene.Sections, x => x.Id == "ordinary-block-changes");
+        var sectionWidth = summary.Right - summary.Left;
+        var renderedRowCounts = summary.Lines
+            .Select(line => DiffInfographicLayout.WrapLine(line, sectionWidth).Count)
+            .ToArray();
+
+        Assert.Equal(21, summary.Lines.Count);
+        Assert.All(renderedRowCounts, count => Assert.Equal(1, count));
+        Assert.Equal(
+            summary.Top + DiffInfographicLayout.SectionHeader
+                + (renderedRowCounts.Sum() * DiffInfographicLayout.WrappedRowHeight)
+                + (summary.Lines.Count * DiffInfographicLayout.LineBottomGap)
+                + DiffInfographicLayout.SectionBottomPadding,
+            summary.Bottom);
+
+        var lastRenderedRowBottom = summary.Top + DiffInfographicLayout.SectionHeader
+            + (renderedRowCounts.Sum() * DiffInfographicLayout.WrappedRowHeight)
+            + ((summary.Lines.Count - 1) * DiffInfographicLayout.LineBottomGap);
+        Assert.Equal(
+            DiffInfographicLayout.LineBottomGap
+                + DiffInfographicLayout.SectionBottomPadding
+                + DiffInfographicLayout.SectionGap,
+            firstPlacementTable.Top - lastRenderedRowBottom);
+    }
+
+    [Fact]
+    public void BuildScene_PlacementSummaryReservesBothRowsForWrappedGroupedName()
+    {
+        var wrappingName = "ZZZ " + string.Join(' ', Enumerable.Repeat("long-placement-name", 24));
+        var report = Empty() with
+        {
+            Blocks =
+            [
+                new(null, Block(wrappingName, 0, 0)),
+                new(null, Block(wrappingName, 32, 0)),
+            ],
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var summary = Assert.Single(scene.Sections, x => x.Id == "placement-summary");
+        var firstPlacementTable = Assert.Single(scene.Sections, x => x.Id == "ordinary-block-changes");
+        var line = Assert.Single(summary.Lines);
+        var wrappedRows = DiffInfographicLayout.WrapLine(line, summary.Right - summary.Left);
+
+        Assert.StartsWith("+ 2x ZZZ", line.Text, StringComparison.Ordinal);
+        Assert.Equal(2, wrappedRows.Count);
+        Assert.Equal(
+            DiffInfographicLayout.SectionHeader
+                + DiffInfographicLayout.LineBlockHeight(wrappedRows.Count)
+                + DiffInfographicLayout.SectionBottomPadding,
+            summary.Bottom - summary.Top);
+        Assert.Equal(summary.Bottom + DiffInfographicLayout.SectionGap, firstPlacementTable.Top);
+    }
+
+    [Fact]
+    public void BuildScene_ListsEveryAddedAndRemovedPlacementInSeparateSpatiallyOrderedTables()
+    {
+        var ordinaryModified = new ValueChange<BlockSnapshot>(
+            Block("Ordinary modified", 640, 0), Block("Ordinary modified", 672, 0));
+        var bakedModified = new ValueChange<BlockSnapshot>(
+            Block("Baked modified", 640, 32), Block("Baked modified", 672, 32));
+        var itemModified = new ValueChange<ItemSnapshot>(
+            Item("Items/Modified.Item.Gbx", 640, 64), Item("Items/Modified.Item.Gbx", 672, 64));
+        var normal = Block("Normal added", 0, 0);
+        var ghost = Block("Ghost removed", 96, 0) with { IsGhost = true };
+        var free = Block("Free added", 192, 0) with
+        {
+            IsFree = true,
+            PhysicalPosition = new(193.25, 4.5, 1.75),
+        };
+        var tiedAdded = Item("Items/Tied added.Item.Gbx", 96.75, 192.25);
+        var tiedRemoved = Item("Items/Tied removed.Item.Gbx", 96.75, 192.25);
+        var report = Empty() with
+        {
+            Blocks =
+            [
+                ordinaryModified,
+                new(null, free),
+                new(ghost, null),
+                new(null, normal),
+            ],
+            BakedBlocks =
+            [
+                bakedModified,
+                new(null, Block("Baked added", 0, 96)),
+                new(Block("Baked removed", 96, 96), null),
+            ],
+            Items =
+            [
+                itemModified,
+                new(null, Item("Items/Environment/Very/Long/Added custom item.Item.Gbx", 0.25, 192.5)),
+                new(Item("Items/Removed.Item.Gbx", 96.75, 192.25), null),
+                new(null, tiedAdded),
+                new(tiedRemoved, null),
+            ],
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var summaryIndex = scene.Sections.ToList().FindIndex(x => x.Id == "placement-summary");
+        var ordinaryIndex = scene.Sections.ToList().FindIndex(x => x.Id == "ordinary-block-changes");
+        var bakedIndex = scene.Sections.ToList().FindIndex(x => x.Id == "baked-block-changes");
+        var itemIndex = scene.Sections.ToList().FindIndex(x => x.Id == "item-changes");
+        var ordinary = scene.Sections[ordinaryIndex];
+        var baked = scene.Sections[bakedIndex];
+        var items = scene.Sections[itemIndex];
+
+        Assert.Equal(summaryIndex + 1, ordinaryIndex);
+        Assert.Equal(ordinaryIndex + 1, bakedIndex);
+        Assert.Equal(bakedIndex + 1, itemIndex);
+        Assert.All(new[] { ordinary, baked, items }, section =>
+        {
+            Assert.Equal(70, section.Left);
+            Assert.Equal(1330, section.Right);
+            Assert.Equal(DiffInfographicTableDensity.Compact, section.Table!.Density);
+            Assert.Equal("+/−", section.Table.MarkerHeader);
+            Assert.Equal("POSITION", section.Table.ValueHeader);
+        });
+        Assert.Equal("NAME", ordinary.Table!.PathHeader);
+        Assert.Equal("NAME", baked.Table!.PathHeader);
+        Assert.Equal("NAME / PATH", items.Table!.PathHeader);
+        Assert.Equal(
+            [
+                ("+", "Normal added", "--"),
+                ("−", "Ghost removed", "--"),
+                ("+", "Free added", "(193.25, 4.5, 1.75)"),
+            ],
+            ordinary.Table!.Rows.Select(x => (x.Marker, x.Path, x.Value)));
+        Assert.Equal(
+            [("+", "Baked added", "(0.0, 0.0, 96.0)"), ("−", "Baked removed", "(96.0, 0.0, 96.0)")],
+            baked.Table!.Rows.Select(x => (x.Marker, x.Path, x.Value)));
+        Assert.Equal(
+            [
+                ("+", "Items/Environment/Very/Long/Added custom item.Item.Gbx", "(0.25, 0.0, 192.5)"),
+                ("−", "Items/Removed.Item.Gbx", "(96.75, 0.0, 192.25)"),
+                ("+", "Items/Tied added.Item.Gbx", "(96.75, 0.0, 192.25)"),
+                ("−", "Items/Tied removed.Item.Gbx", "(96.75, 0.0, 192.25)"),
+            ],
+            items.Table!.Rows.Select(x => (x.Marker, x.Path, x.Value)));
+        Assert.Contains(scene.Sections[summaryIndex].Lines, x => x.Text == "~ 1x Ordinary modified");
+        Assert.Contains(scene.Sections[summaryIndex].Lines, x => x.Text == "~ 1x Baked modified");
+        Assert.Contains(scene.Sections[summaryIndex].Lines, x => x.Text == "~ 1x Items/Modified.Item.Gbx");
+        Assert.DoesNotContain(new[] { ordinary, baked, items }.SelectMany(x => x.Table!.Rows),
+            row => row.Kind == DiffInfographicChangeKind.Changed || row.Marker == "~");
+    }
+
+    [Fact]
+    public void BuildScene_FlowsUnboundedPlacementRowsAcrossFullWidthContinuationPanels()
+    {
+        var changes = Enumerable.Range(0, 633)
+            .Select(i => new ValueChange<ItemSnapshot>(null,
+                Item($"Items/Stress/Very/Long/Folder/{i:D3}-custom.Item.Gbx", (632 - i) * 96, i % 5)))
+            .Append(new(Item("Items/modified.Item.Gbx", -96, 0), Item("Items/modified.Item.Gbx", -32, 0)))
+            .ToArray();
+
+        var scene = DiffInfographic.BuildScene(Empty() with { Items = changes }, "a", "b");
+        var complete = scene.Sections
+            .Where(x => x.Id == "item-changes" || x.Id.StartsWith("item-changes-", StringComparison.Ordinal))
+            .ToArray();
+        var rows = complete.SelectMany(x => x.Table!.Rows).ToArray();
+
+        Assert.Equal(3, complete.Length);
+        Assert.Equal(["item-changes", "item-changes-2", "item-changes-3"], complete.Select(x => x.Id));
+        Assert.Equal("Added / removed items · 633", complete[0].Title);
+        Assert.Equal("Added / removed items · 633 · continued 2/3", complete[1].Title);
+        Assert.All(complete, section =>
+        {
+            Assert.Equal(70, section.Left);
+            Assert.Equal(1330, section.Right);
+            Assert.InRange(section.Table!.Rows.Count, 1, 300);
+            Assert.Equal(DiffInfographicTableDensity.Compact, section.Table.Density);
+            Assert.Equal(
+                DiffInfographicLayout.SectionHeight(section.Lines, section.Table, section.Right - section.Left),
+                section.Bottom - section.Top);
+            Assert.True(section.Bottom <= scene.Height - 36);
+        });
+        Assert.Equal(633, rows.Length);
+        Assert.Equal(633, rows.Select(x => x.Path).Distinct(StringComparer.Ordinal).Count());
+        Assert.DoesNotContain(rows, x => x.Kind == DiffInfographicChangeKind.Changed);
+        Assert.Equal(rows, DiffSpatialGroups.Order(changes, x => x.PhysicalPosition, x => x.Key)
+            .Where(x => x.Change.Left is null || x.Change.Right is null)
+            .Select(x => x.Change.Right ?? x.Change.Left!)
+            .Select(x => rows.Single(row => row.Path == x.Path)));
+    }
+
+    [Fact]
+    public void PlacementTable_UsesMeasuredNameElisionAndPositionReservation()
+    {
+        var font = MonoTestFont(14);
+        DiffInfographicTableRow[] rows =
+        [
+            new("+", "Items/Environment/Stadium/Collection/absurdly-long-custom-item-name-that-never-fits-anywhere.Item.Gbx",
+                "(−9223372036854775808, 0.125, 9223372036854775807)", DiffInfographicChangeKind.Added),
+        ];
+        var columns = DiffInfographicPainter.MeasureTableColumns(rows, 70, 1330, DiffInfographicTableDensity.Compact,
+            "POSITION");
+        var elided = DiffInfographicPainter.ElideTablePath(rows[0].Path, font, columns.PathWidth);
+
+        Assert.True(columns.PathX + columns.PathWidth <= columns.ValueLeft);
+        Assert.True(TextWidth(elided, font) <= columns.PathWidth + .5f);
+        Assert.NotEqual(rows[0].Path, elided);
+        Assert.True(elided.Contains("...", StringComparison.Ordinal) || elided.Contains('…'));
+        Assert.EndsWith(".Item.Gbx", elided, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Footer_DescribesCompletePlacementDetailWithoutCallingItBounded()
+    {
+        Assert.DoesNotContain("bounded", DiffInfographicPainter.FooterLabel, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("complete placement", DiffInfographicPainter.FooterLabel, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void BuildScene_EmptyDiffHasNoPlacementSummarySection()
     {
         var scene = DiffInfographic.BuildScene(Empty(), "", "");
@@ -834,12 +1054,32 @@ public sealed class DiffInfographicTests
         var synthetic = Empty() with
         {
             RightBytes = 1_684_217,
-            Blocks =
-            [
-                new(null, Block("RoadTechStraight", 32, 32)),
-                new(Block("RoadTechCurve", 96, 64), null),
-                new(null, Block("DecorationNeon", 128, 100)),
-            ],
+            Blocks = Enumerable.Range(0, 54).Select(i => (i % 4) switch
+            {
+                0 => new ValueChange<BlockSnapshot>(null, Block("RoadTechStraight", i * 32, (i % 7) * 32)),
+                1 => new ValueChange<BlockSnapshot>(Block("RoadTechCurve", i * 32, (i % 7) * 32), null),
+                2 => new ValueChange<BlockSnapshot>(null, Block("FreeDecorationWithAnUnusuallyLongDescriptiveName", i * 32, (i % 5) * 4, (i % 7) * 32) with { IsFree = true }),
+                _ => new ValueChange<BlockSnapshot>(Block("OrdinaryModifiedExcludedFromTables", i * 32, (i % 7) * 32),
+                    Block("OrdinaryModifiedExcludedFromTables", (i + 1) * 32, (i % 7) * 32)),
+            }).ToArray(),
+            BakedBlocks = Enumerable.Range(0, 42).Select(i => (i % 3) switch
+            {
+                0 => new ValueChange<BlockSnapshot>(null, Block("BakedPlatformLongName", i * 24, i % 6, (i % 4) * 48)),
+                1 => new ValueChange<BlockSnapshot>(Block("BakedWallLongName", i * 24, i % 6, (i % 4) * 48), null),
+                _ => new ValueChange<BlockSnapshot>(Block("BakedModifiedExcludedFromTables", i * 24, i % 6, (i % 4) * 48),
+                    Block("BakedModifiedExcludedFromTables", i * 24 + 8, i % 6, (i % 4) * 48)),
+            }).ToArray(),
+            Items = Enumerable.Range(0, 480).Select(i => (i % 3) switch
+            {
+                0 => new ValueChange<ItemSnapshot>(null, Item($"Items/Environment/Stadium/VeryLongCollection/{i % 12:D2}-Added custom item with long name.Item.Gbx", (i / 2) * 16, (i % 6) * 24)),
+                1 => new ValueChange<ItemSnapshot>(Item($"Items/Environment/Stadium/VeryLongCollection/{i % 12:D2}-Removed custom item with long name.Item.Gbx", (i / 2) * 16, (i % 6) * 24), null),
+                _ => new ValueChange<ItemSnapshot>(
+                    Item($"Items/Modified/{i % 12:D2}-Excluded.Item.Gbx", i * 16, i * 8),
+                    Item($"Items/Modified/{i % 12:D2}-Excluded.Item.Gbx", i * 16 + 4, i * 8 + 4)),
+            }).Concat([
+                new(null, Item("Items/Coincident/Added at exactly coincident position.Item.Gbx", 2_048.5, 144.25)),
+                new(Item("Items/Coincident/Removed at exactly coincident position.Item.Gbx", 2_048.5, 144.25), null),
+            ]).ToArray(),
             LeftBlockSnapshots = [Block("Context A", 0, 0), Block("Context B", 160, 120)],
             RightBlockSnapshots = [Block("Context A", 0, 0), Block("Context C", 200, 150)],
             Embedded = Enumerable.Range(0, 24).Select(i => (i % 3) switch
@@ -856,7 +1096,7 @@ public sealed class DiffInfographicTests
             Warnings = ["One custom chunk remained opaque; file-level change detection is still complete."],
         };
         using (var image = DiffInfographic.Render(synthetic, "Night Circuit — draft.Map.Gbx", "Night Circuit — release.Map.Gbx"))
-            image.SaveAsPng(Path.Combine(outputDirectory!, "diff-infographic-synthetic.png"));
+            image.SaveAsPng(Path.Combine(outputDirectory!, "diff-infographic-placement-stress.png"));
 
         var localizedWithFarContext = Empty() with
         {
@@ -894,7 +1134,10 @@ public sealed class DiffInfographicTests
     }
 
     private static BlockSnapshot Block(string name, int x, int z) =>
-        new(name, x / 32, 0, z / 32, new(x, 0, z), null, "North", 0, 0, false, false, true, "Default", "Normal", 0);
+        Block(name, x, 0, z);
+
+    private static BlockSnapshot Block(string name, int x, int y, int z) =>
+        new(name, x / 32, y / 8, z / 32, new(x, y, z), null, "North", 0, 0, false, false, true, "Default", "Normal", 0);
 
     private static ItemSnapshot Item(string path, double x, double z) =>
         new(path, new(x, 0, z), default, "Default", 1, default, "None", "Normal", 0);
