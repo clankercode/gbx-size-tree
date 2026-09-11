@@ -54,3 +54,22 @@ Phase tracing (`GC.GetTotalMemory` + private bytes at phase boundaries) plus a f
 The stress-pair peak now sits in the right-map parse phase (GBX.NET object graph), not in the
 measurement pipeline; the remaining floor scales with parsed map content rather than with the
 number of measured embedded entries.
+
+## Runtime follow-up: bounded parallel trials
+
+Phase timing on the SB2 pair showed ~97 of ~105 seconds in sequential LZO removal trials
+(Lzo1x_999). Trials are independent given the shared baseline, so the measurer now runs them up
+to `MaxParallelTrials` (default 2) at a time — but only for bodies up to
+`ParallelTrialsMaxBodyBytes` (default 64 MB). Larger bodies stay sequential, which keeps the
+super-large-map memory profile above unchanged. Trial eligibility, budget reasons, and per-path
+results are identical to the sequential loop; results are assembled in path order.
+
+Measured (Release, two runs each against pre-change master):
+
+| Pair | Before | After | Peak RSS after |
+| --- | ---: | ---: | ---: |
+| SB2 v205 → v206 | ~105 s (102–109) | ~64 s | 297 MB (unchanged) |
+| Stress pair (133 MB maps) | ~48 s (46–50) | ~48 s (sequential, unchanged) | 904 MB (unchanged) |
+
+JSON output stays byte-identical on both pairs. `System.GC.ConserveMemory=9` was tried and
+rejected: ~20 MB further savings at best, inside run-to-run variance.

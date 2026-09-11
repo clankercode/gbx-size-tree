@@ -63,6 +63,63 @@ public sealed class EmbeddedFileContributionTests
     }
 
     [Fact]
+    public void Measure_ParallelTrialsMatchSequentialResultsAndBudget()
+    {
+        var file = BuildFile(BuildZip(CompressionLevel.NoCompression,
+            ("a.bin", Data(8192)), ("b.bin", Data(4096)), ("c.bin", Data(2048))));
+        var paths = new[] { "a.bin", "b.bin", "c.bin", "missing.bin" };
+        var sequential = new EmbeddedFileContributionMeasurer().Measure(file, paths,
+            new EmbeddedFileContributionOptions { MaxParallelTrials = 1 }, TestContext.Current.CancellationToken);
+        var parallel = new EmbeddedFileContributionMeasurer().Measure(file, paths,
+            new EmbeddedFileContributionOptions { MaxParallelTrials = 3 }, TestContext.Current.CancellationToken);
+        Assert.Equal(sequential.BaselineCompressedBodyBytes, parallel.BaselineCompressedBodyBytes);
+        Assert.Equal(sequential.UnavailableReason, parallel.UnavailableReason);
+        Assert.Equal(sequential.Entries, parallel.Entries);
+
+        var budget = new EmbeddedFileContributionMeasurer().Measure(file, paths,
+            new EmbeddedFileContributionOptions { MaxTrials = 2, MaxParallelTrials = 3 }, TestContext.Current.CancellationToken);
+        Assert.NotNull(budget.Entries.Single(e => e.Path == "a.bin").MarginalCompressedBodyBytes);
+        Assert.NotNull(budget.Entries.Single(e => e.Path == "b.bin").MarginalCompressedBodyBytes);
+        Assert.Equal("Removal trial budget exhausted.", budget.Entries.Single(e => e.Path == "c.bin").UnavailableReason);
+        Assert.Equal("Entry path is not present in the original ZIP.", budget.Entries.Single(e => e.Path == "missing.bin").UnavailableReason);
+    }
+
+    [Fact]
+    public void Measure_ParallelTrialsPropagateCancellation()
+    {
+        var entries = Enumerable.Range(0, 64).Select(i => ($"entry{i}.bin", Data(512))).ToArray();
+        var file = BuildFile(BuildZip(CompressionLevel.NoCompression, entries));
+        using var cancellation = new CancellationTokenSource();
+        var measured = 0;
+        Assert.Throws<OperationCanceledException>(() =>
+            new EmbeddedFileContributionMeasurer().Measure(file, entries.Select(e => e.Item1).ToArray(),
+                new EmbeddedFileContributionOptions { MaxParallelTrials = 2 },
+                cancellation.Token,
+                progress: _ =>
+                {
+                    if (Interlocked.Increment(ref measured) == 1)
+                    {
+                        cancellation.Cancel();
+                    }
+                }));
+    }
+
+    [Fact]
+    public void Measure_ParallelTrialsReportProgressToCompletion()
+    {
+        var file = BuildFile(BuildZip(CompressionLevel.NoCompression,
+            ("a.bin", Data(8192)), ("b.bin", Data(4096)), ("c.bin", Data(2048))));
+        var seen = new List<EmbeddedFileContributionProgress>();
+        var result = new EmbeddedFileContributionMeasurer().Measure(file, ["a.bin", "b.bin", "c.bin"],
+            new EmbeddedFileContributionOptions { MaxParallelTrials = 3 },
+            cancellationToken: TestContext.Current.CancellationToken, progress: seen.Add);
+        Assert.Null(result.UnavailableReason);
+        Assert.Equal(3, result.Entries.Count(e => e.MarginalCompressedBodyBytes is not null));
+        Assert.Equal(3, seen.Max(v => v.CompletedTrials));
+        Assert.All(seen, v => Assert.Equal(3, v.TotalTrials));
+    }
+
+    [Fact]
     public void Measure_DefaultTrialCapMeasuresMoreThanEightEntries()
     {
         var calls = 0;
