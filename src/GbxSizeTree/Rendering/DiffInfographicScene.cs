@@ -127,8 +127,8 @@ internal static class DiffInfographicLayout
     public const int TableRowHeight = 30;
     public const int CompactTableRowHeight = 24;
     public const int TableBottomGap = 12;
-    public const int MetadataLineHeight = 23;
-    public const int MetadataItemGap = 9;
+    public const int MetadataLineHeight = 18;
+    public const int MetadataItemGap = 4;
     public const float MetadataTextWidth = 520;
     public const float MetadataMarkerValueGap = 7;
 

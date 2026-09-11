@@ -1081,9 +1081,33 @@ public sealed class DiffInfographicTests
         var metadata = Assert.Single(scene.Sections, x => x.Id == "metadata");
 
         Assert.Equal([1, 2, 1], metadata.Items.Select(x => x.Lines.Count));
-        Assert.Equal(198, metadata.Bottom - metadata.Top);
+        Assert.Equal(168, metadata.Bottom - metadata.Top);
         Assert.Equal(DiffInfographicLayout.SectionHeight(metadata), metadata.Bottom - metadata.Top);
         Assert.True(metadata.Bottom - metadata.Top < DiffInfographicLayout.SectionHeight(4, null));
+    }
+
+    [Fact]
+    public void BuildScene_GroupsEmbeddedIndexMetadataIntoSummaryRows()
+    {
+        var report = Empty() with
+        {
+            MapUid = new("uid-before", "uid-after"),
+            MetadataChanges = Enumerable.Range(0, 12)
+                .SelectMany(i => new[]
+                {
+                    new MapMetadataChange($"embedded.identities/{i}/id", new($"old-{i}"), new($"new-{i}")),
+                    new MapMetadataChange($"embedded.identities/{i}/collection", new("old"), new("new")),
+                    new MapMetadataChange($"embedded.identities/{i}/author", new("old"), new("new")),
+                }).ToArray(),
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var metadata = Assert.Single(scene.Sections, x => x.Id == "metadata");
+
+        Assert.Equal(2, metadata.Items.Count);
+        Assert.Contains(metadata.Items, item => item.Lines[0].Text.Contains("Embedded identities", StringComparison.Ordinal));
+        Assert.Contains(metadata.Items, item => item.Lines[0].Text.Contains("Map UID", StringComparison.Ordinal));
+        Assert.True(metadata.Bottom - metadata.Top < 12 * 3 * DiffInfographicLayout.MetadataLineHeight);
     }
 
     [Fact]
@@ -1105,7 +1129,7 @@ public sealed class DiffInfographicTests
 
         Assert.Equal([1, 1, 2], metadata.Items.Select(item => item.Lines.Count));
         Assert.Equal(4, metadata.Items.Sum(item => item.Lines.Count));
-        Assert.Equal(198, metadata.Bottom - metadata.Top);
+        Assert.Equal(168, metadata.Bottom - metadata.Top);
         Assert.Equal(DiffInfographicLayout.SectionHeight(metadata), metadata.Bottom - metadata.Top);
         Assert.All(metadata.Items.SelectMany(item => item.Lines), line =>
             Assert.True(DiffInfographicPainter.MetadataLineWidth(line) <= DiffInfographicLayout.MetadataTextWidth));
