@@ -72,6 +72,29 @@ internal static class EmbeddedItemIdentityPreserver
             textures);
     }
 
+    /// <summary>Builds the snapshot from an encapsulation pass that already read the chunk (no re-decompression).</summary>
+    internal static Snapshot CaptureParsed(
+        int version,
+        Ident[] expectedModels,
+        List<string>? textures,
+        byte[] zipBuffer,
+        int zipOffset,
+        int zipLength)
+    {
+        var itemPaths = ReadItemModelPaths(zipBuffer, zipOffset, zipLength);
+        if (itemPaths.Count != expectedModels.Length)
+        {
+            throw new InvalidDataException(
+                $"Embedded item identity map has {expectedModels.Length} identities but " +
+                $"{itemPaths.Count} readable item model entries.");
+        }
+
+        return new Snapshot(
+            version,
+            itemPaths.Select((path, index) => new EntryIdentity(path, expectedModels[index])).ToArray(),
+            textures);
+    }
+
     /// <summary>
     /// Projects the original ordered mapping onto the final ZIP and makes GBX.NET write the
     /// resulting chunk payload verbatim. Existing actions may recompress or delete entries;
@@ -174,14 +197,17 @@ internal static class EmbeddedItemIdentityPreserver
             : Enumerable.Repeat<Ident?>(null, entries.Count).ToArray();
     }
 
-    private static List<string> ReadItemModelPaths(byte[] zipData)
+    private static List<string> ReadItemModelPaths(byte[] zipData) =>
+        ReadItemModelPaths(zipData, 0, zipData.Length);
+
+    private static List<string> ReadItemModelPaths(byte[] zipBuffer, int zipOffset, int zipLength)
     {
-        if (zipData.Length == 0)
+        if (zipLength == 0)
         {
             return [];
         }
 
-        using var stream = new MemoryStream(zipData, writable: false);
+        using var stream = new MemoryStream(zipBuffer, zipOffset, zipLength, writable: false);
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
         return archive.Entries.Where(IsItemModel).Select(static entry => entry.FullName).ToList();
     }

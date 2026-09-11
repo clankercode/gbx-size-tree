@@ -20,6 +20,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Batch CLI over whole maps: keep the heap small between large phases (B065). -->
+    <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="7" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../GbxSizeTree.Core/GbxSizeTree.Core.csproj" />
     <PackageReference Include="Spectre.Console" Version="0.57.2" />
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="[2.1.7]" />

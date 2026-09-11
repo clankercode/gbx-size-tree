@@ -11,7 +11,10 @@ namespace GbxSizeTree.Container;
 internal sealed class EmbeddedZipRemovalPlan
 {
     internal sealed record Entry(string Path, long ZipCompressedBytes, long ZipRawBytes);
-    private readonly byte[] zip;
+    private readonly byte[] decompressedFile;
+    private readonly int bodyOffset;
+    private readonly int zipStart;
+    private readonly int zipLength;
     private readonly RawZipRemoval archive;
     private readonly int chunkOffset;
     private readonly int payloadEnd;
@@ -19,15 +22,24 @@ internal sealed class EmbeddedZipRemovalPlan
     private readonly byte[] textureTail;
     private readonly EmbeddedItemIdentityPreserver.Snapshot identities;
 
-    public byte[] OriginalBody { get; }
+    // Lazy: only the legacy byte-array paths materialize a standalone body copy.
+    public byte[] OriginalBody => field ??= BodySpan.ToArray();
     public IReadOnlyList<Entry> Entries { get; }
 
-    private EmbeddedZipRemovalPlan(byte[] body, byte[] zip, RawZipRemoval archive,
+    internal ReadOnlySpan<byte> BodySpan => decompressedFile.AsSpan(bodyOffset);
+    internal int BodyLength => decompressedFile.Length - bodyOffset;
+
+    // The ZIP lives inside the body; trials read the slice instead of a second copy.
+    private ReadOnlySpan<byte> Zip => BodySpan.Slice(zipStart, zipLength);
+
+    private EmbeddedZipRemovalPlan(byte[] decompressedFile, int bodyOffset, int zipStart, int zipLength, RawZipRemoval archive,
         int chunkOffset, int payloadEnd, int zipLengthOffset, byte[] textureTail,
         EmbeddedItemIdentityPreserver.Snapshot identities)
     {
-        OriginalBody = body;
-        this.zip = zip;
+        this.decompressedFile = decompressedFile;
+        this.bodyOffset = bodyOffset;
+        this.zipStart = zipStart;
+        this.zipLength = zipLength;
         this.archive = archive;
         this.chunkOffset = chunkOffset;
         this.payloadEnd = payloadEnd;
@@ -49,18 +61,19 @@ internal sealed class EmbeddedZipRemovalPlan
         {
             throw new NotSupportedException("Body exceeds the measurement byte budget.");
         }
-        var body = DecompressedBody.GetBody(file);
-        if (body.LongLength != bodyLength)
+        var decompressed = DecompressedBody.GetDecompressedFile(file);
+        var body = decompressed.Body;
+        if (body.Length != bodyLength)
         {
             throw new InvalidDataException("Decompressed body does not match its declared length.");
         }
 
         // Also count hidden signatures: a scanner resynchronization alone cannot prove uniqueness.
         ReadOnlySpan<byte> signature = [0x54, 0x30, 0x04, 0x03, 0x50, 0x49, 0x4B, 0x53];
-        var signatureOffset = body.AsSpan().IndexOf(signature);
+        var signatureOffset = body.IndexOf(signature);
         var duplicateSignature = signatureOffset >= 0
-            && body.AsSpan(signatureOffset + 1).IndexOf(signature) >= 0;
-        var regions = new SkippableChunkScanner().Scan(body).Regions
+            && body[(signatureOffset + 1)..].IndexOf(signature) >= 0;
+        var regions = new SkippableChunkScanner().Scan(decompressed.BodyMemory).Regions
             .Where(x => x.Kind == RawChunkKind.Skippable && x.ChunkId == 0x03043054).ToArray();
         if (signatureOffset < 0 || duplicateSignature || regions.Length != 1 || signatureOffset != regions[0].Offset)
         {
@@ -78,56 +91,70 @@ internal sealed class EmbeddedZipRemovalPlan
         {
             throw new NotSupportedException("Embedded identity count exceeds the measurement budget.");
         }
-        using var stream = new MemoryStream(body.AsSpan(start, end - start).ToArray(), writable: false);
+        using var stream = new MemoryStream(decompressed.Bytes, decompressed.BodyOffset + start, end - start, writable: false);
         using var reader = new GbxReader(stream);
         var version = reader.ReadInt32();
-        byte[] zip = [];
+        Ident[] idents = [];
+        List<string>? textures = null;
         var zipOffset = 0;
+        var zipLength = 0;
         var tailOffset = 0;
         reader.ReadEncapsulated(inner =>
         {
-            inner.ReadArrayIdent();
+            idents = inner.ReadArrayIdent();
             zipOffset = checked(start + (int)stream.Position);
-            var zipLength = ReadInt(body, zipOffset);
+            zipLength = ReadInt(decompressed.Bytes, decompressed.BodyOffset + zipOffset);
             if (zipLength < 0 || zipLength > end - zipOffset - 4)
             {
                 throw new InvalidDataException("Embedded ZIP length exceeds its chunk span.");
             }
-            zip = inner.ReadData();
+            inner.SkipData(4 + zipLength);
             tailOffset = checked(start + (int)stream.Position);
             if (version == 1)
             {
-                var textureCount = ReadInt(body, tailOffset);
+                var textureCount = ReadInt(decompressed.Bytes, decompressed.BodyOffset + tailOffset);
                 if (textureCount < 0 || textureCount > (end - tailOffset - 4) / 4)
                 {
                     throw new InvalidDataException("Embedded texture count exceeds its chunk span.");
                 }
-                inner.ReadListString();
+                textures = inner.ReadListString();
             }
             if (stream.Position != stream.Length)
             {
                 throw new InvalidDataException("Unrecognized bytes in embedded chunk encapsulation.");
             }
         });
-        if (zipOffset < start + 12 || tailOffset > end || ReadInt(body, zipOffset) != zip.Length
-            || !body.AsSpan(zipOffset + 4, zip.Length).SequenceEqual(zip))
+        if (zipOffset < start + 12 || tailOffset > end || zipOffset + 4 + zipLength != tailOffset)
         {
             throw new InvalidDataException("Embedded ZIP byte span could not be verified.");
         }
-        var archive = RawZipRemoval.Parse(zip, options);
-        var identities = EmbeddedItemIdentityPreserver.Capture(file);
-        return new(body, zip, archive, checked((int)region.Offset), end, zipOffset,
-            body.AsSpan(tailOffset, end - tailOffset).ToArray(), identities);
+        var archive = RawZipRemoval.Parse(decompressed.Bytes, decompressed.BodyOffset + zipOffset + 4, zipLength, options);
+        // Identities come from this same pass: a second decompression would double the transient load.
+        var identities = EmbeddedItemIdentityPreserver.CaptureParsed(version, idents, textures,
+            decompressed.Bytes, decompressed.BodyOffset + zipOffset + 4, zipLength);
+        return new(decompressed.Bytes, decompressed.BodyOffset, zipOffset + 4, zipLength, archive,
+            checked((int)region.Offset), end, zipOffset,
+            body.Slice(tailOffset, end - tailOffset).ToArray(), identities);
     }
 
     public byte[] Remove(string path)
     {
-        var trialZip = archive.Remove(zip, path);
+        var buffer = new byte[BodyLength];
+        var length = Remove(path, buffer);
+        Array.Resize(ref buffer, length);
+        return buffer;
+    }
+
+    /// <summary>Builds the single-entry removal trial into <paramref name="destination"/>; returns its length.</summary>
+    public int Remove(string path, Span<byte> destination)
+    {
+        var trialZipLength = archive.TrialLength(path);
         var removesIdentity = identities.Entries.Any(x => string.Equals(x.Path, path, StringComparison.Ordinal));
-        byte[] prefix;
+        int prefixLength;
         if (!removesIdentity)
         {
-            prefix = OriginalBody.AsSpan(chunkOffset + 12, zipLengthOffset - chunkOffset - 12).ToArray();
+            prefixLength = zipLengthOffset - chunkOffset - 12;
+            BodySpan.Slice(chunkOffset + 12, prefixLength).CopyTo(destination[(chunkOffset + 12)..]);
         }
         else
         {
@@ -139,24 +166,30 @@ internal sealed class EmbeddedZipRemovalPlan
                     .Where(x => !string.Equals(x.Path, path, StringComparison.Ordinal))
                     .Select(x => x.Model).ToList()));
             }
-            prefix = stream.ToArray();
+            prefixLength = checked((int)stream.Length);
+            stream.GetBuffer().AsSpan(0, prefixLength).CopyTo(destination[(chunkOffset + 12)..]);
         }
-        var payloadLength = checked(prefix.Length + 4 + trialZip.Length + textureTail.Length);
-        var result = new byte[checked(chunkOffset + 12 + payloadLength + OriginalBody.Length - payloadEnd)];
-        OriginalBody.AsSpan(0, chunkOffset + 12).CopyTo(result);
-        WriteInt(result, chunkOffset + 8, payloadLength);
-        prefix.CopyTo(result, chunkOffset + 12);
-        WriteInt(result, chunkOffset + 20, payloadLength - 12);
-        var cursor = chunkOffset + 12 + prefix.Length;
-        WriteInt(result, cursor, trialZip.Length);
-        trialZip.CopyTo(result, cursor + 4);
-        textureTail.CopyTo(result, cursor + 4 + trialZip.Length);
-        OriginalBody.AsSpan(payloadEnd).CopyTo(result.AsSpan(chunkOffset + 12 + payloadLength));
-        return result;
+        var payloadLength = checked(prefixLength + 4 + trialZipLength + textureTail.Length);
+        var total = checked(chunkOffset + 12 + payloadLength + BodyLength - payloadEnd);
+        BodySpan[..(chunkOffset + 12)].CopyTo(destination);
+        WriteInt(destination, chunkOffset + 8, payloadLength);
+        WriteInt(destination, chunkOffset + 20, payloadLength - 12);
+        var cursor = chunkOffset + 12 + prefixLength;
+        WriteInt(destination, cursor, trialZipLength);
+        var written = archive.Remove(Zip, path, destination[(cursor + 4)..]);
+        if (written != trialZipLength)
+        {
+            throw new InvalidDataException("Embedded ZIP removal trial length changed during construction.");
+        }
+        cursor += 4 + trialZipLength;
+        textureTail.CopyTo(destination[cursor..]);
+        cursor += textureTail.Length;
+        BodySpan[payloadEnd..].CopyTo(destination[cursor..]);
+        return total;
     }
 
-    private static int ReadInt(byte[] bytes, int offset) => BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(offset, 4));
-    private static void WriteInt(byte[] bytes, int offset, int value) => BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(offset, 4), value);
+    private static int ReadInt(ReadOnlySpan<byte> bytes, int offset) => BinaryPrimitives.ReadInt32LittleEndian(bytes.Slice(offset, 4));
+    private static void WriteInt(Span<byte> bytes, int offset, int value) => BinaryPrimitives.WriteInt32LittleEndian(bytes.Slice(offset, 4), value);
 }
 
 /// <summary>Classic single-disk ZIP surgery retaining compressed local records and central metadata.</summary>
@@ -165,17 +198,20 @@ internal sealed class RawZipRemoval
     private sealed record Record(int LocalOffset, int LocalLength, int CentralOffset, int CentralLength);
     private readonly Record[] records;
     private readonly int endOffset;
+    private readonly int zipLength;
     public IReadOnlyList<EmbeddedZipRemovalPlan.Entry> Entries { get; }
 
-    private RawZipRemoval(Record[] records, int endOffset, IReadOnlyList<EmbeddedZipRemovalPlan.Entry> entries)
+    private RawZipRemoval(Record[] records, int endOffset, int zipLength, IReadOnlyList<EmbeddedZipRemovalPlan.Entry> entries)
     {
         this.records = records;
         this.endOffset = endOffset;
+        this.zipLength = zipLength;
         Entries = entries;
     }
 
-    public static RawZipRemoval Parse(byte[] zip, EmbeddedFileContributionOptions options)
+    public static RawZipRemoval Parse(byte[] body, int zipStart, int zipLength, EmbeddedFileContributionOptions options)
     {
+        var zip = body.AsSpan(zipStart, zipLength);
         var endings = new List<int>();
         for (var i = Math.Max(0, zip.Length - 65557); i <= zip.Length - 22; i++)
         {
@@ -197,7 +233,7 @@ internal sealed class RawZipRemoval
         {
             throw new NotSupportedException("Unsupported ZIP framing or entry budget exceeded (ZIP64/multi-disk are not supported).");
         }
-        using var stream = new MemoryStream(zip, writable: false);
+        using var stream = new MemoryStream(body, zipStart, zipLength, writable: false);
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
         if (archive.Entries.Count != count || archive.Entries.Select(x => x.FullName).Distinct(StringComparer.Ordinal).Count() != count)
         {
@@ -234,7 +270,7 @@ internal sealed class RawZipRemoval
             Require(zip, localCursor, localLength);
             if (U32(zip, localCursor) != 0x04034B50 || U16(zip, localCursor + 6) != flags
                 || U16(zip, localCursor + 8) != method || localName != nameLength
-                || !zip.AsSpan(localCursor + 30, localName).SequenceEqual(zip.AsSpan(cursor + 46, nameLength))
+                || !zip.Slice(localCursor + 30, localName).SequenceEqual(zip.Slice(cursor + 46, nameLength))
                 || (method == 0 && compressed != raw))
             {
                 throw new InvalidDataException("ZIP local and central records disagree.");
@@ -265,18 +301,31 @@ internal sealed class RawZipRemoval
         {
             throw new InvalidDataException("ZIP record spans overlap or contain unrecognized bytes.");
         }
-        return new(records, end, entries);
+        return new(records, end, zipLength, entries);
     }
 
-    public byte[] Remove(byte[] zip, string path)
+    public int TrialLength(string path)
     {
-        var index = Enumerable.Range(0, Entries.Count).Single(i => string.Equals(Entries[i].Path, path, StringComparison.Ordinal));
+        var removed = records[IndexOf(path)];
+        return zipLength - removed.LocalLength - removed.CentralLength;
+    }
+
+    private int IndexOf(string path) =>
+        Enumerable.Range(0, Entries.Count).Single(i => string.Equals(Entries[i].Path, path, StringComparison.Ordinal));
+
+    /// <summary>Writes the single-entry removal to <paramref name="destination"/>; returns the trial ZIP length.</summary>
+    public int Remove(ReadOnlySpan<byte> zip, string path, Span<byte> destination)
+    {
+        var index = IndexOf(path);
         var removed = records[index];
-        using var output = new MemoryStream(zip.Length - removed.LocalLength - removed.CentralLength);
-        output.Write(zip.AsSpan(0, removed.LocalOffset));
-        var centralStart = records.Length == 0 ? 0 : records[^1].LocalOffset + records[^1].LocalLength;
-        output.Write(zip.AsSpan(removed.LocalOffset + removed.LocalLength, centralStart - removed.LocalOffset - removed.LocalLength));
-        var newCentral = checked((int)output.Position);
+        var cursor = 0;
+        zip[..removed.LocalOffset].CopyTo(destination);
+        cursor += removed.LocalOffset;
+        var centralStart = records[^1].LocalOffset + records[^1].LocalLength;
+        var middleLength = centralStart - removed.LocalOffset - removed.LocalLength;
+        zip.Slice(removed.LocalOffset + removed.LocalLength, middleLength).CopyTo(destination[cursor..]);
+        cursor += middleLength;
+        var newCentral = cursor;
         for (var i = 0; i < records.Length; i++)
         {
             if (i == index)
@@ -284,21 +333,23 @@ internal sealed class RawZipRemoval
                 continue;
             }
             var record = records[i];
-            var bytes = zip.AsSpan(record.CentralOffset, record.CentralLength).ToArray();
+            var bytes = zip.Slice(record.CentralOffset, record.CentralLength).ToArray();
             BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(42), record.LocalOffset - (i > index ? removed.LocalLength : 0));
-            output.Write(bytes);
+            bytes.CopyTo(destination[cursor..]);
+            cursor += record.CentralLength;
         }
-        var centralLength = checked((int)output.Position - newCentral);
-        var end = zip.AsSpan(endOffset).ToArray();
+        var centralLength = cursor - newCentral;
+        var end = zip[endOffset..].ToArray();
         BinaryPrimitives.WriteUInt16LittleEndian(end.AsSpan(8), checked((ushort)(records.Length - 1)));
         BinaryPrimitives.WriteUInt16LittleEndian(end.AsSpan(10), checked((ushort)(records.Length - 1)));
         BinaryPrimitives.WriteInt32LittleEndian(end.AsSpan(12), centralLength);
         BinaryPrimitives.WriteInt32LittleEndian(end.AsSpan(16), newCentral);
-        output.Write(end);
-        return output.ToArray();
+        end.CopyTo(destination[cursor..]);
+        cursor += end.Length;
+        return cursor;
     }
 
-    private static void ValidateExtra(byte[] zip, int offset, int length)
+    private static void ValidateExtra(ReadOnlySpan<byte> zip, int offset, int length)
     {
         var end = offset + length;
         while (offset < end)
@@ -315,21 +366,21 @@ internal sealed class RawZipRemoval
         }
     }
 
-    private static void Require(byte[] bytes, int offset, int length)
+    private static void Require(ReadOnlySpan<byte> bytes, int offset, int length)
     {
         if (offset < 0 || length < 0 || offset > bytes.Length - length)
         {
             throw new InvalidDataException("Truncated ZIP record.");
         }
     }
-    private static ushort U16(byte[] bytes, int offset)
+    private static ushort U16(ReadOnlySpan<byte> bytes, int offset)
     {
         Require(bytes, offset, 2);
-        return BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(offset, 2));
+        return BinaryPrimitives.ReadUInt16LittleEndian(bytes.Slice(offset, 2));
     }
-    private static uint U32(byte[] bytes, int offset)
+    private static uint U32(ReadOnlySpan<byte> bytes, int offset)
     {
         Require(bytes, offset, 4);
-        return BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(offset, 4));
+        return BinaryPrimitives.ReadUInt32LittleEndian(bytes.Slice(offset, 4));
     }
 }

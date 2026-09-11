@@ -1,3 +1,4 @@
+using System.Runtime;
 using System.Security.Cryptography;
 using System.Text.Json;
 using GBX.NET;
@@ -36,7 +37,12 @@ public static class DiffMode
             report = CompareFiles(paths[0], paths[1], all,
                 progress: progress is null ? null : progress.Report);
         if (format == CliOutputFormat.Json)
-            Console.WriteLine(RenderJson(report));
+        {
+            // Stream instead of materializing the full document: reports reach hundreds of MB.
+            using var stdout = Console.OpenStandardOutput();
+            JsonSerializer.Serialize(stdout, BuildJsonReport(report), DiffJsonContext.Default.DiffJsonReport);
+            Console.Out.WriteLine();
+        }
         else if (format == CliOutputFormat.Html)
             Console.WriteLine(DiffRenderer.RenderHtml(report, paths[0], paths[1], colorOption, styled));
         else if (format == CliOutputFormat.Markdown)
@@ -47,7 +53,10 @@ public static class DiffMode
     }
 
     // Keep the JSON envelope and string-valued changes compatible; snapshots carry typed detail.
-    public static string RenderJson(DiffReport report) => JsonSerializer.Serialize(new DiffJsonReport(
+    public static string RenderJson(DiffReport report) =>
+        JsonSerializer.Serialize(BuildJsonReport(report), DiffJsonContext.Default.DiffJsonReport);
+
+    private static DiffJsonReport BuildJsonReport(DiffReport report) => new(
         report.LeftBytes, report.RightBytes,
         Legacy(report.Blocks, x => x.Key),
         Legacy(report.BakedBlocks, x => x.Key),
@@ -63,7 +72,7 @@ public static class DiffMode
         report.MetadataChanges, report.EmbeddedContributions, report.EmbeddedPropertyChanges,
         report.PropertyChangeSummaries, report.EmbeddedUsages,
         report.LeftContributionBaselineBytes, report.RightContributionBaselineBytes, report.Warnings
-    ), DiffJsonContext.Default.DiffJsonReport);
+    );
 
     private static IEnumerable<Change> Legacy<T>(IEnumerable<ValueChange<T>> changes, Func<T, string> format) where T : class =>
         changes.Select(c => new Change(c.Left is null ? null : format(c.Left), c.Right is null ? null : format(c.Right)));
@@ -74,35 +83,68 @@ public static class DiffMode
         Action<DiffProgress>? progress = null)
     {
         progress = BestEffort(progress);
-        progress?.Invoke(new(DiffProgressStage.ReadingOld, Path.GetFileName(left)));
-        var leftBytes = File.ReadAllBytes(left);
-        progress?.Invoke(new(DiffProgressStage.ReadingNew, Path.GetFileName(right)));
-        var rightBytes = File.ReadAllBytes(right);
         IReadOnlyDictionary<string, string> leftContent = new Dictionary<string, string>();
         IReadOnlyDictionary<string, string> rightContent = new Dictionary<string, string>();
+        long leftLength = 0, rightLength = 0;
         if (all)
         {
-            progress?.Invoke(new(DiffProgressStage.ParsingOld, Path.GetFileName(left)));
-            leftContent = MapContentComparison.Capture(leftBytes);
-            progress?.Invoke(new(DiffProgressStage.ParsingNew, Path.GetFileName(right)));
-            rightContent = MapContentComparison.Capture(rightBytes);
+            leftContent = CaptureContent(left, DiffProgressStage.ParsingOld, progress);
+            ReleaseTransientMemory();
+            rightContent = CaptureContent(right, DiffProgressStage.ParsingNew, progress);
+            ReleaseTransientMemory();
+            leftLength = new FileInfo(left).Length;
+            rightLength = new FileInfo(right).Length;
         }
         DiffReport report;
+        // Frame-scoped phases keep file bytes, parsed maps, and snapshots out of later phases (B065).
         try
         {
-            progress?.Invoke(new(DiffProgressStage.ParsingOld, Path.GetFileName(left)));
-            var leftSnapshot = ReadBytes(leftBytes, leftContent);
-            progress?.Invoke(new(DiffProgressStage.ParsingNew, Path.GetFileName(right)));
-            var rightSnapshot = ReadBytes(rightBytes, rightContent);
-            progress?.Invoke(new(DiffProgressStage.Comparing));
-            report = Compare(leftSnapshot, rightSnapshot, all, progress);
+            report = ParseAndCompare(left, right, leftContent, rightContent, all, progress);
         }
         catch (Exception ex) when (all && ex is not OperationCanceledException and not OutOfMemoryException)
         {
             progress?.Invoke(new(DiffProgressStage.Comparing));
-            return ContentOnlyReport(leftBytes.Length, rightBytes.Length, leftContent, rightContent);
+            return ContentOnlyReport(leftLength, rightLength, leftContent, rightContent);
         }
-        return WithContributions(report, leftBytes, rightBytes, contributionOptions, progress);
+        ReleaseTransientMemory();
+        return WithContributions(report, left, right, contributionOptions, progress);
+    }
+
+    private static DiffReport ParseAndCompare(string left, string right,
+        IReadOnlyDictionary<string, string> leftContent, IReadOnlyDictionary<string, string> rightContent,
+        bool all, Action<DiffProgress>? progress)
+    {
+        var leftSnapshot = ParseSide(left, DiffProgressStage.ReadingOld, DiffProgressStage.ParsingOld, leftContent, progress);
+        ReleaseTransientMemory();
+        var rightSnapshot = ParseSide(right, DiffProgressStage.ReadingNew, DiffProgressStage.ParsingNew, rightContent, progress);
+        ReleaseTransientMemory();
+        progress?.Invoke(new(DiffProgressStage.Comparing));
+        return Compare(leftSnapshot, rightSnapshot, all, progress);
+    }
+
+    private static IReadOnlyDictionary<string, string> CaptureContent(string path, DiffProgressStage stage,
+        Action<DiffProgress>? progress)
+    {
+        progress?.Invoke(new(stage, Path.GetFileName(path)));
+        return MapContentComparison.Capture(File.ReadAllBytes(path));
+    }
+
+    // File bytes die with this frame; the returned snapshot keeps only extracted data.
+    private static Snapshot ParseSide(string path, DiffProgressStage readStage, DiffProgressStage parseStage,
+        IReadOnlyDictionary<string, string> content, Action<DiffProgress>? progress)
+    {
+        progress?.Invoke(new(readStage, Path.GetFileName(path)));
+        var bytes = File.ReadAllBytes(path);
+        progress?.Invoke(new(parseStage, Path.GetFileName(path)));
+        return ReadBytes(bytes, content);
+    }
+
+    // Phases hold entire parsed maps and decompressed bodies; reclaiming one phase's garbage
+    // before the next allocates keeps peak RSS near a single phase instead of the sum of two.
+    private static void ReleaseTransientMemory()
+    {
+        GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+        GC.Collect();
     }
 
     private static Action<DiffProgress>? BestEffort(Action<DiffProgress>? progress)
@@ -136,13 +178,16 @@ public static class DiffMode
         };
     }
 
-    private static DiffReport WithContributions(DiffReport report, byte[]? leftBytes, byte[]? rightBytes,
+    // Side bytes are re-read from disk and released per side so both maps never pile up with the
+    // decompression plan and trial buffers during measurement (B065 memory target).
+    private static DiffReport WithContributions(DiffReport report, string? leftPath, string? rightPath,
         EmbeddedFileContributionOptions? options = null, Action<DiffProgress>? progress = null)
     {
         if (report.Embedded.Count == 0) return report;
-        var left = Measure(leftBytes, report.Embedded.Select(c => c.Left).OfType<EmbeddedSnapshot>().ToArray(),
+        var left = Measure(leftPath, report.Embedded.Select(c => c.Left).OfType<EmbeddedSnapshot>().ToArray(),
             DiffProgressStage.MeasuringOldEmbeds);
-        var right = Measure(rightBytes, report.Embedded.Select(c => c.Right).OfType<EmbeddedSnapshot>().ToArray(),
+        ReleaseTransientMemory();
+        var right = Measure(rightPath, report.Embedded.Select(c => c.Right).OfType<EmbeddedSnapshot>().ToArray(),
             DiffProgressStage.MeasuringNewEmbeds);
         var leftEntries = left.Entries.ToDictionary(e => e.Path, StringComparer.Ordinal);
         var rightEntries = right.Entries.ToDictionary(e => e.Path, StringComparer.Ordinal);
@@ -155,10 +200,11 @@ public static class DiffMode
                 c.Right is null ? null : rightEntries[c.Right.Path])).ToArray(),
         };
 
-        EmbeddedFileContributionMeasurement Measure(byte[]? bytes, EmbeddedSnapshot[] entries,
+        EmbeddedFileContributionMeasurement Measure(string? path, EmbeddedSnapshot[] entries,
             DiffProgressStage stage)
         {
             if (entries.Length == 0) return new(null, [], null);
+            var bytes = path is null ? null : File.ReadAllBytes(path);
             string? unavailable = null;
             try
             {

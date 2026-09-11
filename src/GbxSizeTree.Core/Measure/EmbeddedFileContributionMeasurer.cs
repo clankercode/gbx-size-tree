@@ -1,6 +1,8 @@
+using System.Buffers;
+using System.Runtime;
 using System.Runtime.CompilerServices;
-using GBX.NET.LZO;
 using GbxSizeTree.Container;
+using SharpLzo;
 
 [assembly: InternalsVisibleTo("GbxSizeTree.Tests")]
 
@@ -44,9 +46,10 @@ public sealed record EmbeddedFileContributionProgress(
 /// <summary>Measures context-dependent embedded-file removal savings without modifying the source map.</summary>
 public sealed class EmbeddedFileContributionMeasurer
 {
-    private readonly Func<byte[], long> compress;
+    // Null selects the pooled SharpLzo path; the delegate exists for tests with fake compressors.
+    private readonly Func<byte[], long>? compress;
 
-    public EmbeddedFileContributionMeasurer() : this(static body => new Lzo().Compress(body).LongLength)
+    public EmbeddedFileContributionMeasurer()
     {
     }
 
@@ -89,7 +92,18 @@ public sealed class EmbeddedFileContributionMeasurer
             return new(null, paths.Select(path => new EmbeddedFileContribution(path, null, null, null, ex.Message)).ToArray(), ex.Message);
         }
 
-        var results = new List<EmbeddedFileContribution>(paths.Length);
+        // The plan slices the decompressed file buffer; the container bytes are no longer needed.
+        originalFile = null!;
+        ReleaseTransientMemory();
+
+        // The pooled path keeps one trial buffer, one output buffer, and one LZO work memory for the
+        // whole measurement instead of allocating full body copies per trial (B065 memory target).
+        // Buffers are per-Measure arrays (not ArrayPool) so the runtime can decommit them between sides.
+        var pooled = compress is null;
+        var trialBuffer = pooled ? new byte[plan.BodyLength] : null;
+        var outputBuffer = pooled ? new byte[OutputBound(plan.BodyLength)] : null;
+        var workMemory = pooled ? new byte[Lzo.WorkMemorySize] : null;
+    var results = new List<EmbeddedFileContribution>(paths.Length);
         long? baseline = null;
         string? baselineFailure = null;
         var trials = 0;
@@ -122,22 +136,44 @@ public sealed class EmbeddedFileContributionMeasurer
                 try
                 {
                     trials++;
-                    // Validate the trial before paying for the shared baseline compression.
-                    var trial = plan.Remove(path);
-                    if (baseline is null)
+                    if (pooled)
                     {
-                        try
+                        // Validate the trial before paying for the shared baseline compression.
+                        var trialLength = plan.Remove(path, trialBuffer!);
+                        if (baseline is null)
                         {
-                            baseline = Compress(plan.OriginalBody);
+                            try
+                            {
+                                baseline = CompressPooled(plan.BodySpan, outputBuffer!, workMemory!);
+                            }
+                            catch (Exception ex) when (IsUnavailable(ex))
+                            {
+                                baselineFailure = ex.Message;
+                                throw;
+                            }
                         }
-                        catch (Exception ex) when (IsUnavailable(ex))
-                        {
-                            baselineFailure = ex.Message;
-                            throw;
-                        }
+                        cancellationToken.ThrowIfCancellationRequested();
+                        marginal = baseline.Value - CompressPooled(trialBuffer!.AsSpan(0, trialLength), outputBuffer!, workMemory!);
                     }
-                    cancellationToken.ThrowIfCancellationRequested();
-                    marginal = baseline.Value - Compress(trial);
+                    else
+                    {
+                        // Validate the trial before paying for the shared baseline compression.
+                        var trial = plan.Remove(path);
+                        if (baseline is null)
+                        {
+                            try
+                            {
+                                baseline = Compress(plan.OriginalBody);
+                            }
+                            catch (Exception ex) when (IsUnavailable(ex))
+                            {
+                                baselineFailure = ex.Message;
+                                throw;
+                            }
+                        }
+                        cancellationToken.ThrowIfCancellationRequested();
+                        marginal = baseline.Value - Compress(trial);
+                    }
                 }
                 catch (Exception ex) when (IsUnavailable(ex))
                 {
@@ -152,6 +188,22 @@ public sealed class EmbeddedFileContributionMeasurer
             results.Add(new(path, entry.ZipCompressedBytes, entry.ZipRawBytes, marginal, reason));
         }
         return new(baseline, results, baselineFailure);
+    }
+
+    private static void ReleaseTransientMemory()
+    {
+        GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+        GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+    }
+
+    private static int OutputBound(int bodyLength) => checked(bodyLength + bodyLength / 16 + 64 + 3);
+
+    private static long CompressPooled(ReadOnlySpan<byte> body, byte[] output, byte[] workMemory)
+    {
+        // Lzo1x_999 matches GBX.NET.LZO.Lzo.Compress, which delegates to SharpLzo with mode 1.
+        var result = Lzo.TryCompress(CompressionMode.Lzo1x_999, body, body.Length, output, out var length, workMemory);
+        return result == LzoResult.OK ? length
+            : throw new InvalidDataException($"LZO compression failed ({result}).");
     }
 
     private static Action<EmbeddedFileContributionProgress>? BestEffort(
@@ -169,7 +221,7 @@ public sealed class EmbeddedFileContributionMeasurer
 
     private long Compress(byte[] body)
     {
-        var length = compress(body);
+        var length = compress!(body);
         return length >= 0 ? length : throw new InvalidDataException("Compressor returned a negative byte count.");
     }
 

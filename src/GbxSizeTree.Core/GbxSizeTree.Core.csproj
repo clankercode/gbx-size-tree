@@ -7,6 +7,8 @@
     <!-- GBX.NET pinned EXACTLY: CumulativeChunkMeasurer mirrors CMwNod.Write internals. -->
     <PackageReference Include="GBX.NET" Version="[2.4.4]" />
     <PackageReference Include="GBX.NET.LZO" Version="[2.1.6]" />
+    <!-- The compressor behind GBX.NET.LZO.Lzo; referenced directly for the span/pooled overloads. -->
+    <PackageReference Include="NativeSharpLzo" Version="[0.3.5]" />
     <PackageReference Include="GBX.NET.ZLib" Version="[1.1.2]" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
   </ItemGroup>
