@@ -16,6 +16,7 @@ public static class DiffInfographic
     private const int MaxSpatialChanges = 400;
     private const int MaxSpatialContext = 900;
     private const int MaxHighlightLines = 5;
+    private const int MaxEmbeddedRowsPerSection = 300;
     private const int MaxPropertyLines = 5;
     private const int MaxChunkLines = 4;
 
@@ -52,10 +53,26 @@ public static class DiffInfographic
             finiteChanges.Length - plotted.Length, invalidChanges, unpositionedChanges,
             finiteContext.Length - sampledContext.Length, invalidContext);
 
-        var sectionContent = new List<(string Id, string Title, IReadOnlyList<DiffInfographicSectionLine> Lines, IReadOnlyList<DiffInfographicTableRow>? TableRows)>();
-        var highlights = Highlights(report);
+        var sectionContent = new List<(string Id, string Title, IReadOnlyList<DiffInfographicSectionLine> Lines, DiffInfographicTable? Table)>();
+        var embeddedRows = EmbeddedRows(report);
+        var highlights = Highlights(report, embeddedRows);
         if (highlights.Rows.Count > 0 || highlights.Notes.Count > 0)
-            sectionContent.Add(("embedded-highlights", "Embedded highlights", highlights.Notes, highlights.Rows));
+            sectionContent.Add(("embedded-highlights", "Embedded highlights", highlights.Notes, new(highlights.Rows)));
+        if (embeddedRows.Count > 0)
+        {
+            var pageCount = (embeddedRows.Count + MaxEmbeddedRowsPerSection - 1) / MaxEmbeddedRowsPerSection;
+            for (var page = 0; page < pageCount; page++)
+            {
+                var pageRows = embeddedRows.Skip(page * MaxEmbeddedRowsPerSection)
+                    .Take(MaxEmbeddedRowsPerSection)
+                    .Select(x => x.Row)
+                    .ToArray();
+                var id = page == 0 ? "embedded-changes" : $"embedded-changes-{page + 1}";
+                var continuation = page == 0 ? "" : $" · continued {page + 1:N0}/{pageCount:N0}";
+                sectionContent.Add((id, $"All embedded changes · {embeddedRows.Count:N0}{continuation}", [],
+                    new(pageRows, DiffInfographicTableDensity.Compact)));
+            }
+        }
         var properties = Properties(report);
         if (properties.Count > 0) sectionContent.Add(("deep-properties", $"Deep properties · {detailCounts.DeepProperties:N0}", properties, null));
         var warnings = Warnings(report, spatial).ToArray();
@@ -79,8 +96,8 @@ public static class DiffInfographic
             var column = columnTops[0] <= columnTops[1] ? 0 : 1;
             var left = column == 0 ? 70 : 710;
             var requestedBottom = columnTops[column]
-                + DiffInfographicLayout.SectionHeight(content.Lines.Count, content.TableRows?.Count ?? 0);
-            sections.Add(new(content.Id, content.Title, content.Lines, left, columnTops[column], left + 620, requestedBottom, content.TableRows));
+                + DiffInfographicLayout.SectionHeight(content.Lines.Count, content.Table);
+            sections.Add(new(content.Id, content.Title, content.Lines, left, columnTops[column], left + 620, requestedBottom, content.Table));
             columnTops[column] = requestedBottom + 22;
         }
         var height = Math.Max(Math.Max(columnTops[0], columnTops[1]) + 24, MinimumHeight);
@@ -205,20 +222,28 @@ public static class DiffInfographic
         IReadOnlyList<DiffInfographicTableRow> Rows,
         IReadOnlyList<DiffInfographicSectionLine> Notes);
 
-    private static EmbeddedHighlights Highlights(DiffReport report)
-    {
-        var ranked = report.Embedded.Select(change =>
+    private sealed record EmbeddedChangeRow(long SizeDeltaBytes, DiffInfographicTableRow Row);
+
+    private static IReadOnlyList<EmbeddedChangeRow> EmbeddedRows(DiffReport report) =>
+        report.Embedded.Select(change =>
         {
             var value = change.Right ?? change.Left!;
             var kind = Kind(change.Left, change.Right);
             var delta = SaturatingSubtract(change.Right?.Compressed ?? 0, change.Left?.Compressed ?? 0);
-            var row = new DiffInfographicTableRow(
+            return new EmbeddedChangeRow(delta, new(
                 KindMarker(kind).ToString(),
                 DiffInfographicText.CleanPath(value.Path),
                 SignedBytes(delta),
-                kind);
-            return (Rank: AbsoluteMagnitude(delta), Row: row);
-        }).OrderByDescending(x => x.Rank)
+                kind));
+        }).OrderBy(x => x.Row.Path, StringComparer.Ordinal).ToArray();
+
+    private static EmbeddedHighlights Highlights(
+        DiffReport report,
+        IReadOnlyList<EmbeddedChangeRow> embeddedRows)
+    {
+        var ranked = embeddedRows.Select(row =>
+            (Rank: AbsoluteMagnitude(row.SizeDeltaBytes), row.Row))
+            .OrderByDescending(x => x.Rank)
             .ThenBy(x => x.Row.Path, StringComparer.Ordinal)
             .Take(MaxHighlightLines)
             .Select(x => x.Row)
@@ -226,7 +251,7 @@ public static class DiffInfographic
             .ToArray();
 
         var notes = new List<DiffInfographicSectionLine>();
-        var omitted = report.Embedded.Count - ranked.Length;
+        var omitted = embeddedRows.Count - ranked.Length;
         if (omitted > 0) notes.Add($"+ {omitted:N0} more embedded change{(omitted == 1 ? "" : "s")} omitted");
 
         var unavailableSides = report.EmbeddedContributions

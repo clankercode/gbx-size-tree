@@ -86,7 +86,7 @@ public sealed class DiffInfographicTests
         var scene = DiffInfographic.BuildScene(report, "a", "b");
         var highlights = Assert.Single(scene.Sections, x => x.Id == "embedded-highlights");
 
-        var rows = Assert.IsAssignableFrom<IReadOnlyList<DiffInfographicTableRow>>(highlights.TableRows);
+        var rows = Assert.IsAssignableFrom<IReadOnlyList<DiffInfographicTableRow>>(highlights.Table!.Rows);
         Assert.Equal(
             ["A/first.Item.Gbx", "B/second.Item.Gbx", "C/third.Item.Gbx", "D/fourth.Item.Gbx", "E/fifth.Item.Gbx"],
             rows.Select(x => x.Path));
@@ -101,11 +101,76 @@ public sealed class DiffInfographicTests
     }
 
     [Fact]
+    public void BuildScene_ListsEveryEmbeddedChangeCompactlyInOrdinalPathOrder()
+    {
+        var changes = Enumerable.Range(0, 18)
+            .Select(i => (i % 3) switch
+            {
+                0 => new ValueChange<EmbeddedSnapshot>(null, new($"Z/{17 - i:D2}-added.Item.Gbx", "new", i + 10, i + 100)),
+                1 => new ValueChange<EmbeddedSnapshot>(new($"A/{17 - i:D2}-removed.Item.Gbx", "old", i + 20, i + 200), null),
+                _ => new ValueChange<EmbeddedSnapshot>(
+                    new($"M/{17 - i:D2}-modified.Item.Gbx", "old", i + 30, i + 300),
+                    new($"M/{17 - i:D2}-modified.Item.Gbx", "new", i + 35, i + 305)),
+            })
+            .ToArray();
+        var scene = DiffInfographic.BuildScene(Empty() with { Embedded = changes }, "a", "b");
+
+        var highlights = Assert.Single(scene.Sections, x => x.Id == "embedded-highlights");
+        var complete = Assert.Single(scene.Sections, x => x.Id == "embedded-changes");
+        var rows = Assert.IsType<DiffInfographicTable>(complete.Table).Rows;
+
+        Assert.Equal(DiffInfographicTableDensity.Standard, highlights.Table!.Density);
+        Assert.Equal(DiffInfographicTableDensity.Compact, complete.Table!.Density);
+        Assert.True(DiffInfographicPainter.TableFont(complete.Table.Density).Size < DiffInfographicPainter.TableFont(highlights.Table.Density).Size);
+        Assert.Equal(changes.Length, rows.Count);
+        Assert.Equal(rows.Select(x => x.Path).Order(StringComparer.Ordinal), rows.Select(x => x.Path));
+        Assert.Equal(6, rows.Count(x => x.Kind == DiffInfographicChangeKind.Added && x.Marker == "+"));
+        Assert.Equal(6, rows.Count(x => x.Kind == DiffInfographicChangeKind.Removed && x.Marker == "−"));
+        Assert.Equal(6, rows.Count(x => x.Kind == DiffInfographicChangeKind.Changed && x.Marker == "~"));
+        Assert.All(rows.Where(x => x.Kind == DiffInfographicChangeKind.Added), x => Assert.StartsWith("+", x.Value, StringComparison.Ordinal));
+        Assert.All(rows.Where(x => x.Kind == DiffInfographicChangeKind.Removed), x => Assert.StartsWith("−", x.Value, StringComparison.Ordinal));
+        Assert.All(rows.Where(x => x.Kind == DiffInfographicChangeKind.Changed), x => Assert.Equal("+5 B", x.Value));
+        Assert.Empty(complete.Lines);
+        Assert.DoesNotContain("omitted", complete.Title, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(complete.Lines, x => x.Text.Contains("omitted", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(
+            DiffInfographicLayout.SectionHeight(0, complete.Table),
+            complete.Bottom - complete.Top);
+        Assert.True(complete.Bottom <= scene.Height - 36);
+    }
+
+    [Fact]
+    public void BuildScene_FlowsLargeCompleteListAcrossPanelsWithoutOmittingRows()
+    {
+        var changes = Enumerable.Range(0, 633)
+            .Select(i => new ValueChange<EmbeddedSnapshot>(null, new($"Items/{632 - i:D3}.Item.Gbx", "new", i, i)))
+            .ToArray();
+
+        var scene = DiffInfographic.BuildScene(Empty() with { Embedded = changes }, "a", "b");
+        var complete = scene.Sections.Where(x => x.Id == "embedded-changes" || x.Id.StartsWith("embedded-changes-", StringComparison.Ordinal)).ToArray();
+        var rows = complete.SelectMany(x => x.Table!.Rows).ToArray();
+
+        Assert.Equal(3, complete.Length);
+        Assert.Equal("embedded-changes", complete[0].Id);
+        Assert.Equal("embedded-changes-2", complete[1].Id);
+        Assert.Equal("embedded-changes-3", complete[2].Id);
+        Assert.Equal("All embedded changes · 633", complete[0].Title);
+        Assert.Equal("All embedded changes · 633 · continued 2/3", complete[1].Title);
+        Assert.All(complete, x => Assert.InRange(x.Table!.Rows.Count, 1, 300));
+        Assert.Equal(changes.Length, rows.Length);
+        Assert.Equal(changes.Length, rows.Select(x => x.Path).Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(rows.Select(x => x.Path).Order(StringComparer.Ordinal), rows.Select(x => x.Path));
+        Assert.All(complete, x => Assert.Equal(DiffInfographicTableDensity.Compact, x.Table!.Density));
+        Assert.True(scene.Height <= 16_383);
+        Assert.All(complete, x => Assert.True(x.Bottom <= scene.Height - 36));
+    }
+
+    [Fact]
     public void HighlightPath_ElidesIntermediateFoldersToFitAndKeepsFileName()
     {
         var font = MonoTestFont(16);
 
-        var path = DiffInfographicPainter.ElideHighlightPath(
+        var path = DiffInfographicPainter.ElideTablePath(
             "Items/Environment/Stadium/VeryLongCollection/bf2 Item.Gbx", font, 250);
 
         Assert.Equal("Items/.../bf2 Item.Gbx", path);
@@ -118,8 +183,8 @@ public sealed class DiffInfographicTests
         var font = MonoTestFont(16);
         var name = "absurdly-long-custom-item-name-that-never-fits-anywhere.Item.Gbx";
 
-        var folderless = DiffInfographicPainter.ElideHighlightPath(name, font, 260);
-        var nested = DiffInfographicPainter.ElideHighlightPath($"Items/Environment/Stadium/{name}", font, 260);
+        var folderless = DiffInfographicPainter.ElideTablePath(name, font, 260);
+        var nested = DiffInfographicPainter.ElideTablePath($"Items/Environment/Stadium/{name}", font, 260);
 
         Assert.Equal(folderless, nested);
         foreach (var elided in new[] { folderless, nested })
@@ -138,7 +203,7 @@ public sealed class DiffInfographicTests
         const string name = "CustomRockFormationLargeMossy_v3.Item.Gbx";
         var width = TextWidth(name, font) + .5f;
 
-        var path = DiffInfographicPainter.ElideHighlightPath($"Items/Environment/Stadium/{name}", font, width);
+        var path = DiffInfographicPainter.ElideTablePath($"Items/Environment/Stadium/{name}", font, width);
 
         Assert.Equal(name, path);
     }
@@ -154,8 +219,8 @@ public sealed class DiffInfographicTests
         ];
         DiffInfographicTableRow[] small = [new("+", "a.Item.Gbx", "+1 B", DiffInfographicChangeKind.Added)];
 
-        var columns = DiffInfographicPainter.MeasureHighlightColumns(extreme, 70, 690);
-        var smallColumns = DiffInfographicPainter.MeasureHighlightColumns(small, 70, 690);
+        var columns = DiffInfographicPainter.MeasureTableColumns(extreme, 70, 690);
+        var smallColumns = DiffInfographicPainter.MeasureTableColumns(small, 70, 690);
 
         Assert.True(columns.PathX + columns.PathWidth <= columns.ValueLeft);
         Assert.True(columns.PathWidth > 0);
@@ -163,7 +228,7 @@ public sealed class DiffInfographicTests
         Assert.All(extreme, row =>
         {
             Assert.True(columns.ValueRight - TextWidth(row.Value, font) >= columns.ValueLeft - .5f);
-            Assert.True(TextWidth(DiffInfographicPainter.ElideHighlightPath(row.Path, font, columns.PathWidth), font) <= columns.PathWidth + .5f);
+            Assert.True(TextWidth(DiffInfographicPainter.ElideTablePath(row.Path, font, columns.PathWidth), font) <= columns.PathWidth + .5f);
         });
     }
 
@@ -175,7 +240,7 @@ public sealed class DiffInfographicTests
         var scene = DiffInfographic.BuildScene(Empty() with { EmbeddedContributions = contributions }, "a", "b");
         var highlights = Assert.Single(scene.Sections, x => x.Id == "embedded-highlights");
 
-        Assert.Empty(highlights.TableRows!);
+        Assert.Empty(highlights.Table!.Rows);
         Assert.Equal(["Marginal measurements are non-additive; 22 unavailable contribution sides: unavailable-0"], highlights.Lines.Select(x => x.Text));
     }
 
@@ -237,13 +302,14 @@ public sealed class DiffInfographicTests
         // Mirrors what the painter consumes: title block, optional table header + 30px rows + gap, 58px per line.
         Assert.All(detailSections, section =>
         {
-            var rows = section.TableRows?.Count ?? 0;
-            var consumed = 66 + (rows > 0 ? 28 + (rows * 30) + 12 : 0) + (section.Lines.Count * 58);
+            var table = section.Table;
+            var consumed = 66 + (table is null ? 0 : 28 + (table.Rows.Count * (table.Density == DiffInfographicTableDensity.Compact ? 24 : 30)) + 12)
+                + (section.Lines.Count * 58);
             Assert.True(section.Top + consumed <= section.Bottom, $"{section.Id} content does not fit");
             Assert.Equal(consumed + 22, section.Bottom - section.Top);
         });
         Assert.All(detailSections, section => Assert.True(section.Bottom <= scene.Height - 36));
-        Assert.Equal(5, Assert.Single(detailSections, x => x.Id == "embedded-highlights").TableRows!.Count);
+        Assert.Equal(5, Assert.Single(detailSections, x => x.Id == "embedded-highlights").Table!.Rows.Count);
         Assert.Contains("+ 5 more deep-property details omitted", Assert.Single(detailSections, x => x.Id == "deep-properties").Lines.Select(x => x.Text));
         var metadata = Assert.Single(detailSections, x => x.Id == "metadata");
         Assert.Equal(24, metadata.Lines.Count);
@@ -597,12 +663,14 @@ public sealed class DiffInfographicTests
             ],
             LeftBlockSnapshots = [Block("Context A", 0, 0), Block("Context B", 160, 120)],
             RightBlockSnapshots = [Block("Context A", 0, 0), Block("Context C", 200, 150)],
-            Embedded =
-            [
-                new(new("Embedded/Items/Stadium/Grandstand.Item.Gbx", "old", 412_000, 900_000), new("Embedded/Items/Stadium/Grandstand.Item.Gbx", "new", 510_000, 1_020_000)),
-                new(null, new("Embedded/Items/Lighting/AmberStrips.Item.Gbx", "new", 184_000, 410_000)),
-                new(new("Embedded/Items/Signs/OldSponsor.Item.Gbx", "old", 92_000, 230_000), null),
-            ],
+            Embedded = Enumerable.Range(0, 24).Select(i => (i % 3) switch
+            {
+                0 => new ValueChange<EmbeddedSnapshot>(null, new($"Embedded/Items/Lighting/{i:D2}-AmberStrips.Item.Gbx", "new", 184_000 + i, 410_000 + i)),
+                1 => new ValueChange<EmbeddedSnapshot>(new($"Embedded/Items/Signs/{i:D2}-OldSponsor.Item.Gbx", "old", 92_000 + i, 230_000 + i), null),
+                _ => new ValueChange<EmbeddedSnapshot>(
+                    new($"Embedded/Items/Stadium/{i:D2}-Grandstand.Item.Gbx", "old", 412_000 + i, 900_000 + i),
+                    new($"Embedded/Items/Stadium/{i:D2}-Grandstand.Item.Gbx", "new", 510_000 + i, 1_020_000 + i)),
+            }).ToArray(),
             MapName = new("Night Circuit v1", "Night Circuit v2"),
             EmbeddedPropertyChanges = [new("Grandstand.Item.Gbx", "old", "new", new(
                 [new("Item > EntityModel > Prefab > Ent#2 > Solid2Model > Material#1 > Name", new("Concrete"), new("Carbon"))], true, [], []))],

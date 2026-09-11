@@ -41,6 +41,16 @@ public sealed record DiffInfographicTableRow(
     string Value,
     DiffInfographicChangeKind Kind);
 
+public enum DiffInfographicTableDensity
+{
+    Standard,
+    Compact,
+}
+
+public sealed record DiffInfographicTable(
+    IReadOnlyList<DiffInfographicTableRow> Rows,
+    DiffInfographicTableDensity Density = DiffInfographicTableDensity.Standard);
+
 public sealed record DiffInfographicSection(
     string Id,
     string Title,
@@ -49,9 +59,9 @@ public sealed record DiffInfographicSection(
     int Top,
     int Right,
     int Bottom,
-    IReadOnlyList<DiffInfographicTableRow>? TableRows = null);
+    DiffInfographicTable? Table = null);
 
-internal readonly record struct HighlightTableColumns(
+internal readonly record struct InfographicTableColumns(
     float MarkerX,
     float PathX,
     float PathWidth,
@@ -67,16 +77,21 @@ internal static class DiffInfographicLayout
     public const int LineHeight = 58;
     public const int TableHeaderHeight = 28;
     public const int TableRowHeight = 30;
+    public const int CompactTableRowHeight = 24;
     public const int TableBottomGap = 12;
 
-    public static int TableHeight(int tableRowCount) =>
-        tableRowCount <= 0 ? 0 : TableHeaderHeight + (tableRowCount * TableRowHeight) + TableBottomGap;
+    public static int TableHeight(DiffInfographicTable? table) => table is null || table.Rows.Count == 0
+        ? 0
+        : TableHeaderHeight + (table.Rows.Count * RowHeight(table.Density)) + TableBottomGap;
 
-    public static int SectionHeight(int lineCount, int tableRowCount)
+    public static int RowHeight(DiffInfographicTableDensity density) =>
+        density == DiffInfographicTableDensity.Compact ? CompactTableRowHeight : TableRowHeight;
+
+    public static int SectionHeight(int lineCount, DiffInfographicTable? table)
     {
-        var table = TableHeight(tableRowCount);
-        var lines = Math.Max(lineCount, table == 0 ? 1 : 0) * LineHeight;
-        return SectionHeader + table + lines + SectionBottomPadding;
+        var tableHeight = TableHeight(table);
+        var lines = Math.Max(lineCount, tableHeight == 0 ? 1 : 0) * LineHeight;
+        return SectionHeader + tableHeight + lines + SectionBottomPadding;
     }
 }
 
