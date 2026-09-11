@@ -65,3 +65,4 @@ bugs:
     - file: B064-show-transient-terminal-progre.todo
     - file: B065-profile-and-optimize-memory-us.todo
     - file: B066-do-not-count-entries-as-modifi.todo
+    - file: B067-infographic-split-placements-e.todo
