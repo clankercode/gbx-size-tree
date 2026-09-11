@@ -64,3 +64,4 @@ bugs:
     - file: B063-match-diff-json-error-code-to.todo
     - file: B064-show-transient-terminal-progre.todo
     - file: B065-profile-and-optimize-memory-us.todo
+    - file: B066-do-not-count-entries-as-modifi.todo

@@ -1,0 +1,13 @@
+---
+complexity: low
+created_at: "2026-09-11T04:08:37Z"
+depends_on: []
+estimate_hours: 1
+id: B066
+priority: medium
+status: pending
+tags: []
+title: Do not count entries as modified when only the compressed size changed
+updated_at: "2026-09-11T04:08:37Z"
+---
+Diff logic currently treats an entry as modified/changed when its compressed size differs even if content is identical. Compressed size can vary for trivial reasons (recompression, container metadata) without any real content change. Change modified detection so compressed-size-only deltas are not reported as modified; decompressed/content comparison should be the source of truth. Verify against 'Sweet 2 burger v206 -> v207' that spurious modified entries disappear.
