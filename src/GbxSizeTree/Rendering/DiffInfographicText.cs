@@ -87,5 +87,17 @@ internal static class DiffInfographicText
             : value.ToString("0.0##", CultureInfo.InvariantCulture)
         : "—";
 
+    public static (string Minimum, string Maximum) PositionPair(double minimum, double maximum)
+    {
+        var minimumText = Position(minimum);
+        var maximumText = Position(maximum);
+        if (minimum == maximum || minimumText != maximumText)
+            return (minimumText, maximumText);
+
+        // G17 is bounded while retaining enough precision to distinguish any two finite doubles.
+        return (minimum.ToString("G17", CultureInfo.InvariantCulture),
+            maximum.ToString("G17", CultureInfo.InvariantCulture));
+    }
+
     private static float Width(string text, Font font) => TextMeasurer.MeasureAdvance(text, new TextOptions(font)).Width;
 }

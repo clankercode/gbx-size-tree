@@ -190,7 +190,9 @@ public static class DiffInfographic
             NormalizeAxis(p.X, minX, maxX), NormalizeAxis(p.Z, minZ, maxZ), kind, DiffInfographicText.Clean(label));
         var normalizedChanges = changes.Select(x => N(x.Position!.Value, x.Kind, x.Label)).ToArray();
         var normalizedContext = context.Select(x => N(x.Position, x.Kind, x.Label)).ToArray();
-        var range = FormattableString.Invariant($"X {DiffInfographicText.Position(minX)}–{DiffInfographicText.Position(maxX)} m · Z {DiffInfographicText.Position(minZ)}–{DiffInfographicText.Position(maxZ)} m");
+        var xRange = DiffInfographicText.PositionPair(minX, maxX);
+        var zRange = DiffInfographicText.PositionPair(minZ, maxZ);
+        var range = FormattableString.Invariant($"X {xRange.Minimum}–{xRange.Maximum} m · Z {zRange.Minimum}–{zRange.Maximum} m");
         var coverage = $"{normalizedChanges.Length:N0} changes plotted";
         if (sampledOutChanges > 0) coverage += $" · {sampledOutChanges:N0} changes sampled out";
         if (unpositionedChanges > 0) coverage += $" · {unpositionedChanges:N0} unpositioned";
@@ -223,16 +225,75 @@ public static class DiffInfographic
 
         static void SquareRanges(ref double minX, ref double maxX, ref double minZ, ref double maxZ)
         {
-            var halfRange = Math.Max(HalfRange(minX, maxX), HalfRange(minZ, maxZ));
-            ExpandAroundCenter(ref minX, ref maxX, halfRange);
-            ExpandAroundCenter(ref minZ, ref maxZ, halfRange);
+            for (var attempt = 0; attempt < 8; attempt++)
+            {
+                var xHalfRange = HalfRange(minX, maxX);
+                var zHalfRange = HalfRange(minZ, maxZ);
+                if (xHalfRange == zHalfRange) return;
+
+                if (xHalfRange < zHalfRange)
+                    ExpandAroundCenter(ref minX, ref maxX, zHalfRange);
+                else
+                    ExpandAroundCenter(ref minZ, ref maxZ, xHalfRange);
+            }
+
+            // Defensive finite fallback if repeated representable-value rounding cannot reconcile
+            // the two axes. This retains every finite placement and an exactly square viewport.
+            minX = minZ = -double.MaxValue;
+            maxX = maxZ = double.MaxValue;
         }
 
         static void ExpandAroundCenter(ref double minimum, ref double maximum, double halfRange)
         {
+            var originalMinimum = minimum;
+            var originalMaximum = maximum;
             var center = minimum / 2 + maximum / 2;
-            minimum = SaturatingAdd(center, -halfRange);
-            maximum = SaturatingAdd(center, halfRange);
+            var expandedMinimum = center - halfRange;
+            var expandedMaximum = center + halfRange;
+
+            if (!double.IsFinite(expandedMinimum))
+            {
+                // Shift the whole interval against the finite lower boundary rather than
+                // saturating just one endpoint, which would shrink its plotted half-span.
+                expandedMinimum = -double.MaxValue;
+                var maximumHalf = halfRange - double.MaxValue / 2;
+                expandedMaximum = maximumHalf + maximumHalf;
+            }
+            else if (!double.IsFinite(expandedMaximum))
+            {
+                // As above, retain the requested span by recentering at the upper boundary.
+                expandedMaximum = double.MaxValue;
+                var minimumHalf = double.MaxValue / 2 - halfRange;
+                expandedMinimum = minimumHalf + minimumHalf;
+            }
+
+            // Preserve containment if endpoint rounding moved either expanded bound inward.
+            expandedMinimum = Math.Min(expandedMinimum, originalMinimum);
+            expandedMaximum = Math.Max(expandedMaximum, originalMaximum);
+
+            // Center arithmetic can leave the safe half-span one ULP short. Move the least
+            // disruptive available endpoint outward until the requested half-span is reached.
+            for (var adjustment = 0; adjustment < 16 &&
+                 HalfRange(expandedMinimum, expandedMaximum) < halfRange; adjustment++)
+            {
+                var lowerCandidate = expandedMinimum > -double.MaxValue
+                    ? Math.BitDecrement(expandedMinimum)
+                    : expandedMinimum;
+                var upperCandidate = expandedMaximum < double.MaxValue
+                    ? Math.BitIncrement(expandedMaximum)
+                    : expandedMaximum;
+
+                if (lowerCandidate == expandedMinimum)
+                    expandedMaximum = upperCandidate;
+                else if (upperCandidate == expandedMaximum ||
+                         HalfRange(lowerCandidate, expandedMaximum) <= HalfRange(expandedMinimum, upperCandidate))
+                    expandedMinimum = lowerCandidate;
+                else
+                    expandedMaximum = upperCandidate;
+            }
+
+            minimum = expandedMinimum;
+            maximum = expandedMaximum;
         }
 
         static double HalfRange(double minimum, double maximum) => maximum / 2 - minimum / 2;

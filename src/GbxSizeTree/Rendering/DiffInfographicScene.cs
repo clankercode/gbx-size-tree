@@ -10,10 +10,13 @@ public sealed record DiffInfographicPoint(float X, float Z, DiffInfographicChang
 
 public sealed record DiffInfographicViewport(double MinX, double MaxX, double MinZ, double MaxZ)
 {
-    public string XMinimumLabel => $"X {DiffInfographicText.Position(MinX)} m";
-    public string XMaximumLabel => $"X {DiffInfographicText.Position(MaxX)} m";
-    public string ZMinimumLabel => $"Z {DiffInfographicText.Position(MinZ)} m";
-    public string ZMaximumLabel => $"Z {DiffInfographicText.Position(MaxZ)} m";
+    private (string Minimum, string Maximum) XLabels => DiffInfographicText.PositionPair(MinX, MaxX);
+    private (string Minimum, string Maximum) ZLabels => DiffInfographicText.PositionPair(MinZ, MaxZ);
+
+    public string XMinimumLabel => $"X {XLabels.Minimum} m";
+    public string XMaximumLabel => $"X {XLabels.Maximum} m";
+    public string ZMinimumLabel => $"Z {ZLabels.Minimum} m";
+    public string ZMaximumLabel => $"Z {ZLabels.Maximum} m";
 }
 
 public enum DiffInfographicChangeKind

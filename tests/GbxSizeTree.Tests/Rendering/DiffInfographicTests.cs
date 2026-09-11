@@ -497,6 +497,90 @@ public sealed class DiffInfographicTests
         Assert.Equal("Z 223.0 m", viewport.ZMaximumLabel);
         Assert.Equal("JetBrains Mono", DiffInfographicPainter.SpatialAxisFont.Family.Name);
         Assert.Equal(DiffInfographicPainter.SpatialPlotBounds.Width, DiffInfographicPainter.SpatialPlotBounds.Height);
+        var labels = DiffInfographicPainter.MeasureSpatialAxisLabels(viewport);
+        Assert.Equal(14, labels.XMinimum.Font.Size);
+        Assert.Equal(14, labels.XMaximum.Font.Size);
+        Assert.Equal(14, labels.ZMinimum.Font.Size);
+        Assert.Equal(14, labels.ZMaximum.Font.Size);
+    }
+
+    [Fact]
+    public void BuildScene_AsymmetricExtremeViewportKeepsEqualSafeHalfSpansAndContainsChanges()
+    {
+        var positions = new[]
+        {
+            (X: -double.MaxValue, Z: double.MaxValue / 2),
+            (X: 0d, Z: double.MaxValue),
+        };
+        var scene = DiffInfographic.BuildScene(Empty() with
+        {
+            Items = positions.Select((position, i) =>
+                new ValueChange<ItemSnapshot>(null, Item($"extreme-{i}", position.X, position.Z))).ToArray(),
+        }, "a", "b");
+        var viewport = Assert.IsType<DiffInfographicViewport>(scene.Spatial.Viewport);
+
+        var xHalfSpan = viewport.MaxX / 2 - viewport.MinX / 2;
+        var zHalfSpan = viewport.MaxZ / 2 - viewport.MinZ / 2;
+        Assert.Equal(xHalfSpan, zHalfSpan);
+        Assert.All(positions, position =>
+        {
+            Assert.InRange(position.X, viewport.MinX, viewport.MaxX);
+            Assert.InRange(position.Z, viewport.MinZ, viewport.MaxZ);
+        });
+        Assert.Equal(0, scene.Spatial.EdgePinnedChanges);
+    }
+
+    [Fact]
+    public void BuildScene_HighOffsetNarrowViewportHasDistinctBoundedEndpointLabels()
+    {
+        var scene = DiffInfographic.BuildScene(Empty() with
+        {
+            Items =
+            [
+                new(null, Item("south-west", 10_000_000_000, 20_000_000_000)),
+                new(null, Item("north-east", 10_000_000_020, 20_000_000_020)),
+            ],
+        }, "a", "b");
+        var viewport = Assert.IsType<DiffInfographicViewport>(scene.Spatial.Viewport);
+
+        Assert.NotEqual(viewport.MinX, viewport.MaxX);
+        Assert.NotEqual(viewport.MinZ, viewport.MaxZ);
+        Assert.NotEqual(viewport.XMinimumLabel, viewport.XMaximumLabel);
+        Assert.NotEqual(viewport.ZMinimumLabel, viewport.ZMaximumLabel);
+        Assert.All(new[]
+        {
+            viewport.XMinimumLabel,
+            viewport.XMaximumLabel,
+            viewport.ZMinimumLabel,
+            viewport.ZMaximumLabel,
+        }, label => Assert.InRange(label.Length, 1, 32));
+    }
+
+    [Fact]
+    public void SpatialAxisLabels_ExtremeOffsetDrawBoundsFitWithoutXOverlap()
+    {
+        var scene = DiffInfographic.BuildScene(Empty() with
+        {
+            Items = [new(null, Item("singleton", 1e300, -1e300))],
+        }, "a", "b");
+        var viewport = Assert.IsType<DiffInfographicViewport>(scene.Spatial.Viewport);
+        var labels = DiffInfographicPainter.MeasureSpatialAxisLabels(viewport);
+        var plot = DiffInfographicPainter.SpatialPlotBounds;
+
+        var xMinimum = DrawBounds(labels.XMinimum);
+        var xMaximum = DrawBounds(labels.XMaximum);
+        var zMinimum = DrawBounds(labels.ZMinimum);
+        var zMaximum = DrawBounds(labels.ZMaximum);
+        Assert.InRange(xMinimum.Left, plot.Left, plot.Right);
+        Assert.InRange(xMinimum.Right, plot.Left, plot.Right);
+        Assert.InRange(xMaximum.Left, plot.Left, plot.Right);
+        Assert.InRange(xMaximum.Right, plot.Left, plot.Right);
+        Assert.True(xMinimum.Right <= xMaximum.Left);
+        Assert.InRange(zMinimum.Left, 0, plot.X);
+        Assert.InRange(zMinimum.Right, 0, plot.X);
+        Assert.InRange(zMaximum.Left, 0, plot.X);
+        Assert.InRange(zMaximum.Right, 0, plot.X);
+        Assert.InRange(labels.XMinimum.Font.Size, 10, 14);
     }
 
     [Fact]
@@ -577,6 +661,13 @@ public sealed class DiffInfographicTests
 
     private static float TextWidth(string text, SixLabors.Fonts.Font font) =>
         SixLabors.Fonts.TextMeasurer.MeasureAdvance(text, new SixLabors.Fonts.TextOptions(font)).Width;
+
+    private static RectangleF DrawBounds(InfographicAxisLabel label)
+    {
+        var measured = SixLabors.Fonts.TextMeasurer.MeasureBounds(
+            label.Text, new SixLabors.Fonts.TextOptions(label.Font));
+        return new(label.Origin.X + measured.X, label.Origin.Y + measured.Y, measured.Width, measured.Height);
+    }
 
     private static SixLabors.Fonts.Font MonoTestFont(float size, bool bold = false)
     {

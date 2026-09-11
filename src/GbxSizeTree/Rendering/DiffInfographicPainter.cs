@@ -7,6 +7,14 @@ using SixLabors.ImageSharp.Processing;
 
 namespace GbxSizeTree.Cli.Rendering;
 
+internal readonly record struct InfographicAxisLabel(string Text, Font Font, PointF Origin);
+
+internal readonly record struct InfographicSpatialAxisLabels(
+    InfographicAxisLabel XMinimum,
+    InfographicAxisLabel XMaximum,
+    InfographicAxisLabel ZMinimum,
+    InfographicAxisLabel ZMaximum);
+
 internal static class DiffInfographicPainter
 {
     private static readonly Color Background = Color.ParseHex("09131D");
@@ -25,6 +33,8 @@ internal static class DiffInfographicPainter
     private const float TablePathInset = 64;
     private const float TableRightInset = 28;
     private const float TableColumnGap = 18;
+    private const float SpatialAxisGap = 14;
+    private const float SpatialXAxisLabelGap = 12;
     private const string ChangeMarkerHeader = "+/−";
     private const string SizeChangeHeader = "SIZE CHANGE";
     internal static Font TableFont(DiffInfographicTableDensity density) =>
@@ -166,7 +176,7 @@ internal static class DiffInfographicPainter
 
         if (scene.Spatial.Viewport is { } viewport)
         {
-            DrawAxisLabels(c, viewport, plot);
+            DrawAxisLabels(c, viewport);
             foreach (var point in scene.Spatial.Context)
                 c.Fill(Color.FromRgba(157, 176, 188, 35), new EllipsePolygon(plot.X + point.X * plot.Width, plot.Y + (1 - point.Z) * plot.Height, 2.1f));
             foreach (var point in scene.Spatial.Changes)
@@ -192,13 +202,74 @@ internal static class DiffInfographicPainter
         DrawSpatialNotes(c, scene, 750, 684, 530);
     }
 
-    private static void DrawAxisLabels(IImageProcessingContext c, DiffInfographicViewport viewport, RectangleF plot)
+    internal static InfographicSpatialAxisLabels MeasureSpatialAxisLabels(DiffInfographicViewport viewport)
     {
-        var font = SpatialAxisFont;
-        DrawRightAligned(c, viewport.ZMaximumLabel, font, Muted, plot.X - 14, plot.Y - 8);
-        DrawRightAligned(c, viewport.ZMinimumLabel, font, Muted, plot.X - 14, plot.Bottom - 10);
-        c.DrawText(viewport.XMinimumLabel, font, Muted, new PointF(plot.X, plot.Bottom + 14));
-        DrawRightAligned(c, viewport.XMaximumLabel, font, Muted, plot.Right, plot.Bottom + 14);
+        var plot = SpatialPlotBounds;
+        var layout = CreateSpatialAxisLabels(viewport, plot, SpatialAxisFont);
+        if (SpatialAxisLabelsFit(layout, plot)) return layout;
+
+        var minimumSize = 1f;
+        var maximumSize = SpatialAxisFont.Size;
+        var fitted = CreateSpatialAxisLabels(viewport, plot, DiffInfographicFonts.Mono(minimumSize));
+        for (var attempt = 0; attempt < 14; attempt++)
+        {
+            var candidateSize = (minimumSize + maximumSize) / 2;
+            var candidate = CreateSpatialAxisLabels(viewport, plot, DiffInfographicFonts.Mono(candidateSize));
+            if (SpatialAxisLabelsFit(candidate, plot))
+            {
+                minimumSize = candidateSize;
+                fitted = candidate;
+            }
+            else
+            {
+                maximumSize = candidateSize;
+            }
+        }
+        return fitted;
+    }
+
+    private static InfographicSpatialAxisLabels CreateSpatialAxisLabels(
+        DiffInfographicViewport viewport, RectangleF plot, Font font)
+    {
+        var zRight = plot.X - SpatialAxisGap;
+        return new(
+            new(viewport.XMinimumLabel, font, new PointF(plot.X, plot.Bottom + SpatialAxisGap)),
+            RightAligned(viewport.XMaximumLabel, font, plot.Right, plot.Bottom + SpatialAxisGap),
+            RightAligned(viewport.ZMinimumLabel, font, zRight, plot.Bottom - 10),
+            RightAligned(viewport.ZMaximumLabel, font, zRight, plot.Y - 8));
+    }
+
+    private static bool SpatialAxisLabelsFit(InfographicSpatialAxisLabels labels, RectangleF plot)
+    {
+        var xMinimum = DrawBounds(labels.XMinimum);
+        var xMaximum = DrawBounds(labels.XMaximum);
+        var zMinimum = DrawBounds(labels.ZMinimum);
+        var zMaximum = DrawBounds(labels.ZMaximum);
+        return xMinimum.Left >= plot.Left && xMinimum.Right <= plot.Right &&
+               xMaximum.Left >= plot.Left && xMaximum.Right <= plot.Right &&
+               xMinimum.Right + SpatialXAxisLabelGap <= xMaximum.Left &&
+               zMinimum.Left >= 0 && zMinimum.Right <= plot.X - SpatialAxisGap &&
+               zMaximum.Left >= 0 && zMaximum.Right <= plot.X - SpatialAxisGap;
+    }
+
+    private static InfographicAxisLabel RightAligned(string text, Font font, float right, float y) =>
+        new(text, font, new PointF(right - TextWidth(text, font), y));
+
+    private static RectangleF DrawBounds(InfographicAxisLabel label)
+    {
+        var measured = TextMeasurer.MeasureBounds(label.Text, new TextOptions(label.Font));
+        return new(label.Origin.X + measured.X, label.Origin.Y + measured.Y, measured.Width, measured.Height);
+    }
+
+    private static void DrawAxisLabels(IImageProcessingContext c, DiffInfographicViewport viewport)
+    {
+        var labels = MeasureSpatialAxisLabels(viewport);
+        Draw(labels.XMinimum);
+        Draw(labels.XMaximum);
+        Draw(labels.ZMinimum);
+        Draw(labels.ZMaximum);
+
+        void Draw(InfographicAxisLabel label) => c.DrawText(label.Text, label.Font, Muted, label.Origin);
     }
 
     private static void DrawSpatialNotes(IImageProcessingContext c, DiffInfographicScene scene, float x, float y, float width)
@@ -230,9 +301,6 @@ internal static class DiffInfographicPainter
         y += 54;
         c.DrawText(SpatialFooterLabel(scene), DiffInfographicFonts.MonoBold(15), Changed, new PointF(x, y));
     }
-
-    private static void DrawRightAligned(IImageProcessingContext c, string text, Font font, Color color, float right, float y) =>
-        c.DrawText(text, font, color, new PointF(right - TextWidth(text, font), y));
 
     private static void Legend(IImageProcessingContext c, float x, float y, Color color, string text)
     {
