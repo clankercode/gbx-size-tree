@@ -304,10 +304,11 @@ public static class DiffMode
             .ThenBy(c => c.Left is null ? 1 : 0).ToArray();
     }
 
+    // Content hash decides modification: compressed sizes move with recompression alone.
     private static IReadOnlyList<ValueChange<EmbeddedSnapshot>> EmbeddedDiff(
         IReadOnlyDictionary<string, EmbeddedSnapshot> a, IReadOnlyDictionary<string, EmbeddedSnapshot> b) =>
         a.Keys.Union(b.Keys, StringComparer.Ordinal).OrderBy(k => k, StringComparer.Ordinal)
-            .Where(k => !a.TryGetValue(k, out var av) || !b.TryGetValue(k, out var bv) || av != bv)
+            .Where(k => !a.TryGetValue(k, out var av) || !b.TryGetValue(k, out var bv) || av.Sha256 != bv.Sha256)
             .Select(k => new ValueChange<EmbeddedSnapshot>(a.GetValueOrDefault(k), b.GetValueOrDefault(k))).ToArray();
 
     private sealed record Snapshot(long FileBytes, IReadOnlyDictionary<string, string> Chunks,

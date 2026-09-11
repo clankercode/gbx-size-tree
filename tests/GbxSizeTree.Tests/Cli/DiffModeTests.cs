@@ -66,6 +66,23 @@ public sealed class DiffModeTests
     }
 
     [Fact]
+    public void CompareMaps_CompressedSizeOnlyDeltaIsNotModified()
+    {
+        var content = new byte[4096];
+        var left = MapWithEmbeddedBytes(CompressionLevel.NoCompression, ("asset.bin", content));
+        var right = MapWithEmbeddedBytes(CompressionLevel.SmallestSize, ("asset.bin", content));
+
+        var report = DiffMode.CompareMaps(left, right);
+
+        var leftSnapshot = Assert.Single(report.LeftEmbeddedSnapshots);
+        var rightSnapshot = Assert.Single(report.RightEmbeddedSnapshots);
+        Assert.NotEqual(leftSnapshot.Compressed, rightSnapshot.Compressed);
+        Assert.Equal(leftSnapshot.Sha256, rightSnapshot.Sha256);
+        Assert.Empty(report.Embedded);
+        Assert.Empty(report.EmbeddedPropertyChanges);
+    }
+
+    [Fact]
     public void CompareMaps_CaseOnlyEmbedRenamePreservesDistinctPaths()
     {
         var report = DiffMode.CompareMaps(MapWithEmbed("asset.Item.Gbx", "data"), MapWithEmbed("Asset.Item.Gbx", "data"));
@@ -458,14 +475,17 @@ public sealed class DiffModeTests
 
     private static CGameCtnChallenge MapWithEmbed(string path, string content) => MapWithEmbeds((path, content));
 
-    private static CGameCtnChallenge MapWithEmbeddedBytes(params (string Path, byte[] Content)[] entries)
+    private static CGameCtnChallenge MapWithEmbeddedBytes(params (string Path, byte[] Content)[] entries) =>
+        MapWithEmbeddedBytes(CompressionLevel.NoCompression, entries);
+
+    private static CGameCtnChallenge MapWithEmbeddedBytes(CompressionLevel level, params (string Path, byte[] Content)[] entries)
     {
         using var stream = new MemoryStream();
         using (var zip = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
         {
             foreach (var (path, content) in entries)
             {
-                using var output = zip.CreateEntry(path, CompressionLevel.NoCompression).Open();
+                using var output = zip.CreateEntry(path, level).Open();
                 output.Write(content);
             }
         }
