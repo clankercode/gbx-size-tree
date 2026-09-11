@@ -66,16 +66,117 @@ public sealed class DiffInfographicTests
     }
 
     [Fact]
-    public void BuildScene_BoundsContributionHighlightsAndReservesExactOmissionCount()
+    public void BuildScene_SelectsLargestEmbeddedDeltasThenSortsHighlightsByOrdinalPath()
+    {
+        var report = Empty() with
+        {
+            Embedded =
+            [
+                new(null, new("Z/tiny.Item.Gbx", "new", 1, 1)),
+                new(null, new("E/fifth.Item.Gbx", "new", 500, 500)),
+                new(new("C/third.Item.Gbx", "old", 800, 800), new("C/third.Item.Gbx", "new", 100, 100)),
+                new(null, new("A/first.Item.Gbx", "new", 900, 900)),
+                new(new("F/sixth.Item.Gbx", "old", 400, 400), null),
+                new(new("B/second.Item.Gbx", "old", 800, 800), null),
+                new(null, new("D/fourth.Item.Gbx", "new", 600, 600)),
+            ],
+            EmbeddedContributions = [new(null, new("contribution-only.Item.Gbx", 1, 1, 1, null))],
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var highlights = Assert.Single(scene.Sections, x => x.Id == "embedded-highlights");
+
+        var rows = Assert.IsAssignableFrom<IReadOnlyList<DiffInfographicTableRow>>(highlights.TableRows);
+        Assert.Equal(
+            ["A/first.Item.Gbx", "B/second.Item.Gbx", "C/third.Item.Gbx", "D/fourth.Item.Gbx", "E/fifth.Item.Gbx"],
+            rows.Select(x => x.Path));
+        Assert.Equal(["+900 B", "−800 B", "−700 B", "+600 B", "+500 B"], rows.Select(x => x.Value));
+        Assert.Equal(["+", "−", "~", "+", "+"], rows.Select(x => x.Marker));
+        Assert.Equal(
+            [DiffInfographicChangeKind.Added, DiffInfographicChangeKind.Removed, DiffInfographicChangeKind.Changed, DiffInfographicChangeKind.Added, DiffInfographicChangeKind.Added],
+            rows.Select(x => x.Kind));
+        Assert.DoesNotContain(rows, x => x.Path.Contains("contribution", StringComparison.Ordinal));
+        Assert.DoesNotContain("ZIP", string.Join(' ', rows.SelectMany(x => new[] { x.Marker, x.Path, x.Value })), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(["+ 2 more embedded changes omitted", "Outer-map marginal measurements are non-additive and are never summed."], highlights.Lines.Select(x => x.Text));
+    }
+
+    [Fact]
+    public void HighlightPath_ElidesIntermediateFoldersToFitAndKeepsFileName()
+    {
+        var font = MonoTestFont(16);
+
+        var path = DiffInfographicPainter.ElideHighlightPath(
+            "Items/Environment/Stadium/VeryLongCollection/bf2 Item.Gbx", font, 250);
+
+        Assert.Equal("Items/.../bf2 Item.Gbx", path);
+        Assert.True(TextWidth(path, font) <= 250.5f);
+    }
+
+    [Fact]
+    public void HighlightPath_KeepsBothEndsOfTheFileNameWhenNoFolderElisionCanFit()
+    {
+        var font = MonoTestFont(16);
+        var name = "absurdly-long-custom-item-name-that-never-fits-anywhere.Item.Gbx";
+
+        var folderless = DiffInfographicPainter.ElideHighlightPath(name, font, 260);
+        var nested = DiffInfographicPainter.ElideHighlightPath($"Items/Environment/Stadium/{name}", font, 260);
+
+        Assert.Equal(folderless, nested);
+        foreach (var elided in new[] { folderless, nested })
+        {
+            Assert.True(TextWidth(elided, font) <= 260.5f);
+            Assert.Contains("…", elided, StringComparison.Ordinal);
+            Assert.EndsWith(".Item.Gbx", elided, StringComparison.Ordinal);
+            Assert.StartsWith("absurdly", elided, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void HighlightPath_DropsFoldersWithoutElidingAFileNameThatFits()
+    {
+        var font = MonoTestFont(16);
+        const string name = "CustomRockFormationLargeMossy_v3.Item.Gbx";
+        var width = TextWidth(name, font) + .5f;
+
+        var path = DiffInfographicPainter.ElideHighlightPath($"Items/Environment/Stadium/{name}", font, width);
+
+        Assert.Equal(name, path);
+    }
+
+    [Fact]
+    public void HighlightTable_ReservesMeasuredRoomForExtremeSizeChangesSoPathsNeverOverlap()
+    {
+        var font = MonoTestFont(16);
+        DiffInfographicTableRow[] extreme =
+        [
+            new("+", "Items/Environment/Stadium/Collection/first.Item.Gbx", "+9223372036.85 GB", DiffInfographicChangeKind.Added),
+            new("−", "Items/Environment/Stadium/Collection/second.Item.Gbx", "−9223372036.85 GB", DiffInfographicChangeKind.Removed),
+        ];
+        DiffInfographicTableRow[] small = [new("+", "a.Item.Gbx", "+1 B", DiffInfographicChangeKind.Added)];
+
+        var columns = DiffInfographicPainter.MeasureHighlightColumns(extreme, 70, 690);
+        var smallColumns = DiffInfographicPainter.MeasureHighlightColumns(small, 70, 690);
+
+        Assert.True(columns.PathX + columns.PathWidth <= columns.ValueLeft);
+        Assert.True(columns.PathWidth > 0);
+        Assert.True(smallColumns.PathWidth > columns.PathWidth, "a narrower value column must hand its room back to the path");
+        Assert.All(extreme, row =>
+        {
+            Assert.True(columns.ValueRight - TextWidth(row.Value, font) >= columns.ValueLeft - .5f);
+            Assert.True(TextWidth(DiffInfographicPainter.ElideHighlightPath(row.Path, font, columns.PathWidth), font) <= columns.PathWidth + .5f);
+        });
+    }
+
+    [Fact]
+    public void BuildScene_ContributionEntriesRemainASeparateBoundedNote()
     {
         var contributions = Enumerable.Range(0, 22).Select(i => new ValueChange<GbxSizeTree.Measure.EmbeddedFileContribution>(null,
             new($"contribution-{i}", 1, 1, null, $"unavailable-{i}"))).ToArray();
         var scene = DiffInfographic.BuildScene(Empty() with { EmbeddedContributions = contributions }, "a", "b");
         var highlights = Assert.Single(scene.Sections, x => x.Id == "embedded-highlights");
 
-        Assert.Equal(5, highlights.Lines.Count);
-        Assert.Equal("+ 19 more embedded highlights omitted", highlights.Lines[^2].Text);
-        Assert.Equal("Marginal measurements are non-additive; 22 unavailable contribution sides: unavailable-0", highlights.Lines[^1].Text);
+        Assert.Empty(highlights.TableRows!);
+        Assert.Equal(["Marginal measurements are non-additive; 22 unavailable contribution sides: unavailable-0"], highlights.Lines.Select(x => x.Text));
     }
 
     [Fact]
@@ -87,9 +188,7 @@ public sealed class DiffInfographicTests
         var scene = DiffInfographic.BuildScene(Empty() with { EmbeddedContributions = contributions }, "a", "b");
         var highlights = Assert.Single(scene.Sections, x => x.Id == "embedded-highlights");
 
-        Assert.Equal(5, highlights.Lines.Count);
-        Assert.Equal("+ 2 more embedded highlights omitted", highlights.Lines[^2].Text);
-        Assert.Equal("Marginal measurements are non-additive; 2 unavailable contribution sides: left unavailable", highlights.Lines[^1].Text);
+        Assert.Equal(["Marginal measurements are non-additive; 2 unavailable contribution sides: left unavailable"], highlights.Lines.Select(x => x.Text));
     }
 
     [Fact]
@@ -135,9 +234,16 @@ public sealed class DiffInfographicTests
         var coverage = Assert.Single(detailSections, x => x.Id == "coverage");
 
         Assert.True(scene.Height >= 2100);
-        Assert.All(detailSections, section => Assert.True(section.Top + 66 + section.Lines.Count * 57 <= section.Bottom));
+        // Mirrors what the painter consumes: title block, optional table header + 30px rows + gap, 58px per line.
+        Assert.All(detailSections, section =>
+        {
+            var rows = section.TableRows?.Count ?? 0;
+            var consumed = 66 + (rows > 0 ? 28 + (rows * 30) + 12 : 0) + (section.Lines.Count * 58);
+            Assert.True(section.Top + consumed <= section.Bottom, $"{section.Id} content does not fit");
+            Assert.Equal(consumed + 22, section.Bottom - section.Top);
+        });
         Assert.All(detailSections, section => Assert.True(section.Bottom <= scene.Height - 36));
-        Assert.Contains("+ 4 more embedded highlights omitted", Assert.Single(detailSections, x => x.Id == "embedded-highlights").Lines.Select(x => x.Text));
+        Assert.Equal(5, Assert.Single(detailSections, x => x.Id == "embedded-highlights").TableRows!.Count);
         Assert.Contains("+ 5 more deep-property details omitted", Assert.Single(detailSections, x => x.Id == "deep-properties").Lines.Select(x => x.Text));
         var metadata = Assert.Single(detailSections, x => x.Id == "metadata");
         Assert.Equal(24, metadata.Lines.Count);
@@ -315,6 +421,9 @@ public sealed class DiffInfographicTests
 
         Assert.True(rangeWidth + coverageWidth + 32 <= 1200.5f);
     }
+
+    private static float TextWidth(string text, SixLabors.Fonts.Font font) =>
+        SixLabors.Fonts.TextMeasurer.MeasureAdvance(text, new SixLabors.Fonts.TextOptions(font)).Width;
 
     private static SixLabors.Fonts.Font MonoTestFont(float size, bool bold = false)
     {

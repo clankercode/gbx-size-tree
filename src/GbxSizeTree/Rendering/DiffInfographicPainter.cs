@@ -21,6 +21,13 @@ internal static class DiffInfographicPainter
     private const float HeroDeltaMaxWidth = 598;
     private const float HeroDeltaMaxFontSize = 82;
     private const float HeroDeltaMinFontSize = 24;
+    private const float TableMarkerInset = 32;
+    private const float TablePathInset = 64;
+    private const float TableRightInset = 28;
+    private const float TableColumnGap = 18;
+    private const string SizeChangeHeader = "SIZE CHANGE";
+    private static Font HighlightTableFont => DiffInfographicFonts.Mono(16);
+    private static Font HighlightTableHeaderFont => DiffInfographicFonts.Bold(13);
 
     public static Image<Rgba32> Paint(DiffInfographicScene scene)
     {
@@ -191,10 +198,11 @@ internal static class DiffInfographicPainter
             c.Draw(PanelEdge, 2, Rounded(section.Left, section.Top, section.Right - section.Left, section.Bottom - section.Top, 22));
             c.Fill(accent, Rounded(section.Left, section.Top, 8, section.Bottom - section.Top, 4));
             c.DrawText(section.Title.ToUpperInvariant(), DiffInfographicFonts.Bold(20), accent, new PointF(section.Left + 30, section.Top + 24));
-            var top = section.Top + 66;
+            float top = section.Top + DiffInfographicLayout.SectionHeader;
+            if (section.TableRows is { Count: > 0 }) top = DrawTable(c, section, section.TableRows, top);
             foreach (var line in section.Lines)
             {
-                if (top + 58 > section.Bottom) break;
+                if (top + DiffInfographicLayout.LineHeight > section.Bottom) break;
                 var markerColor = line.Text.StartsWith('+') ? Added : line.Text.StartsWith('−') ? Removed : line.Text.StartsWith("WARNING", StringComparison.Ordinal) ? Changed : Text;
                 var font = line.Mono ? DiffInfographicFonts.Mono(17) : DiffInfographicFonts.Regular(18);
                 c.Fill(markerColor, new EllipsePolygon(section.Left + 41, top + 10, 3));
@@ -207,6 +215,85 @@ internal static class DiffInfographicPainter
                 top += 12;
             }
         }
+    }
+
+    /// Path column budget, measured from the widest signed size change actually present so an extreme
+    /// value (up to ±9223372036.85 GB) reserves its own room instead of overlapping the path.
+    internal static HighlightTableColumns MeasureHighlightColumns(IReadOnlyList<DiffInfographicTableRow> rows, float left, float right)
+    {
+        var font = HighlightTableFont;
+        var valueRight = right - TableRightInset;
+        var pathX = left + TablePathInset;
+        var valueWidth = Math.Max(
+            TextWidth(SizeChangeHeader, HighlightTableHeaderFont),
+            rows.Count == 0 ? 0 : rows.Max(row => TextWidth(row.Value, font)));
+        var valueLeft = valueRight - valueWidth;
+        return new(left + TableMarkerInset, pathX, Math.Max(0, valueLeft - TableColumnGap - pathX), valueLeft, valueRight);
+    }
+
+    private static float DrawTable(
+        IImageProcessingContext c,
+        DiffInfographicSection section,
+        IReadOnlyList<DiffInfographicTableRow> rows,
+        float top)
+    {
+        var font = HighlightTableFont;
+        var columns = MeasureHighlightColumns(rows, section.Left, section.Right);
+        c.DrawText("PATH", HighlightTableHeaderFont, Muted, new PointF(columns.PathX, top));
+        c.DrawText(SizeChangeHeader, HighlightTableHeaderFont, Muted, new PointF(columns.ValueLeft, top));
+        top += DiffInfographicLayout.TableHeaderHeight;
+        foreach (var row in rows)
+        {
+            if (top + DiffInfographicLayout.TableRowHeight > section.Bottom) break;
+            var color = PointColor(row.Kind);
+            c.DrawText(row.Marker, font, color, new PointF(columns.MarkerX, top));
+            if (columns.PathWidth >= 1)
+                c.DrawText(ElideHighlightPath(row.Path, font, columns.PathWidth), font, Text, new PointF(columns.PathX, top));
+            c.DrawText(row.Value, font, Faint(color), new PointF(columns.ValueRight - TextWidth(row.Value, font), top));
+            top += DiffInfographicLayout.TableRowHeight;
+        }
+        return top + DiffInfographicLayout.TableBottomGap;
+    }
+
+    /// Elides folders first, then the middle of the file name, so a row always keeps a recognizable
+    /// name; truncating a long path from the front alone would leave only shared parent folders.
+    internal static string ElideHighlightPath(string path, Font font, float maxWidth)
+    {
+        if (TextWidth(path, font) <= maxWidth) return path;
+        var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var name = parts.Length == 0 ? path : parts[^1];
+        if (parts.Length > 2)
+        {
+            var elided = $"{parts[0]}/.../{name}";
+            if (TextWidth(elided, font) <= maxWidth) return elided;
+        }
+        if (parts.Length > 1 && TextWidth($".../{name}", font) <= maxWidth) return $".../{name}";
+        if (TextWidth(name, font) <= maxWidth) return name;
+        return ElideMiddle(name, font, maxWidth);
+    }
+
+    private static string ElideMiddle(string text, Font font, float maxWidth)
+    {
+        var runes = text.EnumerateRunes().ToArray();
+        var low = 0;
+        var high = runes.Length / 2;
+        while (low < high)
+        {
+            var middle = (low + high + 1) / 2;
+            if (TextWidth(Compose(middle), font) <= maxWidth) low = middle;
+            else high = middle - 1;
+        }
+        return low == 0 ? DiffInfographicText.Fit(text, font, maxWidth) : Compose(low);
+
+        string Compose(int keep) => string.Concat(runes.Take(keep)) + "…" + string.Concat(runes.TakeLast(keep));
+    }
+
+    private static float TextWidth(string text, Font font) => TextMeasurer.MeasureAdvance(text, new TextOptions(font)).Width;
+
+    private static Color Faint(Color color)
+    {
+        var pixel = color.ToPixel<Rgba32>();
+        return Color.FromRgba(pixel.R, pixel.G, pixel.B, 190);
     }
 
     private static void DrawFooter(IImageProcessingContext c, DiffInfographicScene scene)
