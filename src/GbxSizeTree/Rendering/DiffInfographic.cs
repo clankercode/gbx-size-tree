@@ -487,9 +487,11 @@ public static class DiffInfographic
                 var right = EncodeMetadataText(row.Right);
                 var candidate = new DiffInfographicMetadataLine(
                 [
-                    new(prefix + "− "),
+                    new(prefix),
+                    MetadataValueMarker("−"),
                     new(left, Mono: true),
-                    new("  + "),
+                    new("  "),
+                    MetadataValueMarker("+"),
                     new(right, Mono: true),
                 ]);
                 if (DiffInfographicPainter.MetadataLineWidth(candidate) <= DiffInfographicLayout.MetadataTextWidth)
@@ -501,16 +503,17 @@ public static class DiffInfographic
                 var minimumLeftWidth = MinimumFittedValueWidth(left);
                 var minimumRightWidth = MinimumFittedValueWidth(right);
                 var fittedLabel = FitMetadataText(label, candidateLabel => Math.Max(
-                    DiffInfographicPainter.MetadataRunWidth($"~ {candidateLabel}: − ") + minimumLeftWidth,
                     DiffInfographicPainter.MetadataRunWidth($"~ {candidateLabel}: ") +
-                        DiffInfographicPainter.MetadataRunWidth("+ ") + minimumRightWidth) <=
+                        MetadataMarkerWidth("−") + minimumLeftWidth,
+                    DiffInfographicPainter.MetadataRunWidth($"~ {candidateLabel}: ") +
+                        MetadataMarkerWidth("+") + minimumRightWidth) <=
                     DiffInfographicLayout.MetadataTextWidth);
                 var fittedPrefix = $"~ {fittedLabel}: ";
                 var prefixWidth = DiffInfographicPainter.MetadataRunWidth(fittedPrefix);
                 items.Add(new(
                 [
-                    MetadataValueLine(fittedPrefix + "− ", left),
-                    MetadataValueLine("+ ", right, prefixWidth),
+                    MetadataMarkedValueLine(fittedPrefix, "−", left),
+                    MetadataMarkedValueLine("", "+", right, prefixWidth),
                 ]));
             }
             else
@@ -613,6 +616,12 @@ public static class DiffInfographic
         static bool IsQuotedMetadataText(string value) =>
             value.Length >= 2 && value[0] == '"' && value[^1] == '"';
 
+        static DiffInfographicTextRun MetadataValueMarker(string marker) =>
+            new(marker, GapAfter: DiffInfographicLayout.MetadataMarkerValueGap);
+
+        static float MetadataMarkerWidth(string marker) =>
+            DiffInfographicPainter.MetadataRunWidth(marker) + DiffInfographicLayout.MetadataMarkerValueGap;
+
         static string FitMetadataText(string value, Func<string, bool> fits)
         {
             if (fits(value)) return value;
@@ -655,7 +664,10 @@ public static class DiffInfographic
             }
         }
 
-        static DiffInfographicMetadataLine MetadataValueLine(string prefix, string value, float indent = 0)
+        static DiffInfographicMetadataLine MetadataValueLine(
+            string prefix,
+            string value,
+            float indent = 0)
         {
             var available = Math.Max(0, DiffInfographicLayout.MetadataTextWidth - indent -
                 DiffInfographicPainter.MetadataRunWidth(prefix));
@@ -664,6 +676,26 @@ public static class DiffInfographic
             return new(
             [
                 new(prefix),
+                new(fittedValue, Mono: true),
+            ], indent);
+        }
+
+        static DiffInfographicMetadataLine MetadataMarkedValueLine(
+            string prefix,
+            string marker,
+            string value,
+            float indent = 0)
+        {
+            var prefixWidth = DiffInfographicPainter.MetadataRunWidth(prefix);
+            var markerWidth = MetadataMarkerWidth(marker);
+            var available = Math.Max(0, DiffInfographicLayout.MetadataTextWidth - indent -
+                prefixWidth - markerWidth);
+            var fittedValue = FitMetadataText(value, candidate =>
+                DiffInfographicPainter.MetadataRunWidth(candidate, mono: true) <= available);
+            return new(
+            [
+                new(prefix),
+                MetadataValueMarker(marker),
                 new(fittedValue, Mono: true),
             ], indent);
         }

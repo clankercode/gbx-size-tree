@@ -708,7 +708,59 @@ public sealed class DiffInfographicTests
         {
             Assert.Contains(line.Runs, run => !run.Mono);
             Assert.Equal(2, line.Runs.Count(run => run.Mono));
+            var markers = line.Runs.Where(run => run.Text is "−" or "+").ToArray();
+            Assert.Equal(2, markers.Length);
+            Assert.All(markers, marker =>
+            {
+                Assert.False(char.IsWhiteSpace(marker.Text[^1]));
+                Assert.Equal(DiffInfographicLayout.MetadataMarkerValueGap, marker.GapAfter);
+            });
+            var measuredWidth = line.Indent + line.Runs.Sum(run =>
+                DiffInfographicPainter.MetadataRunWidth(run.Text, run.Mono) + run.GapAfter);
+            Assert.Equal(measuredWidth, DiffInfographicPainter.MetadataLineWidth(line));
         });
+    }
+
+    [Fact]
+    public void BuildScene_MetadataCandidateFittingIncludesMarkerValueGutters()
+    {
+        const string prefix = "~ boundary: ";
+        var boundaryLength = Enumerable.Range(1, 100).First(length =>
+        {
+            var withoutGutters = DiffInfographicPainter.MetadataRunWidth(prefix) +
+                DiffInfographicPainter.MetadataRunWidth("−") +
+                DiffInfographicPainter.MetadataRunWidth(new string('a', length), mono: true) +
+                DiffInfographicPainter.MetadataRunWidth("  ") +
+                DiffInfographicPainter.MetadataRunWidth("+") +
+                DiffInfographicPainter.MetadataRunWidth(new string('b', length), mono: true);
+            return withoutGutters <= DiffInfographicLayout.MetadataTextWidth &&
+                withoutGutters + (2 * DiffInfographicLayout.MetadataMarkerValueGap) >
+                    DiffInfographicLayout.MetadataTextWidth;
+        });
+
+        var fittingReport = Empty() with
+        {
+            MetadataChanges =
+            [
+                new("boundary", new(new string('a', boundaryLength - 1)),
+                    new(new string('b', boundaryLength - 1))),
+            ],
+        };
+        var overflowingReport = Empty() with
+        {
+            MetadataChanges =
+            [
+                new("boundary", new(new string('a', boundaryLength)), new(new string('b', boundaryLength))),
+            ],
+        };
+
+        var fittingMetadata = Assert.Single(
+            DiffInfographic.BuildScene(fittingReport, "a", "b").Sections, x => x.Id == "metadata");
+        var overflowingMetadata = Assert.Single(
+            DiffInfographic.BuildScene(overflowingReport, "a", "b").Sections, x => x.Id == "metadata");
+
+        Assert.Single(Assert.Single(fittingMetadata.Items).Lines);
+        Assert.Equal(2, Assert.Single(overflowingMetadata.Items).Lines.Count);
     }
 
     [Fact]
@@ -727,9 +779,24 @@ public sealed class DiffInfographicTests
         Assert.StartsWith("+ ", item.Lines[1].Text, StringComparison.Ordinal);
         var expectedIndent = DiffInfographicPainter.MetadataRunWidth("~ long.field: ");
         Assert.InRange(item.Lines[1].Indent, expectedIndent - .01f, expectedIndent + .01f);
+        var firstMarker = item.Lines[0].Runs[^2];
+        var secondMarker = item.Lines[1].Runs[^2];
+        Assert.Equal("−", firstMarker.Text);
+        Assert.Equal("+", secondMarker.Text);
+        Assert.Equal(DiffInfographicLayout.MetadataMarkerValueGap, firstMarker.GapAfter);
+        Assert.Equal(DiffInfographicLayout.MetadataMarkerValueGap, secondMarker.GapAfter);
+        Assert.Equal(
+            DiffInfographicPainter.MetadataRunWidth(item.Lines[0].Runs[0].Text),
+            item.Lines[1].Indent);
         Assert.EndsWith("…", item.Lines[0].Text, StringComparison.Ordinal);
         Assert.EndsWith("…", item.Lines[1].Text, StringComparison.Ordinal);
-        Assert.All(item.Lines, line => Assert.True(DiffInfographicPainter.MetadataLineWidth(line) <= DiffInfographicLayout.MetadataTextWidth));
+        Assert.All(item.Lines, line =>
+        {
+            var measuredWidth = line.Indent + line.Runs.Sum(run =>
+                DiffInfographicPainter.MetadataRunWidth(run.Text, run.Mono) + run.GapAfter);
+            Assert.Equal(measuredWidth, DiffInfographicPainter.MetadataLineWidth(line));
+            Assert.True(measuredWidth <= DiffInfographicLayout.MetadataTextWidth);
+        });
     }
 
     [Fact]
@@ -892,8 +959,10 @@ public sealed class DiffInfographicTests
         Assert.Equal(2, item.Lines.Count);
         var regularRun = item.Lines[0].Runs[0].Text;
         Assert.StartsWith("~ ", regularRun, StringComparison.Ordinal);
-        Assert.EndsWith(": − ", regularRun, StringComparison.Ordinal);
-        var fittedLabel = regularRun[2..^4];
+        Assert.EndsWith(": ", regularRun, StringComparison.Ordinal);
+        Assert.Equal("−", item.Lines[0].Runs[1].Text);
+        Assert.Equal(DiffInfographicLayout.MetadataMarkerValueGap, item.Lines[0].Runs[1].GapAfter);
+        var fittedLabel = regularRun[2..^2];
         Assert.EndsWith("…", fittedLabel, StringComparison.Ordinal);
         Assert.DoesNotContain('\t', fittedLabel);
         Assert.DoesNotContain('\u202E', fittedLabel);
@@ -1012,8 +1081,34 @@ public sealed class DiffInfographicTests
         var metadata = Assert.Single(scene.Sections, x => x.Id == "metadata");
 
         Assert.Equal([1, 2, 1], metadata.Items.Select(x => x.Lines.Count));
+        Assert.Equal(198, metadata.Bottom - metadata.Top);
         Assert.Equal(DiffInfographicLayout.SectionHeight(metadata), metadata.Bottom - metadata.Top);
         Assert.True(metadata.Bottom - metadata.Top < DiffInfographicLayout.SectionHeight(4, null));
+    }
+
+    [Fact]
+    public void BuildScene_SyntheticMetadataKeepsOneOneTwoLinesAndCompactHeight()
+    {
+        var report = Empty() with
+        {
+            MapName = new("Night Circuit v1", "Night Circuit v2"),
+            MetadataChanges =
+            [
+                new("editor.version", new(Integer: 100), new(Integer: 101)),
+                new("environment.decorations.renderProfile", new(Text: "Legacy dusk lighting with compact stadium signage"),
+                    new(Text: "Tournament broadcast night lighting with animated grandstand signage and extended sponsor treatment")),
+            ],
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        var metadata = Assert.Single(scene.Sections, x => x.Id == "metadata");
+
+        Assert.Equal([1, 1, 2], metadata.Items.Select(item => item.Lines.Count));
+        Assert.Equal(4, metadata.Items.Sum(item => item.Lines.Count));
+        Assert.Equal(198, metadata.Bottom - metadata.Top);
+        Assert.Equal(DiffInfographicLayout.SectionHeight(metadata), metadata.Bottom - metadata.Top);
+        Assert.All(metadata.Items.SelectMany(item => item.Lines), line =>
+            Assert.True(DiffInfographicPainter.MetadataLineWidth(line) <= DiffInfographicLayout.MetadataTextWidth));
     }
 
     [Fact]

@@ -374,7 +374,7 @@ internal static class DiffInfographicPainter
         TextWidth(text, mono ? MetadataMonoFont : MetadataRegularFont);
 
     internal static float MetadataLineWidth(DiffInfographicMetadataLine line) =>
-        line.Indent + line.Runs.Sum(run => MetadataRunWidth(run.Text, run.Mono));
+        line.Indent + line.Runs.Sum(run => MetadataRunWidth(run.Text, run.Mono) + run.GapAfter);
 
     private static void DrawMetadata(
         IImageProcessingContext c,
@@ -393,7 +393,7 @@ internal static class DiffInfographicPainter
                 {
                     var font = run.Mono ? MetadataMonoFont : MetadataRegularFont;
                     c.DrawText(run.Text, font, Text, new PointF(x, top));
-                    x += TextWidth(run.Text, font);
+                    x += TextWidth(run.Text, font) + run.GapAfter;
                 }
                 top += DiffInfographicLayout.MetadataLineHeight;
             }

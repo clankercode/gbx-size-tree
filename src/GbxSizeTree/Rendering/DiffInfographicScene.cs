@@ -55,13 +55,18 @@ public sealed record DiffInfographicSectionLine(string Text, bool Mono = false)
     public static implicit operator DiffInfographicSectionLine(string text) => new(text);
 }
 
-public sealed record DiffInfographicTextRun(string Text, bool Mono = false);
+/// A measured text run. GapAfter is an explicit pixel advance applied after drawing the glyphs.
+public sealed record DiffInfographicTextRun(
+    string Text,
+    bool Mono = false,
+    float GapAfter = 0);
 
 public sealed record DiffInfographicMetadataLine(
     IReadOnlyList<DiffInfographicTextRun> Runs,
     float Indent = 0)
 {
-    public string Text => string.Concat(Runs.Select(x => x.Text));
+    // Keep diagnostic text readable while leaving the rendered separation to measured geometry.
+    public string Text => string.Concat(Runs.Select(x => x.Text + (x.GapAfter > 0 ? " " : "")));
 }
 
 public sealed record DiffInfographicMetadataItem(IReadOnlyList<DiffInfographicMetadataLine> Lines);
@@ -125,6 +130,7 @@ internal static class DiffInfographicLayout
     public const int MetadataLineHeight = 23;
     public const int MetadataItemGap = 9;
     public const float MetadataTextWidth = 520;
+    public const float MetadataMarkerValueGap = 7;
 
     public static int TableHeight(DiffInfographicTable? table) => table is null || table.Rows.Count == 0
         ? 0
