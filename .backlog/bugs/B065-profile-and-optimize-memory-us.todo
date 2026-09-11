@@ -22,3 +22,5 @@ Lane plan: B065 and B066 both touch the diff path (DiffMode/MapContentComparison
 Decision (2026-09-11): the v206->v207 pair named in this ticket does not exist on disk. Substitute measurement: v205 -> v206 (the established regression pair in /home/xertrov/tm-docs/Maps/SB2, 3.3 MB -> 7.1 MB) plus a stress case using the largest available maps (v180 Ultra2 7.8 MB vs v206 7.1 MB). Peak RSS measured before/after with /usr/bin/time -v.
 
 Result (2026-09-11): peak RSS (ru_maxrss) before -> after: stress pair (synthetic 133 MB maps, ~190 MB bodies) 4.32 GB -> 0.93 GB; SB2 v205->v206 849 MB -> 296 MB; v180->recompressed 641 MB -> 276 MB. JSON output byte-identical on all three pairs (Debug+Release); full test suite (629) and RealMapDiffRegressionTests pass. Documented in docs/verification-memory-diff.md.
+
+Follow-up (2026-09-11): bounded parallel removal trials (MaxParallelTrials=2, bodies <=64 MB) cut SB2 v205->v206 diff from ~105 s to ~64 s; peak RSS unchanged; JSON byte-identical. See docs/verification-memory-diff.md.
