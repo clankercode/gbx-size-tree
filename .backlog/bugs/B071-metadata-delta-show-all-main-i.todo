@@ -15,3 +15,5 @@ title: 'Metadata delta: show all main info with old/new left-aligned monospace p
 updated_at: "2026-09-11T04:15:22Z"
 ---
 The METADATA section currently omits most changes ('+16 more metadata changes omitted') and renders long values inline mid-sentence. Show all main metadata info. For values like map UID and author login (and other long identifiers), format each as old and new on separate lines aligned on the left, in a monospace font, e.g.:\n\n  - Map UID: u5byRl2QnqZ6a1e_YumY._6plk\n  + Map UID: 36ROAOA.O5tyi7744S_L9xyQ1k\n\nso old/new can be compared visually. Same alignment pattern for author login, author name, map name, and any other long string values.
+
+Lane plan: serial infographic lane B072 -> B071 -> B067 -> B073 (all touch DiffInfographic/Painter/Fonts), one worktree. B072 first: lands the DiffInfographicFonts.Mono family B071's alignment needs.
