@@ -17,3 +17,5 @@ updated_at: "2026-09-11T04:14:35Z"
 Diff logic currently treats an entry as modified/changed when its compressed size differs even if content is identical. Compressed size can vary for trivial reasons (recompression, container metadata) without any real content change. Change modified detection so compressed-size-only deltas are not reported as modified; decompressed/content comparison should be the source of truth. Verify against 'Sweet 2 burger v206 -> v207' that spurious modified entries disappear.
 
 Lane plan: runs first in a serial lane with B065 (shared diff-path files). See B065 for details.
+
+Decision (2026-09-11): the v206->v207 pair named in this ticket does not exist on disk (~/Downloads has no Sweet maps; /home/xertrov/tm-docs/Maps/SB2 goes up to v206). Substitute verification: (1) the established SB2 pair v205 -> v206 for spurious modified entries, (2) ~/Downloads 'Sweet 2 Burger v180 (Ultra2).Map.gbx' vs '..._recompressed.Map.gbx' as the recompression-only case.
