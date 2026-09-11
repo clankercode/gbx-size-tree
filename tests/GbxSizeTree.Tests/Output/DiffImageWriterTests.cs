@@ -47,6 +47,26 @@ public sealed class DiffImageWriterTests
     }
 
     [Fact]
+    public void Write_WebpTooTallReturnsActionableOutputError()
+    {
+        using var source = new Image<Rgba32>(1, 16_384);
+        using var stdout = new MemoryStream();
+
+        var exception = Assert.Throws<DiffImageOutputException>(() => DiffImageWriter.Write(
+            source,
+            CliOutputFormat.Webp,
+            null,
+            ["left", "right"],
+            false,
+            stdout,
+            true));
+
+        Assert.Equal(ExitCodes.IoError, exception.ExitCode);
+        Assert.Contains("PNG", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(0, stdout.Length);
+    }
+
+    [Fact]
     public void Write_TerminalStdoutRequiresOutputAndWritesNothing()
     {
         using var source = TestImage();

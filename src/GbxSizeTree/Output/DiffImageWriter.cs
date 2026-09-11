@@ -70,6 +70,12 @@ public static class DiffImageWriter
         ArgumentNullException.ThrowIfNull(image);
         ArgumentNullException.ThrowIfNull(stdout);
         ValidateDestination(outputPath, inputPaths, force, stdoutRedirected);
+        if (format == CliOutputFormat.Webp && (image.Width > 16_383 || image.Height > 16_383))
+        {
+            throw new DiffImageOutputException(
+                $"WebP output supports dimensions up to 16,383 pixels; this infographic is {image.Width:N0} × {image.Height:N0}. Use PNG output instead.",
+                ExitCodes.IoError);
+        }
 
         using var encoded = new MemoryStream();
         image.Save(encoded, Encoder(format));

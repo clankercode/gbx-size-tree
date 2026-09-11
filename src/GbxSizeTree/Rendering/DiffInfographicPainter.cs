@@ -25,9 +25,21 @@ internal static class DiffInfographicPainter
     private const float TablePathInset = 64;
     private const float TableRightInset = 28;
     private const float TableColumnGap = 18;
+    private const string ChangeMarkerHeader = "+/−";
     private const string SizeChangeHeader = "SIZE CHANGE";
-    private static Font HighlightTableFont => DiffInfographicFonts.Mono(16);
-    private static Font HighlightTableHeaderFont => DiffInfographicFonts.Bold(13);
+    internal static Font TableFont(DiffInfographicTableDensity density) =>
+        DiffInfographicFonts.Mono(density == DiffInfographicTableDensity.Compact ? 14 : 16);
+    private static Font TableHeaderFont(DiffInfographicTableDensity density) =>
+        DiffInfographicFonts.Bold(density == DiffInfographicTableDensity.Compact ? 12 : 13);
+    internal static Color DetailAccent(string sectionId) =>
+        sectionId == "embedded-highlights" || sectionId.StartsWith("embedded-changes", StringComparison.Ordinal)
+            ? Cyan
+            : sectionId switch
+            {
+                "deep-properties" or "chunks" => Changed,
+                "metadata" => Added,
+                _ => Removed,
+            };
 
     public static Image<Rgba32> Paint(DiffInfographicScene scene)
     {
@@ -193,13 +205,13 @@ internal static class DiffInfographicPainter
         var detailSections = scene.Sections.Where(x => x.Top >= 1000).ToArray();
         foreach (var section in detailSections)
         {
-            var accent = section.Id switch { "embedded-highlights" => Cyan, "deep-properties" or "chunks" => Changed, "metadata" => Added, _ => Removed };
+            var accent = DetailAccent(section.Id);
             c.Fill(Panel, Rounded(section.Left, section.Top, section.Right - section.Left, section.Bottom - section.Top, 22));
             c.Draw(PanelEdge, 2, Rounded(section.Left, section.Top, section.Right - section.Left, section.Bottom - section.Top, 22));
             c.Fill(accent, Rounded(section.Left, section.Top, 8, section.Bottom - section.Top, 4));
             c.DrawText(section.Title.ToUpperInvariant(), DiffInfographicFonts.Bold(20), accent, new PointF(section.Left + 30, section.Top + 24));
             float top = section.Top + DiffInfographicLayout.SectionHeader;
-            if (section.TableRows is { Count: > 0 }) top = DrawTable(c, section, section.TableRows, top);
+            if (section.Table is { Rows.Count: > 0 } table) top = DrawTable(c, section, table, top);
             foreach (var line in section.Lines)
             {
                 if (top + DiffInfographicLayout.LineHeight > section.Bottom) break;
@@ -219,13 +231,18 @@ internal static class DiffInfographicPainter
 
     /// Path column budget, measured from the widest signed size change actually present so an extreme
     /// value (up to ±9223372036.85 GB) reserves its own room instead of overlapping the path.
-    internal static HighlightTableColumns MeasureHighlightColumns(IReadOnlyList<DiffInfographicTableRow> rows, float left, float right)
+    internal static InfographicTableColumns MeasureTableColumns(
+        IReadOnlyList<DiffInfographicTableRow> rows,
+        float left,
+        float right,
+        DiffInfographicTableDensity density = DiffInfographicTableDensity.Standard)
     {
-        var font = HighlightTableFont;
+        var font = TableFont(density);
+        var headerFont = TableHeaderFont(density);
         var valueRight = right - TableRightInset;
         var pathX = left + TablePathInset;
         var valueWidth = Math.Max(
-            TextWidth(SizeChangeHeader, HighlightTableHeaderFont),
+            TextWidth(SizeChangeHeader, headerFont),
             rows.Count == 0 ? 0 : rows.Max(row => TextWidth(row.Value, font)));
         var valueLeft = valueRight - valueWidth;
         return new(left + TableMarkerInset, pathX, Math.Max(0, valueLeft - TableColumnGap - pathX), valueLeft, valueRight);
@@ -234,30 +251,32 @@ internal static class DiffInfographicPainter
     private static float DrawTable(
         IImageProcessingContext c,
         DiffInfographicSection section,
-        IReadOnlyList<DiffInfographicTableRow> rows,
+        DiffInfographicTable table,
         float top)
     {
-        var font = HighlightTableFont;
-        var columns = MeasureHighlightColumns(rows, section.Left, section.Right);
-        c.DrawText("PATH", HighlightTableHeaderFont, Muted, new PointF(columns.PathX, top));
-        c.DrawText(SizeChangeHeader, HighlightTableHeaderFont, Muted, new PointF(columns.ValueLeft, top));
+        var font = TableFont(table.Density);
+        var headerFont = TableHeaderFont(table.Density);
+        var columns = MeasureTableColumns(table.Rows, section.Left, section.Right, table.Density);
+        c.DrawText(ChangeMarkerHeader, headerFont, Muted, new PointF(columns.MarkerX, top));
+        c.DrawText("PATH", headerFont, Muted, new PointF(columns.PathX, top));
+        c.DrawText(SizeChangeHeader, headerFont, Muted, new PointF(columns.ValueLeft, top));
         top += DiffInfographicLayout.TableHeaderHeight;
-        foreach (var row in rows)
+        var rowHeight = DiffInfographicLayout.RowHeight(table.Density);
+        foreach (var row in table.Rows)
         {
-            if (top + DiffInfographicLayout.TableRowHeight > section.Bottom) break;
             var color = PointColor(row.Kind);
             c.DrawText(row.Marker, font, color, new PointF(columns.MarkerX, top));
             if (columns.PathWidth >= 1)
-                c.DrawText(ElideHighlightPath(row.Path, font, columns.PathWidth), font, Text, new PointF(columns.PathX, top));
+                c.DrawText(ElideTablePath(row.Path, font, columns.PathWidth), font, Text, new PointF(columns.PathX, top));
             c.DrawText(row.Value, font, Faint(color), new PointF(columns.ValueRight - TextWidth(row.Value, font), top));
-            top += DiffInfographicLayout.TableRowHeight;
+            top += rowHeight;
         }
         return top + DiffInfographicLayout.TableBottomGap;
     }
 
     /// Elides folders first, then the middle of the file name, so a row always keeps a recognizable
     /// name; truncating a long path from the front alone would leave only shared parent folders.
-    internal static string ElideHighlightPath(string path, Font font, float maxWidth)
+    internal static string ElideTablePath(string path, Font font, float maxWidth)
     {
         if (TextWidth(path, font) <= maxWidth) return path;
         var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
