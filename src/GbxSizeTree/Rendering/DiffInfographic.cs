@@ -52,19 +52,20 @@ public static class DiffInfographic
             finiteChanges.Length - plotted.Length, invalidChanges, unpositionedChanges,
             finiteContext.Length - sampledContext.Length, invalidContext);
 
-        var sectionContent = new List<(string Id, string Title, IReadOnlyList<DiffInfographicSectionLine> Lines)>();
+        var sectionContent = new List<(string Id, string Title, IReadOnlyList<DiffInfographicSectionLine> Lines, IReadOnlyList<DiffInfographicTableRow>? TableRows)>();
         var highlights = Highlights(report);
-        if (highlights.Count > 0) sectionContent.Add(("embedded-highlights", "Embedded highlights", highlights));
+        if (highlights.Rows.Count > 0 || highlights.Notes.Count > 0)
+            sectionContent.Add(("embedded-highlights", "Embedded highlights", highlights.Notes, highlights.Rows));
         var properties = Properties(report);
-        if (properties.Count > 0) sectionContent.Add(("deep-properties", $"Deep properties · {detailCounts.DeepProperties:N0}", properties));
+        if (properties.Count > 0) sectionContent.Add(("deep-properties", $"Deep properties · {detailCounts.DeepProperties:N0}", properties, null));
         var warnings = Warnings(report, spatial).ToArray();
-        if (warnings.Length > 0) sectionContent.Add(("coverage", "Coverage notes", warnings.Select(x => new DiffInfographicSectionLine(x)).ToArray()));
+        if (warnings.Length > 0) sectionContent.Add(("coverage", "Coverage notes", warnings.Select(x => new DiffInfographicSectionLine(x)).ToArray(), null));
         var metadata = Metadata(report);
-        if (metadata.Count > 0) sectionContent.Add(("metadata", $"Metadata · {detailCounts.Metadata:N0}", metadata));
+        if (metadata.Count > 0) sectionContent.Add(("metadata", $"Metadata · {detailCounts.Metadata:N0}", metadata, null));
         var chunks = Chunks(report);
-        if (chunks.Count > 0) sectionContent.Add(("chunks", $"Chunk observations · {detailCounts.Chunks:N0}", chunks));
+        if (chunks.Count > 0) sectionContent.Add(("chunks", $"Chunk observations · {detailCounts.Chunks:N0}", chunks, null));
         var placementSummary = PlacementSummary(placementChanges);
-        if (placementSummary.Count > 0) sectionContent.Add(("placement-summary", $"Placement summary · {placementSummary.Count:N0} names", placementSummary));
+        if (placementSummary.Count > 0) sectionContent.Add(("placement-summary", $"Placement summary · {placementSummary.Count:N0} names", placementSummary, null));
 
         var sections = new List<DiffInfographicSection>
         {
@@ -77,8 +78,9 @@ public static class DiffInfographic
         {
             var column = columnTops[0] <= columnTops[1] ? 0 : 1;
             var left = column == 0 ? 70 : 710;
-            var requestedBottom = columnTops[column] + 88 + Math.Max(1, content.Lines.Count) * 58;
-            sections.Add(new(content.Id, content.Title, content.Lines, left, columnTops[column], left + 620, requestedBottom));
+            var requestedBottom = columnTops[column]
+                + DiffInfographicLayout.SectionHeight(content.Lines.Count, content.TableRows?.Count ?? 0);
+            sections.Add(new(content.Id, content.Title, content.Lines, left, columnTops[column], left + 620, requestedBottom, content.TableRows));
             columnTops[column] = requestedBottom + 22;
         }
         var height = Math.Max(Math.Max(columnTops[0], columnTops[1]) + 24, MinimumHeight);
@@ -199,47 +201,48 @@ public static class DiffInfographic
         }
     }
 
-    private static IReadOnlyList<DiffInfographicSectionLine> Highlights(DiffReport report)
-    {
-        var lines = new List<DiffInfographicSectionLine>();
-        var ranked = report.Embedded.Select(c =>
-        {
-            var value = c.Right ?? c.Left!;
-            var delta = SaturatingSubtract(c.Right?.Compressed ?? 0, c.Left?.Compressed ?? 0);
-            var kind = c.Left is null ? "+" : c.Right is null ? "−" : "~";
-            var detail = c.Left is not null && c.Right is not null
-                ? $"ZIP {DiffInfographicText.Bytes(c.Left.Compressed)} to {DiffInfographicText.Bytes(c.Right.Compressed)} ({SignedBytes(delta)})"
-                : $"ZIP {DiffInfographicText.Bytes(value.Compressed)}";
-            return (Rank: Math.Abs((double)delta), Text: $"{kind} {value.Path}  ·  {detail}");
-        }).OrderByDescending(x => x.Rank).ThenBy(x => x.Text, StringComparer.Ordinal).ToArray();
-        lines.AddRange(ranked.Select(x => new DiffInfographicSectionLine(x.Text)));
+    private sealed record EmbeddedHighlights(
+        IReadOnlyList<DiffInfographicTableRow> Rows,
+        IReadOnlyList<DiffInfographicSectionLine> Notes);
 
-        var highlightedPaths = new HashSet<string>(report.Embedded.Select(x => (x.Right ?? x.Left)!.Path), StringComparer.Ordinal);
-        foreach (var contribution in report.EmbeddedContributions)
+    private static EmbeddedHighlights Highlights(DiffReport report)
+    {
+        var ranked = report.Embedded.Select(change =>
         {
-            var value = contribution.Right ?? contribution.Left;
-            if (value is null || !highlightedPaths.Add(value.Path)) continue;
-            var unavailable = value.UnavailableReason;
-            var detail = unavailable is null
-                ? "Outer-map marginal available (non-additive; not summed)"
-                : $"Outer-map marginal unavailable: {unavailable}";
-            lines.Add($"~ {value.Path}  ·  {detail}");
-        }
+            var value = change.Right ?? change.Left!;
+            var kind = Kind(change.Left, change.Right);
+            var delta = SaturatingSubtract(change.Right?.Compressed ?? 0, change.Left?.Compressed ?? 0);
+            var row = new DiffInfographicTableRow(
+                KindMarker(kind).ToString(),
+                DiffInfographicText.CleanPath(value.Path),
+                SignedBytes(delta),
+                kind);
+            return (Rank: AbsoluteMagnitude(delta), Row: row);
+        }).OrderByDescending(x => x.Rank)
+            .ThenBy(x => x.Row.Path, StringComparer.Ordinal)
+            .Take(MaxHighlightLines)
+            .Select(x => x.Row)
+            .OrderBy(x => x.Path, StringComparer.Ordinal)
+            .ToArray();
+
+        var notes = new List<DiffInfographicSectionLine>();
+        var omitted = report.Embedded.Count - ranked.Length;
+        if (omitted > 0) notes.Add($"+ {omitted:N0} more embedded change{(omitted == 1 ? "" : "s")} omitted");
+
         var unavailableSides = report.EmbeddedContributions
             .SelectMany(x => new[] { x.Left, x.Right })
             .OfType<EmbeddedFileContribution>()
             .Where(x => x.UnavailableReason is not null)
             .ToArray();
-        string? note = null;
         if (unavailableSides.Length > 0)
         {
-            note = $"Marginal measurements are non-additive; {unavailableSides.Length:N0} unavailable contribution side{(unavailableSides.Length == 1 ? "" : "s")}: {unavailableSides[0].UnavailableReason}";
+            notes.Add($"Marginal measurements are non-additive; {unavailableSides.Length:N0} unavailable contribution side{(unavailableSides.Length == 1 ? "" : "s")}: {unavailableSides[0].UnavailableReason}");
         }
         else if (report.EmbeddedContributions.Count > 0)
         {
-            note = "Outer-map marginal measurements are non-additive and are never summed.";
+            notes.Add("Outer-map marginal measurements are non-additive and are never summed.");
         }
-        return LimitLines(lines, MaxHighlightLines, "embedded highlight", note);
+        return new(ranked, notes);
     }
 
     private static IReadOnlyList<DiffInfographicSectionLine> Properties(DiffReport report)
@@ -383,6 +386,8 @@ public static class DiffInfographic
         if (values.Count <= limit) return values;
         return Enumerable.Range(0, limit).Select(i => values[(int)((long)i * values.Count / limit)]);
     }
+    private static ulong AbsoluteMagnitude(long value) => value >= 0 ? (ulong)value : (ulong)(-(value + 1)) + 1;
+
     private static long SaturatingSubtract(long right, long left)
     {
         if (left < 0 && right > long.MaxValue + left) return long.MaxValue;

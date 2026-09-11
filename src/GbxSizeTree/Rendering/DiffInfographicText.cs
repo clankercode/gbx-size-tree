@@ -20,9 +20,11 @@ internal static class DiffInfographicText
         return string.Join(' ', b.ToString().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
     }
 
+    public static string CleanPath(string? path) => Clean(path?.Replace('\\', '/'));
+
     public static string FileName(string path)
     {
-        var clean = Clean(path.Replace('\\', '/'));
+        var clean = CleanPath(path);
         var slash = clean.LastIndexOf('/');
         return slash < 0 ? clean : clean[(slash + 1)..];
     }
