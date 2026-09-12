@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 using GbxSizeTree.Cli.Modes;
 using GbxSizeTree.Measure;
 using GbxSizeTree.Semantics;
@@ -485,13 +486,51 @@ public static class DiffInfographic
         var changes = new List<MetadataEntry>();
         Add("Map UID", report.MapUid); Add("Map name", report.MapName); Add("Author login", report.AuthorLogin);
         Add("Author name", report.AuthorNickname); Add("Password present", report.Password);
-        changes.AddRange(report.MetadataChanges.Where(x => LegacyMetadata(report, x.Path) is null)
-            .Select(x => new MetadataEntry(x.Path, MetaOrNull(x.Left), MetaOrNull(x.Right))));
+        var ordinary = report.MetadataChanges.Where(x => LegacyMetadata(report, x.Path) is null)
+            .Where(x => GroupPrefix(x.Path) is null);
+        changes.AddRange(ordinary.Select(x => new MetadataEntry(x.Path, MetaOrNull(x.Left), MetaOrNull(x.Right))));
+        foreach (var group in report.MetadataChanges.Where(x => LegacyMetadata(report, x.Path) is null)
+                     .Where(x => GroupPrefix(x.Path) is not null)
+                     .GroupBy(x => GroupPrefix(x.Path)!, StringComparer.Ordinal))
+        {
+            var indices = group.Select(x => IndexOf(x.Path)).Where(x => x >= 0).Distinct().Count();
+            var kinds = group.Select(x => KindOf(x.Path)).Where(x => x is not null)
+                .GroupBy(x => x!, StringComparer.Ordinal).OrderByDescending(x => x.Count()).ThenBy(x => x.Key, StringComparer.Ordinal)
+                .Take(3).Select(x => $"{x.Key} {x.Count():N0}");
+            var suffix = kinds.Any() ? $" · {string.Join(", ", kinds)}" : "";
+            var summary = $"{group.Count():N0} field changes across {indices:N0} indices{suffix}";
+            changes.Add(new MetadataEntry($"{GroupLabel(group.Key)}", summary, summary));
+        }
         return changes.Distinct().ToArray();
 
         void Add(string label, Change? change)
         {
             if (change is not null) changes.Add(new(label, change.Left, change.Right));
+        }
+
+        static string? GroupPrefix(string path) =>
+            path.StartsWith("embedded.identities/", StringComparison.Ordinal) ? "embedded.identities" :
+            path.StartsWith("embedded.textures/", StringComparison.Ordinal) ? "embedded.textures" :
+            path.StartsWith("script.traits/", StringComparison.Ordinal) ? "script.traits" : null;
+
+        static string GroupLabel(string prefix) => prefix switch
+        {
+            "embedded.identities" => "Embedded identities",
+            "embedded.textures" => "Embedded textures",
+            "script.traits" => "Script traits",
+            _ => prefix,
+        };
+
+        static int IndexOf(string path)
+        {
+            var match = Regex.Match(path, @"/(\d+)(?:/|$)");
+            return match.Success && int.TryParse(match.Groups[1].Value, out var index) ? index : -1;
+        }
+
+        static string? KindOf(string path)
+        {
+            var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            return parts.Length >= 3 && int.TryParse(parts[1], out _) ? parts[2] : null;
         }
     }
 
