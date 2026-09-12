@@ -48,13 +48,11 @@ internal static class DiffInfographicPainter
     internal static Color DetailAccent(string sectionId) =>
         sectionId == "embedded-highlights" || sectionId.StartsWith("embedded-changes", StringComparison.Ordinal)
             ? Cyan
-            : sectionId.StartsWith("ordinary-block-changes", StringComparison.Ordinal)
-                ? Added
-                : sectionId.StartsWith("baked-block-changes", StringComparison.Ordinal)
-                    ? Changed
-                    : sectionId.StartsWith("item-changes", StringComparison.Ordinal)
-                        ? Cyan
-                        : sectionId switch
+            : sectionId.StartsWith("ordinary-block-changes-", StringComparison.Ordinal)
+                || sectionId.StartsWith("baked-block-changes-", StringComparison.Ordinal)
+                || sectionId.StartsWith("item-changes-", StringComparison.Ordinal)
+                ? sectionId.Contains("-removed", StringComparison.Ordinal) ? Removed : Added
+                : sectionId switch
             {
                 "deep-properties" or "chunks" => Changed,
                 "metadata" => Added,
@@ -335,6 +333,16 @@ internal static class DiffInfographicPainter
         c.DrawText(text, DiffInfographicFonts.Regular(16), Muted, new PointF(x + 14, y));
     }
 
+    internal static Font FitDetailTitleFont(string title, int sectionWidth)
+    {
+        var font = DiffInfographicFonts.Bold(20);
+        var bounds = TextMeasurer.MeasureBounds(title, new TextOptions(font));
+        var width = bounds.X + bounds.Width;
+        var available = Math.Max(1, sectionWidth - 60);
+        // Preserve counts and continuation numbers rather than truncating the title.
+        return width <= available ? font : DiffInfographicFonts.Bold(20 * (available - 1) / width);
+    }
+
     private static void DrawDetails(IImageProcessingContext c, DiffInfographicScene scene)
     {
         var detailSections = scene.Sections.Where(x => x.Top >= 1250).ToArray();
@@ -344,7 +352,9 @@ internal static class DiffInfographicPainter
             c.Fill(Panel, Rounded(section.Left, section.Top, section.Right - section.Left, section.Bottom - section.Top, 22));
             c.Draw(PanelEdge, 2, Rounded(section.Left, section.Top, section.Right - section.Left, section.Bottom - section.Top, 22));
             c.Fill(accent, Rounded(section.Left, section.Top, 8, section.Bottom - section.Top, 4));
-            c.DrawText(section.Title.ToUpperInvariant(), DiffInfographicFonts.Bold(20), accent, new PointF(section.Left + 30, section.Top + 24));
+            var title = section.Title.ToUpperInvariant();
+            c.DrawText(title, FitDetailTitleFont(title, section.Right - section.Left), accent,
+                new PointF(section.Left + 30, section.Top + 24));
             float top = section.Top + DiffInfographicLayout.SectionHeader;
             if (section.Table is { Rows.Count: > 0 } table) top = DrawTable(c, section, table, top);
             if (section.Items is { Count: > 0 } items)
