@@ -140,6 +140,42 @@ public sealed class DiffInfographicTests
     }
 
     [Fact]
+    public void BuildScene_OmitsModifiedEmbedsWhenUncompressedUnchangedAndRanksByUncompressedDelta()
+    {
+        var report = Empty() with
+        {
+            Embedded =
+            [
+                // Same uncompressed: zip/content-length noise — omit from PNG modified list.
+                new(new("zip-only.Item.Gbx", "hash-a", 200, 500), new("zip-only.Item.Gbx", "hash-b", 80, 500)),
+                // Uncompressed grew — keep and rank/value by uncompressed delta (+100 B), not compressed (+20 B).
+                new(new("grew.Item.Gbx", "old", 100, 500), new("grew.Item.Gbx", "new", 120, 600)),
+                // Large compressed swing, tiny uncompressed swing — ranking must prefer uncompressed magnitude.
+                new(new("repack.Item.Gbx", "old", 10, 1000), new("repack.Item.Gbx", "new", 900, 1005)),
+                new(null, new("added.Item.Gbx", "new", 10, 40)),
+                new(new("gone.Item.Gbx", "old", 10, 40), null),
+            ],
+        };
+
+        var scene = DiffInfographic.BuildScene(report, "a", "b");
+        Assert.Equal(new DiffInfographicCounts(1, 1, 2), scene.Embedded.Counts);
+
+        var complete = Assert.Single(scene.Sections, x => x.Id == "embedded-changes");
+        var rows = Assert.IsType<DiffInfographicTable>(complete.Table).Rows;
+        Assert.Equal(4, rows.Count);
+        Assert.DoesNotContain(rows, x => x.Path == "zip-only.Item.Gbx");
+        Assert.Equal("+100 B", Assert.Single(rows, x => x.Path == "grew.Item.Gbx").Value);
+        Assert.Equal("+5 B", Assert.Single(rows, x => x.Path == "repack.Item.Gbx").Value);
+
+        var highlights = Assert.Single(scene.Sections, x => x.Id == "embedded-highlights");
+        var highlightRows = Assert.IsAssignableFrom<IReadOnlyList<DiffInfographicTableRow>>(highlights.Table!.Rows);
+        Assert.DoesNotContain(highlightRows, x => x.Path == "zip-only.Item.Gbx");
+        // Largest |uncompressed| deltas first among candidates, then ordinal path among top N.
+        Assert.Contains(highlightRows, x => x.Path == "grew.Item.Gbx");
+        Assert.Contains(highlightRows, x => x.Path == "repack.Item.Gbx");
+    }
+
+    [Fact]
     public void BuildScene_FlowsLargeCompleteListAcrossPanelsWithoutOmittingRows()
     {
         var changes = Enumerable.Range(0, 633)

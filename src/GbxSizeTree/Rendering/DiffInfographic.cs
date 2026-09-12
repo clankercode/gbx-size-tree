@@ -42,7 +42,8 @@ public static class DiffInfographic
         ArgumentNullException.ThrowIfNull(report);
         var placementChanges = PlacementChanges(report).ToArray();
         var placements = new DiffInfographicCountGroup("Placements", CountKinds(placementChanges));
-        var embedded = new DiffInfographicCountGroup("Embedded", Count(report.Embedded));
+        var embeddedChanges = VisibleEmbeddedChanges(report);
+        var embedded = new DiffInfographicCountGroup("Embedded", Count(embeddedChanges));
         var detailCounts = new DiffInfographicDetailCounts(
             MetadataEntries(report).Count,
             report.EmbeddedPropertyChanges.Sum(x => x.Properties.Changes.Count),
@@ -67,7 +68,7 @@ public static class DiffInfographic
             finiteChanges.Length == 0 ? finiteContext.Length : 0);
 
         var sectionContent = new List<SectionContent>();
-        var embeddedRows = EmbeddedRows(report);
+        var embeddedRows = EmbeddedRows(embeddedChanges);
         var highlights = Highlights(report, embeddedRows);
         if (highlights.Rows.Count > 0 || highlights.Notes.Count > 0)
             sectionContent.Add(new("embedded-highlights", "Embedded highlights", highlights.Notes, new(highlights.Rows)));
@@ -422,12 +423,19 @@ public static class DiffInfographic
 
     private sealed record EmbeddedChangeRow(long SizeDeltaBytes, DiffInfographicTableRow Row);
 
-    private static IReadOnlyList<EmbeddedChangeRow> EmbeddedRows(DiffReport report) =>
-        report.Embedded.Select(change =>
+    // Size infographic: omit modified embeds when only compressed/zip packing moved (Uncompressed unchanged).
+    private static IEnumerable<ValueChange<EmbeddedSnapshot>> VisibleEmbeddedChanges(DiffReport report) =>
+        report.Embedded.Where(change =>
+            change.Left is null
+            || change.Right is null
+            || change.Left.Uncompressed != change.Right.Uncompressed);
+
+    private static IReadOnlyList<EmbeddedChangeRow> EmbeddedRows(IEnumerable<ValueChange<EmbeddedSnapshot>> changes) =>
+        changes.Select(change =>
         {
             var value = change.Right ?? change.Left!;
             var kind = Kind(change.Left, change.Right);
-            var delta = SaturatingSubtract(change.Right?.Compressed ?? 0, change.Left?.Compressed ?? 0);
+            var delta = SaturatingSubtract(change.Right?.Uncompressed ?? 0, change.Left?.Uncompressed ?? 0);
             return new EmbeddedChangeRow(delta, new(
                 KindMarker(kind).ToString(),
                 DiffInfographicText.CleanPath(value.Path),
