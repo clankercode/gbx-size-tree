@@ -2,9 +2,9 @@ name: release
 
 # Tag vX.Y.Z → test gate → publish linux-x64 + win-x64 single-file binaries →
 # zip with LICENSE/notices/README → GitHub Release with auto-generated notes.
-# After CI succeeds, an agent/human MUST finalize the release notes from
-# CHANGELOG.md via `gh release edit` — full procedure: RELEASE.md (keep that
-# file in sync if this workflow changes).
+# After CI succeeds, the releasing agent MUST replace the generated body with
+# the matching CHANGELOG.md section via `gh release edit` — full procedure:
+# RELEASE.md (keep that file in sync if this workflow changes).
 
 on:
   push:

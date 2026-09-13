@@ -58,7 +58,9 @@ commands.
 ## Post-CI — finalize the release notes (mandatory)
 
 CI's auto-generated notes are not the finished product. Once `release.yml` is
-green:
+green, the releasing agent must replace them with the matching changelog
+section before calling the release complete. Do not leave the auto-generated
+notes as the published release body:
 
 ```bash
 TAG=vX.Y.Z; VERSION=X.Y.Z
